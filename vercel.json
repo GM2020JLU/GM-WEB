@@ -1,6 +1,6 @@
 {
   "buildCommand": "PATH=.venv/bin:$PATH bun run build",
-  "installCommand": "python -m venv .venv && .venv/bin/python -m pip install --disable-pip-version-check fonttools brotli && bun install --frozen-lockfile",
+  "installCommand": "python -m venv .venv && .venv/bin/python -m pip install --disable-pip-version-check fonttools brotli && HUSKY=0 bun install --frozen-lockfile",
   "outputDirectory": "dist",
   "headers": [
     {
@@ -22,7 +22,12 @@
     },
     {
       "source": "/fonts/(.*)",
-      "headers": [{ "key": "Cache-Control", "value": "public, max-age=31536000, immutable" }]
+      "headers": [
+        {
+          "key": "Cache-Control",
+          "value": "public, max-age=3600, stale-while-revalidate=604800"
+        }
+      ]
     }
   ]
 }

@@ -21,6 +21,11 @@ GitHub 登录。
 PUBLIC_KEYSTATIC_STORAGE_KIND=github bun run dev
 ```
 
+在创建表单的 **Deployed site URL** 中填写 `https://goumin.work`，确保 GitHub App
+包含正式站回调：
+`https://goumin.work/api/keystatic/github/oauth/callback`。如果 App 已经创建，可在
+GitHub App 设置的 **Callback URL** 列表中补充该地址。
+
 引导会生成下列环境变量，它们只能写入本地 `.env` 和 Vercel，不得提交到
 Git：
 

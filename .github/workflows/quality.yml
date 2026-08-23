@@ -15,6 +15,9 @@ jobs:
   check:
     runs-on: ubuntu-latest
     timeout-minutes: 15
+    env:
+      SITE_URL: https://goumin.work
+      SITE_BASE: /
 
     steps:
       - name: Checkout

@@ -1,11 +1,11 @@
 [config.site]
 title = "Gou Min"
-description = "Gou Min 的个人站，记录嵌入式系统、Linux BSP、存储驱动与日常折腾。"
-pageTitle = "Gou Min｜嵌入式系统与技术笔记"
-pageDescription = "关于 Bootloader、Linux BSP、存储驱动、SoC Bring-up 与生活的中文个人站。"
+description = "Gou Min 的中文个人站，记录嵌入式系统、Linux、开发板、存储与生活。"
+pageTitle = "Gou Min｜嵌入式系统与个人笔记"
+pageDescription = "嵌入式系统工程师 Gou Min 的个人站，记录 Linux、驱动、开发板、存储和日常思考。"
 url = "https://goumin.work"
 repository = "https://github.com/GM2020JLU/GM-WEB"
-footerNote = "用 Astro 与 Navfolio 构建。"
+footerNote = "记录技术，也记录生活。"
 
 [config.theme]
 # 可用色盘：
@@ -121,7 +121,7 @@ comment = true
 [config.profile]
 name = "Gou Min"
 handle = "@GM2020JLU"
-role = "嵌入式系统工程师"
+role = "嵌入式系统 / Linux"
 email = "gouminjlu@gmail.com"
 website = "https://goumin.work/"
 github = "https://github.com/GM2020JLU"
@@ -151,18 +151,18 @@ href = "/about"
 
 [config.home.quote]
 text = [
-  "把复杂的问题拆开，",
-  "把关键的过程记下，",
-  "让技术与生活都留下可回看的痕迹。",
+  "把问题讲清楚，",
+  "把过程留下来，",
+  "让每次折腾都有回声。",
 ]
 
 [config.home.intro]
-title = "你好，我是"
+title = "我是"
 name = "Gou Min"
 body = [
-  "一名嵌入式系统工程师，关注 Bootloader、Linux BSP、存储驱动与 SoC Bring-up。",
-  "我喜欢沿着启动链路、寄存器和日志追问“为什么”，也喜欢把折腾过的设备和工具整理清楚。",
-  "这里不是华丽的简历页，而是一个持续更新的中文技术笔记本。",
+  "一名嵌入式系统工程师，主要和 Bootloader、Linux BSP、存储驱动以及 SoC Bring-up 打交道。",
+  "我习惯从启动日志、寄存器和源码一路追到问题根因，再把解决过程整理成可以复用的笔记。",
+  "这里记录技术实践、设备折腾和一些生活片段。希望每篇记录，都能在下次遇到类似问题时派上用场。",
 ]
 
 [config.home.latest]
@@ -175,44 +175,32 @@ dateArchiveBaseHref = ""
 
 [[config.home.navigation]]
 icon = "pen"
-title = "技术文章"
-subtitle = "嵌入式、Linux 与系统调试"
+title = "文章"
+subtitle = "技术问题与长期笔记"
 href = "/blog"
 
 [[config.home.navigation]]
 icon = "briefcase"
-title = "项目记录"
-subtitle = "实现过程、工程取舍与复盘"
+title = "项目"
+subtitle = "正在做的事与实现记录"
 href = "/projects"
 
 [[config.home.navigation]]
 icon = "sparkle"
-title = "随手记"
-subtitle = "代码、设备与日常片段"
+title = "随记"
+subtitle = "短小的观察与日常"
 href = "/vibe"
 
 [[config.home.navigation]]
 icon = "compass"
-title = "关于我"
-subtitle = "我在做什么，以及这个站为什么存在"
+title = "关于"
+subtitle = "了解我和这个站"
 href = "/about"
 
 [[config.home.links]]
 label = "GitHub"
 icon = "github"
 tooltip = "https://github.com/GM2020JLU"
-copy = false
-
-[[config.home.links]]
-label = "LinkedIn"
-icon = "linkedin"
-tooltip = "" # 留空会隐藏这个链接项。
-copy = false
-
-[[config.home.links]]
-label = "X"
-icon = "x"
-tooltip = "" # 留空会隐藏这个链接项。
 copy = false
 
 [[config.home.links]]
@@ -227,58 +215,22 @@ icon = "mail"
 tooltip = "gouminjlu@gmail.com"
 copy = true
 
-[[config.home.links]]
-label = "QQ"
-icon = "qq"
-tooltip = ""
-copy = true
-
-[[config.home.links]]
-label = "WeChat"
-icon = "wechat"
-tooltip = ""
-copy = true
-
-[[config.home.links]]
-label = "Weibo"
-icon = "weibo"
-tooltip = ""
-copy = false
-
-[[config.home.links]]
-label = "Xiaohongshu"
-icon = "xiaohongshu"
-tooltip = ""
-copy = false
-
-[[config.home.links]]
-label = "Zhihu"
-icon = "zhihu"
-tooltip = ""
-copy = false
-
-[[config.home.links]]
-label = "Bilibili"
-icon = "bilibili"
-tooltip = ""
-copy = false
-
 [[config.home.doing]]
-text = "梳理 Bootloader 与 Linux BSP 实践"
+text = "整理嵌入式与 Linux 调试笔记"
 mark = "01"
 
 [[config.home.doing]]
-text = "记录存储驱动和系统调试经验"
+text = "维护个人网站与写作后台"
 mark = "02"
 
 [[config.home.doing]]
-text = "折腾 RISC-V 开发板与家庭网络"
+text = "折腾开发板、存储与家庭网络"
 mark = "03"
 
 [[config.home.doing]]
-text = "重建这个更安静的中文个人站"
+text = "把解决过的问题写成可复用的记录"
 mark = "04"
 
 [[config.home.doing]]
-text = "整理值得长期留下的阅读与生活笔记"
+text = "给值得留下的生活片段留个位置"
 mark = "05"

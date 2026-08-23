@@ -111,7 +111,7 @@ for (const file of htmlFiles) {
 }
 
 const home = readFileSync(join(dist, 'index.html'), 'utf8');
-for (const marker of ['Gou Min', '嵌入式系统工程师', '技术文章', '项目记录', '随手记']) {
+for (const marker of ['Gou Min', '嵌入式系统工程师', '文章', '项目', '随记']) {
   if (!home.includes(marker)) fail(`首页缺少关键内容：${marker}`);
 }
 if (home.includes('data-navfolio-full-font-warmup')) fail('首页仍在预取完整中文字体');

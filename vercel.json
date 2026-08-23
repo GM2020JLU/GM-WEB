@@ -1,8 +1,21 @@
 {
   "buildCommand": "PATH=.venv/bin:$PATH bun run build",
   "installCommand": "python -m venv .venv && .venv/bin/python -m pip install --disable-pip-version-check fonttools brotli && HUSKY=0 bun install --frozen-lockfile",
-  "outputDirectory": "dist",
   "headers": [
+    {
+      "source": "/keystatic/(.*)",
+      "headers": [
+        { "key": "Cache-Control", "value": "private, no-store" },
+        { "key": "X-Robots-Tag", "value": "noindex, nofollow, noarchive" }
+      ]
+    },
+    {
+      "source": "/api/keystatic/(.*)",
+      "headers": [
+        { "key": "Cache-Control", "value": "private, no-store" },
+        { "key": "X-Robots-Tag", "value": "noindex, nofollow, noarchive" }
+      ]
+    },
     {
       "source": "/(.*)",
       "headers": [

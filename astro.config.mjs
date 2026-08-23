@@ -3,7 +3,10 @@
 import fs from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import mdx from '@astrojs/mdx';
+import react from '@astrojs/react';
 import sitemap from '@astrojs/sitemap';
+import vercel from '@astrojs/vercel';
+import keystatic from '@keystatic/astro';
 import { defineConfig } from 'astro/config';
 import { parse } from 'smol-toml';
 
@@ -66,11 +69,13 @@ const resolvedBase =
 export default defineConfig({
   site: resolvedSite,
   base: resolvedBase,
+  output: 'static',
+  adapter: vercel(),
   markdown: {
     remarkPlugins: astroPluginConfig.remarkPlugins,
     rehypePlugins: astroPluginConfig.rehypePlugins,
   },
-  integrations: [...astroPluginConfig.integrations, mdx(), sitemap()],
+  integrations: [...astroPluginConfig.integrations, react(), keystatic(), mdx(), sitemap()],
 
   vite: {
     plugins: [tailwindcss()],

@@ -1,7 +1,9 @@
 import { readFileSync, readdirSync, writeFileSync } from 'node:fs';
 import { extname, join } from 'node:path';
 
-const dist = join(process.cwd(), 'dist');
+import { getBuildOutputDirectory } from './build-output.mjs';
+
+const dist = getBuildOutputDirectory();
 const replacements = new Map([['aria-label="Close image preview"', 'aria-label="关闭图片预览"']]);
 
 function collectHtmlFiles(directory) {

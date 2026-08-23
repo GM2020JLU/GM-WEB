@@ -1,8 +1,12 @@
 import { existsSync, readFileSync, readdirSync, statSync } from 'node:fs';
 import { extname, join } from 'node:path';
 
+import { getBuildOutputDirectory } from './build-output.mjs';
+
 const root = process.cwd();
-const dist = join(root, 'dist');
+const dist = getBuildOutputDirectory(root);
+const vercelOutput = join(root, '.vercel', 'output');
+const vercelStatic = join(vercelOutput, 'static');
 const errors = [];
 
 function fail(message) {
@@ -113,6 +117,9 @@ for (const marker of ['Gou Min', '嵌入式系统工程师', '技术文章', '�
 if (home.includes('data-navfolio-full-font-warmup')) fail('首页仍在预取完整中文字体');
 if (home.includes('href="/media"')) fail('首页仍展示空的书影音入口');
 if (!home.includes('https://goumin.work/og-card.png')) fail('首页未使用自定义 OG 图');
+if (home.includes('keystatic-page') || home.includes('react-dom')) {
+  fail('公开首页意外加载了 Keystatic/React 后台资源');
+}
 
 const manifest = JSON.parse(readFileSync(join(dist, 'manifest.json'), 'utf8'));
 if (manifest.name !== 'Gou Min 的个人站') fail('Web App Manifest 名称不正确');
@@ -123,6 +130,35 @@ if (!sitemapIndex.includes('https://goumin.work/')) fail('Sitemap 未指向生�
 
 const rss = readFileSync(join(dist, 'rss.xml'), 'utf8');
 if (!rss.includes('我为什么重新做了个人站')) fail('RSS 缺少已发布文章');
+
+const robots = readFileSync(join(dist, 'robots.txt'), 'utf8');
+for (const route of ['/keystatic/', '/api/keystatic/']) {
+  if (!robots.includes(`Disallow: ${route}`)) fail(`robots.txt 未禁止索引 ${route}`);
+}
+
+const vercelRequiredFiles = [
+  'config.json',
+  'functions/_render.func/.vc-config.json',
+  'static/index.html',
+  'static/pagefind/pagefind.js',
+  'static/robots.txt',
+];
+for (const file of vercelRequiredFiles) {
+  if (!existsSync(join(vercelOutput, file))) fail(`Vercel 产物缺少：${file}`);
+}
+
+if (existsSync(join(vercelOutput, 'config.json'))) {
+  const vercelConfig = readFileSync(join(vercelOutput, 'config.json'), 'utf8');
+  for (const route of ['/keystatic', '/api/keystatic']) {
+    if (!vercelConfig.includes(route)) fail(`Vercel 未配置后台动态路由：${route}`);
+  }
+}
+
+if (existsSync(vercelStatic)) {
+  for (const removed of ['audio', 'images', 'fonts/ChillRoundM.ttf']) {
+    if (existsSync(join(vercelStatic, removed))) fail(`Vercel 产物仍包含已精简资源：${removed}`);
+  }
+}
 
 const sizeBudgets = [
   ['og-card.png', 200 * 1024],

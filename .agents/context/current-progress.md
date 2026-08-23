@@ -1,6 +1,6 @@
 # 当前进度
 
-最后核对：2026-07-26
+最后核对：2026-08-23
 证据：当前功能分支、当前 manifests、lockfile、source、deploy workflow 与上层
 生态地图。
 
@@ -23,6 +23,12 @@
 - 首页 dashboard、Blog archive/category/series/tag、搜索、评论、多语言 UI。
 - starter 与 docs/demo 双内容模式。
 - Friend Circle build-time sync、静态 JSON consumer 和字体子集联动。
+- 复用开源 Keystatic 的中文写作后台，已映射 Blog、Projects、Vibe 和
+  About 的现有 Markdown/MDX 字段。
+- 官方 Keystatic Reader、编辑器语义往返、本地 API 创建/二次保存/删除、
+  Astro 内容同步与 Vercel GitHub 模式构建验证。
+- 公开页继续静态预渲染，Keystatic/React 资源不会被首页加载；搜索、
+  中文化和资源精简产物会同步到 Vercel Build Output。
 
 ## 过渡中
 
@@ -34,6 +40,8 @@
 - GitHub dependencies 通过远端 commit 和 lockfile 集成，没有统一的 sibling
   workspace linking。
 - deploy 使用 docs submodule `--remote`，但本地可复现仍依赖正确提交 gitlink。
+- 线上 Keystatic 还需要仓库拥有者完成一次 GitHub App 创建/授权，并将生成的
+  4 个环境变量写入 Vercel；密钥不进入仓库。
 
 ## 已存在但未接入主站
 

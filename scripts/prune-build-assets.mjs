@@ -1,7 +1,9 @@
 import { existsSync, readdirSync, rmSync } from 'node:fs';
 import { join } from 'node:path';
 
-const dist = join(process.cwd(), 'dist');
+import { getBuildOutputDirectory } from './build-output.mjs';
+
+const dist = getBuildOutputDirectory();
 const unusedPaths = [
   'audio',
   'images',

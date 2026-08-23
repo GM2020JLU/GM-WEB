@@ -1,6 +1,6 @@
 # 当前设计与架构
 
-最后核对：2026-07-25  
+最后核对：2026-08-23
 证据：当前功能分支、`package.json`、`bun.lock`、当前源码、deploy workflow
 与上层生态地图。
 
@@ -70,6 +70,9 @@ collection、默认 navigation、scaffold 和 i18n contribution 都应消失。
 ## 内容、数据与部署
 
 - starter 内容：`src/content`
+- 写作后台：开源 Keystatic，通过官方 Astro/React 集成注入
+  `/keystatic` 和 `/api/keystatic`；本地直接读写文件，Vercel 使用 GitHub 模式
+- 内容文件仍是 Astro 直接消费的 Markdown/MDX，Keystatic 不成为公开页运行时依赖
 - docs/demo 内容：`src/docs` submodule，由
   `NAVFOLIO_CONTENT_SOURCE=docs` 选择
 - docs 发布：先推送 `astro-navfolio-docs`，再更新 gitlink 并运行 docs build
@@ -77,6 +80,8 @@ collection、默认 navigation、scaffold 和 i18n contribution 都应消失。
   subset consumer
 - WeRead：生态 producer 已存在，但主站无 dependency、workflow、route 或 component
   consumer
+- 公开页仍静态预渲染；Vercel adapter 只为 Keystatic 的两组后台路由打包
+  Node.js function。构建后处理会同步到 `.vercel/output/static`。
 
 ## 约束
 
@@ -84,4 +89,4 @@ collection、默认 navigation、scaffold 和 i18n contribution 都应消失。
 - package-owned route 不直接 import 主站私有路径，而通过 virtual runtime。
 - plugin 结构契约与 theme 视觉契约分离。
 - producer 与 consumer 通过可验证、隐私安全的数据契约连接。
-- 保持静态输出、无 secret 入库和 GitHub Pages 子路径兼容。
+- 保持公开页静态输出、无 secret 入库和 GitHub Pages 子路径兼容。

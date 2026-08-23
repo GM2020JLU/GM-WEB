@@ -1,47 +1,18 @@
 {
-  "name": "navfolio",
-  "short_name": "navfolio",
-  "description": "A personal navigation portfolio starter built with Astro.",
-  "start_url": ".",
+  "name": "Gou Min 的个人站",
+  "short_name": "Gou Min",
+  "description": "嵌入式系统、Linux BSP、存储驱动与日常折腾。",
+  "lang": "zh-CN",
+  "start_url": "/",
   "display": "standalone",
-  "background_color": "#ffffff",
-  "theme_color": "#ffffff",
+  "background_color": "#f7f8f4",
+  "theme_color": "#406b9b",
   "icons": [
     {
-      "src": "/android-icon-36x36.png",
-      "sizes": "36x36",
-      "type": "image/png",
-      "density": "0.75"
-    },
-    {
-      "src": "/android-icon-48x48.png",
-      "sizes": "48x48",
-      "type": "image/png",
-      "density": "1.0"
-    },
-    {
-      "src": "/android-icon-72x72.png",
-      "sizes": "72x72",
-      "type": "image/png",
-      "density": "1.5"
-    },
-    {
-      "src": "/android-icon-96x96.png",
-      "sizes": "96x96",
-      "type": "image/png",
-      "density": "2.0"
-    },
-    {
-      "src": "/android-icon-144x144.png",
-      "sizes": "144x144",
-      "type": "image/png",
-      "density": "3.0"
-    },
-    {
-      "src": "/android-icon-192x192.png",
+      "src": "/web-app-manifest-192x192.png",
       "sizes": "192x192",
       "type": "image/png",
-      "density": "4.0"
+      "purpose": "any"
     },
     {
       "src": "/web-app-manifest-512x512.png",

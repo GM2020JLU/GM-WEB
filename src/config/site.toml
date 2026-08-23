@@ -1,18 +1,18 @@
 [config.site]
-title = "navfolio"
-description = "A personal navigation portfolio starter built with Astro."
-pageTitle = "navfolio | Digital Publication Space"
-pageDescription = "A calm AI-native personal publication space for notes, links, and writing."
-url = "https://astro.navfolio.site"
-repository = "https://github.com/dodolalorc/astro-navfolio"
-footerNote = "Released as an open-source starter."
+title = "Gou Min"
+description = "Gou Min 的个人站，记录嵌入式系统、Linux BSP、存储驱动与日常折腾。"
+pageTitle = "Gou Min｜嵌入式系统与技术笔记"
+pageDescription = "关于 Bootloader、Linux BSP、存储驱动、SoC Bring-up 与生活的中文个人站。"
+url = "https://goumin.work"
+repository = "https://github.com/GM2020JLU/GM-WEB"
+footerNote = "用 Astro 与 Navfolio 构建。"
 
 [config.theme]
 # 可用色盘：
 # green-soft, green-vivid, rose-soft, pink-soft, purple-soft, blue-soft, orange-soft, brown-soft
-palette = "green-soft"
+palette = "blue-soft"
 # 原生 UI 语言。可用值：en、zh-CN、zh-TW。未知值会回退到 en。
-lang = "en"
+lang = "zh-CN"
 
 [config.fonts]
 # 英文与代码感 UI 字体
@@ -20,9 +20,10 @@ en = "Maple Mono"
 code = "Monaco"
 # 模板内可直接选择：ChillRoundM、LXGW WenKai
 # 中文阅读字体
-zh = "ChillRoundM"
-# 中文完整字体文件
-file = "/fonts/ChillRoundM.ttf"
+zh = "LXGW WenKai"
+# 浏览器使用的完整 WOFF2，以及构建子集时使用的 TTF 源文件。
+file = "/fonts/LXGWWenKai-Regular.woff2"
+source = "/fonts/LXGWWenKai-Regular.ttf"
 
 [config.code]
 lightTheme = "catppuccin-latte"
@@ -43,14 +44,14 @@ show_on_posts = true
 [config.search]
 enabled = true
 shortcut = "mod+k"
-placeholder = "Search notes..."
+placeholder = "搜索文章、项目和随记……"
 maxResults = 6
 
 [config.pages.blog]
-title = "Writing notes"
-kicker = "Notebook archive"
-subtitle = "Notes from the margins."
-note = "Field notes, drafts, and technical margins arranged for slow browsing."
+title = "文章"
+kicker = "技术笔记"
+subtitle = "把解决过的问题，写成下次还能用的经验。"
+note = "主要记录嵌入式系统、Linux、驱动开发与工程实践。"
 postsPerPage = 6
 # date-fns 使用的日期格式模板。
 dateFormat = "yyyy-MM-dd"
@@ -60,28 +61,28 @@ metadataSeparator = "icon"
 coverImageStyle = "mask"
 
 [config.pages.blog.categories]
-title = "Categories"
-kicker = "Browse notes"
+title = "分类"
+kicker = "按主题浏览"
 subtitle = ""
-note = "A quiet index of recurring topics, gathered from article frontmatter."
+note = "按技术方向整理的文章索引。"
 
 [config.pages.blog.series]
-title = "Series"
-kicker = "Reading paths"
+title = "系列"
+kicker = "按顺序阅读"
 subtitle = ""
-note = "Connected notes that can be followed in the order they were written."
+note = "把同一个问题的多篇记录连成完整路径。"
 
 [config.pages.projects]
-title = "Projects"
-kicker = "Project shelf"
-subtitle = "Small tools and site systems."
-note = "A compact shelf for implementation choices, releases, and publishing experiments."
+title = "项目"
+kicker = "工程记录"
+subtitle = "不只展示结果，也记下问题、取舍与实现。"
+note = "真实项目和个人折腾的长期归档。"
 
 [config.pages.vibe]
-title = "vibe"
-kicker = ""
-subtitle = "Life and coding fragments."
-note = "Not formal enough for blog posts, but still part of the story."
+title = "随记"
+kicker = "日常片段"
+subtitle = "不够长成文章，但值得留下的想法。"
+note = "关于代码、设备、阅读和生活的短记录。"
 showTrail = true
 
 [config.pages.media]
@@ -118,61 +119,54 @@ pageview = true
 comment = true
 
 [config.profile]
-name = "navfolio"
-handle = "@navfolio"
-role = "A Cat Developer"
-email = "hello@navfolio.site"
-website = "https://astro.navfolio.site/"
-github = "https://github.com/dodolalorc/astro-navfolio"
-avatar = "/images/logo-thin.webp"
+name = "Gou Min"
+handle = "@GM2020JLU"
+role = "嵌入式系统工程师"
+email = "gouminjlu@gmail.com"
+website = "https://goumin.work/"
+github = "https://github.com/GM2020JLU"
+avatar = "https://avatars.githubusercontent.com/u/66173922?v=4"
 
 [[config.topNav.links]]
-label = "Home"
+label = "首页"
 href = "/"
 
 [[config.topNav.links]]
-label = "Blog"
+label = "文章"
 href = "/blog"
 
 [[config.topNav.links]]
-label = "Projects"
+label = "项目"
 module = "projects"
 
 [[config.topNav.links]]
-label = "Vibe"
+label = "随记"
 module = "vibe"
 
 [[config.topNav.links]]
-label = "Media"
-module = "media"
-
-[[config.topNav.links]]
-label = "About"
+label = "关于"
 href = "/about"
 
 [config.home]
 
 [config.home.quote]
 text = [
-  "Navigate your world,",
-  "Showcase your story,",
-  "and keep everything in one place.",
+  "把复杂的问题拆开，",
+  "把关键的过程记下，",
+  "让技术与生活都留下可回看的痕迹。",
 ]
 
 [config.home.intro]
-title = "here is navfolio"
-name = "navfolio"
+title = "你好，我是"
+name = "Gou Min"
 body = [
-  "The name combines \"Navigation\" and \"Portfolio\".",
-  "Navfolio prioritizes lightweight organization, seamless reading, and developer-friendly aesthetics.",
-  "It’s less a resume than a personal OS for your ideas, projects, notes, and online presence.",
-  "这个名字融合了“导航”与“作品集”。",
-  "Navfolio 专注于轻量级组织、流畅的阅读体验，以及对开发者友好的美学设计。",
-  "它不像一份简历，更像是一个属于你自己的个人操作系统——承载想法、项目、笔记与网络足迹。",
+  "一名嵌入式系统工程师，关注 Bootloader、Linux BSP、存储驱动与 SoC Bring-up。",
+  "我喜欢沿着启动链路、寄存器和日志追问“为什么”，也喜欢把折腾过的设备和工具整理清楚。",
+  "这里不是华丽的简历页，而是一个持续更新的中文技术笔记本。",
 ]
 
 [config.home.latest]
-count = 1
+count = 2
 heatmapWeeks = 24
 showHeatmapLatest = true
 excludeDraft = true
@@ -180,39 +174,39 @@ startDate = ""
 dateArchiveBaseHref = ""
 
 [[config.home.navigation]]
-icon = "compass"
-title = "Portfolio"
-subtitle = "Selected work and case studies"
-href = "https://astro.navfolio.site/"
-
-[[config.home.navigation]]
 icon = "pen"
-title = "Blog"
-subtitle = "Essays, notes, and field reports"
+title = "技术文章"
+subtitle = "嵌入式、Linux 与系统调试"
 href = "/blog"
 
 [[config.home.navigation]]
 icon = "briefcase"
-title = "Resume"
-subtitle = "Career profile and experience"
-href = "https://github.com/dodolalorc/navfolio"
+title = "项目记录"
+subtitle = "实现过程、工程取舍与复盘"
+href = "/projects"
 
 [[config.home.navigation]]
-icon = "github"
-title = "Open Source"
-subtitle = "Code, experiments, and tools"
-href = "https://github.com/dodolalorc/astro-navfolio"
+icon = "sparkle"
+title = "随手记"
+subtitle = "代码、设备与日常片段"
+href = "/vibe"
+
+[[config.home.navigation]]
+icon = "compass"
+title = "关于我"
+subtitle = "我在做什么，以及这个站为什么存在"
+href = "/about"
 
 [[config.home.links]]
 label = "GitHub"
 icon = "github"
-tooltip = "https://github.com/dodolalorc/astro-navfolio"
+tooltip = "https://github.com/GM2020JLU"
 copy = false
 
 [[config.home.links]]
 label = "LinkedIn"
 icon = "linkedin"
-tooltip = "https://www.linkedin.com/"
+tooltip = "" # 留空会隐藏这个链接项。
 copy = false
 
 [[config.home.links]]
@@ -230,61 +224,61 @@ copy = false
 [[config.home.links]]
 label = "Email"
 icon = "mail"
-tooltip = "hello@navfolio.site"
+tooltip = "gouminjlu@gmail.com"
 copy = true
 
 [[config.home.links]]
 label = "QQ"
 icon = "qq"
-tooltip = "123456789"
+tooltip = ""
 copy = true
 
 [[config.home.links]]
 label = "WeChat"
 icon = "wechat"
-tooltip = "navfolio"
+tooltip = ""
 copy = true
 
 [[config.home.links]]
 label = "Weibo"
 icon = "weibo"
-tooltip = "https://weibo.com/"
+tooltip = ""
 copy = false
 
 [[config.home.links]]
 label = "Xiaohongshu"
 icon = "xiaohongshu"
-tooltip = "https://www.xiaohongshu.com/"
+tooltip = ""
 copy = false
 
 [[config.home.links]]
 label = "Zhihu"
 icon = "zhihu"
-tooltip = "https://www.zhihu.com/"
+tooltip = ""
 copy = false
 
 [[config.home.links]]
 label = "Bilibili"
 icon = "bilibili"
-tooltip = "https://www.bilibili.com/"
+tooltip = ""
 copy = false
 
 [[config.home.doing]]
-text = "Shipping a personal dashboard template"
+text = "梳理 Bootloader 与 Linux BSP 实践"
 mark = "01"
 
 [[config.home.doing]]
-text = "Writing reusable notes for future projects"
+text = "记录存储驱动和系统调试经验"
 mark = "02"
 
 [[config.home.doing]]
-text = "Improving static-site publishing workflow"
+text = "折腾 RISC-V 开发板与家庭网络"
 mark = "03"
 
 [[config.home.doing]]
-text = "Collecting useful developer resources"
+text = "重建这个更安静的中文个人站"
 mark = "04"
 
 [[config.home.doing]]
-text = "Exploring small open-source ideas"
+text = "整理值得长期留下的阅读与生活笔记"
 mark = "05"

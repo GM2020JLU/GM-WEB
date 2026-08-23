@@ -64,7 +64,7 @@ const shouldShowTocAction = showTocIcon && tocItems.length > 0;
   <button
     class="mobile-menu-toggle"
     type="button"
-    aria-label="Open navigation menu"
+    aria-label="打开导航菜单"
     aria-expanded="false"
     aria-controls="mobile-nav-menu"
     data-mobile-menu-toggle
@@ -72,7 +72,7 @@ const shouldShowTocAction = showTocIcon && tocItems.length > 0;
     <Menu size={18} stroke-width={2} />
   </button>
 
-  <a class="brand" href={withBase('/')} aria-label={`Go to ${site.title} home`}>
+  <a class="brand" href={withBase('/')} aria-label={`返回 ${site.title} 首页`}>
     <span class="brand-mark" aria-hidden="true"></span>
     <span class="brand-title">
       <span>{site.title}</span>
@@ -80,15 +80,11 @@ const shouldShowTocAction = showTocIcon && tocItems.length > 0;
     </span>
   </a>
 
-  <nav class="nav-links" aria-label="Article navigation">
+  <nav class="nav-links" aria-label="文章导航">
     {
       links.map((link) =>
         link.disabled ? (
-          <span
-            class="nav-link nav-link-placeholder"
-            aria-disabled="true"
-            title="Projects content placeholder"
-          >
+          <span class="nav-link nav-link-placeholder" aria-disabled="true" title="内容尚未发布">
             {link.label}
           </span>
         ) : (
@@ -100,12 +96,7 @@ const shouldShowTocAction = showTocIcon && tocItems.length > 0;
     }
   </nav>
 
-  <nav
-    class="mobile-menu-panel"
-    id="mobile-nav-menu"
-    aria-label="Mobile navigation"
-    data-mobile-menu
-  >
+  <nav class="mobile-menu-panel" id="mobile-nav-menu" aria-label="移动端导航" data-mobile-menu>
     {
       links.map((link) =>
         link.disabled ? (
@@ -125,17 +116,17 @@ const shouldShowTocAction = showTocIcon && tocItems.length > 0;
     }
   </nav>
 
-  <div class="nav-actions" aria-label="Page actions">
+  <div class="nav-actions" aria-label="页面操作">
     <a
       href={site.repository}
       target="_blank"
       rel="noreferrer"
-      aria-label="Open GitHub repository"
+      aria-label="打开 GitHub 仓库"
       title="GitHub"
     >
       <Github size={17} stroke-width={2} />
     </a>
-    <button type="button" data-theme-toggle aria-label="Switch theme">
+    <button type="button" data-theme-toggle aria-label="切换明暗主题">
       <Moon class="theme-icon-moon" size={17} stroke-width={2} />
       <Sun class="theme-icon-sun" size={17} stroke-width={2} />
     </button>
@@ -292,18 +283,15 @@ const shouldShowTocAction = showTocIcon && tocItems.length > 0;
         const setMenuOpen = (open: boolean) => {
           header.dataset.mobileMenuOpen = open ? 'true' : 'false';
           toggle.setAttribute('aria-expanded', String(open));
-          toggle.setAttribute(
-            'aria-label',
-            open ? 'Close navigation menu' : 'Open navigation menu',
-          );
+          toggle.setAttribute('aria-label', open ? '关闭导航菜单' : '打开导航菜单');
         };
         const setTocOpen = (open: boolean) => {
           if (!tocTrigger || !tocMenu) {
             return;
           }
 
-          const tocOpenLabel = header.dataset.tocOpenLabel ?? 'Open table of contents';
-          const tocCloseLabel = header.dataset.tocCloseLabel ?? 'Close table of contents';
+          const tocOpenLabel = header.dataset.tocOpenLabel ?? '打开目录';
+          const tocCloseLabel = header.dataset.tocCloseLabel ?? '关闭目录';
 
           header.dataset.mobileTocOpen = open ? 'true' : 'false';
           tocTrigger.setAttribute('aria-expanded', String(open));

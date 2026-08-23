@@ -27,18 +27,18 @@ const ZOOMABLE_TARGET_SELECTOR = '[data-zoomable-image-target]';
 const ZOOMABLE_GALLERY_SELECTOR = '[data-zoomable-gallery], astro-carousel';
 
 const LIGHTBOX_MARKUP = `
-  <button class="zoomable-image-lightbox__close" type="button" aria-label="Close image preview" data-zoomable-lightbox-close>
+  <button class="zoomable-image-lightbox__close" type="button" aria-label="关闭图片预览" data-zoomable-lightbox-close>
     <svg aria-hidden="true" viewBox="0 0 24 24" width="22" height="22">
       <path d="M18 6 6 18M6 6l12 12" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8"></path>
     </svg>
   </button>
-  <button class="zoomable-image-lightbox__nav zoomable-image-lightbox__nav--prev" type="button" aria-label="Previous image" data-zoomable-lightbox-prev hidden>
+  <button class="zoomable-image-lightbox__nav zoomable-image-lightbox__nav--prev" type="button" aria-label="上一张图片" data-zoomable-lightbox-prev hidden>
     <svg aria-hidden="true" viewBox="0 0 24 24" width="24" height="24">
       <path d="m15 18-6-6 6-6" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8"></path>
     </svg>
   </button>
   <img class="zoomable-image-lightbox__image" alt="" draggable="false" data-zoomable-lightbox-image />
-  <button class="zoomable-image-lightbox__nav zoomable-image-lightbox__nav--next" type="button" aria-label="Next image" data-zoomable-lightbox-next hidden>
+  <button class="zoomable-image-lightbox__nav zoomable-image-lightbox__nav--next" type="button" aria-label="下一张图片" data-zoomable-lightbox-next hidden>
     <svg aria-hidden="true" viewBox="0 0 24 24" width="24" height="24">
       <path d="m9 18 6-6-6-6" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8"></path>
     </svg>

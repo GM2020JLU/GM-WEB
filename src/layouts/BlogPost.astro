@@ -7,7 +7,6 @@ import FormattedDate from '../components/FormattedDate.astro';
 import ScrollToTopButton from '../components/ScrollToTopButton.astro';
 import SmartImage from '../components/SmartImage.astro';
 import BlogTopNav from '../components/blog/BlogTopNav.astro';
-import MermaidRenderer from '@navfolio/mdx-components/MermaidRenderer.astro';
 import { getSiteConfig } from '../data/site';
 import { getHtmlLang } from '../utils/ui-text';
 
@@ -36,6 +35,5 @@ const htmlLang = getHtmlLang(siteConfig);
   <Fragment slot="after-content">
     <ScrollToTopButton />
     <Footer />
-    <MermaidRenderer />
   </Fragment>
 </ThemeBlogPost>

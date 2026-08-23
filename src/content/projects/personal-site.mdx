@@ -1,0 +1,41 @@
+---
+title: '个人站重建'
+description: '用 Astro 和 Navfolio 重建一个中文优先、内容优先的个人站。'
+date: '2026-08-23T00:00:00+08:00'
+draft: false
+sticky: true
+showHeroImage: false
+icon: globe-2
+iconColor: var(--paper-accent)
+authors:
+  - name: 'Gou Min'
+    url: 'https://github.com/GM2020JLU'
+links:
+  - label: '在线站点'
+    href: 'https://goumin.work'
+    kind: website
+  - label: 'GitHub'
+    href: 'https://github.com/GM2020JLU/GM-WEB'
+    kind: github
+tags:
+  - Astro
+  - Navfolio
+comments: false
+sidebar:
+  enable: false
+  toc: false
+  relatedPosts: false
+---
+
+这个项目是对旧个人站的一次减法重建。它不再把后台、数据库和大量交互组件当作主角，而是围绕“好好写东西”来组织。
+
+## 当前方案
+
+- Astro 生成静态页面，Vercel 负责托管。
+- Navfolio 提供首页、博客、项目、随记、书影音和搜索骨架。
+- Markdown / MDX 作为内容源，与代码一起版本管理。
+- 站点以简体中文为默认语言，文案、导航、搜索和日期显示都优先服务中文阅读。
+
+## 项目边界
+
+旧站会作为归档保留，新站在独立目录中开发和预览。只有当新版内容、构建和路由都验证通过后，才会切换 `goumin.work` 的部署。

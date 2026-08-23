@@ -14,6 +14,7 @@ type FontConfig = {
   en: string;
   zh: string;
   file: string;
+  source: string;
 };
 
 const projectRoot = process.cwd();
@@ -22,7 +23,7 @@ const friendCirclePath = join(projectRoot, 'public/friend-circle.json');
 const fontConfig = readFontConfig();
 const subsetFontUrl = getSubsetFontUrl(fontConfig.file);
 const outputFontPath = resolveProjectPath(subsetFontUrl);
-const sourceFontPath = resolveProjectPath(fontConfig.file);
+const sourceFontPath = resolveProjectPath(fontConfig.source);
 const subsetFontName = `${fontConfig.zh} UI Subset`;
 const isWindows = process.platform === 'win32';
 const venvBinDir = isWindows ? 'Scripts' : 'bin';
@@ -70,6 +71,7 @@ const contentFrontmatterDirs = [
   ...(mediaModuleEnabled ? [`${contentRoot}/media`] : []),
 ];
 const lightweightContentDirs = [
+  `${contentRoot}/blog`,
   ...(vibeModuleEnabled ? [`${contentRoot}/vibe`] : []),
   ...(mediaModuleEnabled ? [`${contentRoot}/media`] : []),
 ];
@@ -100,6 +102,7 @@ function readFontConfig(): FontConfig {
     en: 'Maple Mono',
     zh: 'ChillRoundM',
     file: '/fonts/ChillRoundM.ttf',
+    source: '/fonts/ChillRoundM.ttf',
   };
   const siteConfigPath = join(projectRoot, 'src/config/site.toml');
 
@@ -116,6 +119,7 @@ function readFontConfig(): FontConfig {
     en: normalizeConfigString(fonts.en, defaults.en),
     zh: normalizeConfigString(fonts.zh, defaults.zh),
     file: normalizeConfigString(fonts.file, defaults.file),
+    source: normalizeConfigString(fonts.source, normalizeConfigString(fonts.file, defaults.file)),
   };
 }
 

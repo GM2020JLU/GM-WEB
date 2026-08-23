@@ -14,16 +14,16 @@ const { date, readingTime, tags } = Astro.props;
 <aside class="article-info blog-card">
   <dl>
     <div>
-      <dt>Reading time</dt>
+      <dt>阅读时间</dt>
       <dd>{readingTime}</dd>
     </div>
     <div>
-      <dt>Created</dt>
+      <dt>发布日期</dt>
       <dd><FormattedDate date={date} /></dd>
     </div>
   </dl>
 
-  <div class="tags" aria-label="Article tags">
+  <div class="tags" aria-label="文章标签">
     {tags.map((tag) => <span>{tag}</span>)}
   </div>
 </aside>

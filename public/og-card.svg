@@ -1,0 +1,19 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="630" viewBox="0 0 1200 630">
+  <defs>
+    <linearGradient id="paper" x1="0" y1="0" x2="1" y2="1">
+      <stop stop-color="#fdfdf9" />
+      <stop offset="1" stop-color="#edf2f8" />
+    </linearGradient>
+    <pattern id="rule" width="32" height="32" patternUnits="userSpaceOnUse">
+      <path d="M0 31.5h32" stroke="#3f587d" stroke-opacity=".06" />
+    </pattern>
+  </defs>
+  <rect width="1200" height="630" fill="url(#paper)" />
+  <rect width="1200" height="630" fill="url(#rule)" />
+  <rect x="84" y="74" width="88" height="88" rx="22" fill="#637da3" />
+  <text x="128" y="134" fill="#fdfdf9" font-family="Maple Mono, monospace" font-size="38" font-weight="700" text-anchor="middle">GM</text>
+  <text x="84" y="286" fill="#272d28" font-family="LXGW WenKai, Noto Sans CJK SC, sans-serif" font-size="82">Gou Min</text>
+  <text x="88" y="370" fill="#405b80" font-family="LXGW WenKai, Noto Sans CJK SC, sans-serif" font-size="38">嵌入式系统 · Linux BSP · 存储驱动</text>
+  <text x="88" y="454" fill="#667066" font-family="LXGW WenKai, Noto Sans CJK SC, sans-serif" font-size="28">把复杂的问题拆开，把关键的过程记下。</text>
+  <text x="88" y="548" fill="#637da3" font-family="Maple Mono, monospace" font-size="22">goumin.work</text>
+</svg>

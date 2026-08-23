@@ -1,0 +1,86 @@
+---
+import { X } from 'lucide-astro';
+---
+
+<dialog class="zoom-dialog" data-zoom-dialog>
+  <button type="button" aria-label="关闭图片预览" data-close>
+    <X size={20} />
+  </button>
+  <img alt="" data-image />
+</dialog>
+
+<script>
+  const initializeZoomDialog = () => {
+    const dialog = document.querySelector<HTMLDialogElement>('[data-zoom-dialog]');
+    if (!dialog || dialog.dataset.ready === 'true') return;
+
+    dialog.dataset.ready = 'true';
+    const preview = dialog.querySelector<HTMLImageElement>('[data-image]');
+
+    document.querySelectorAll<HTMLElement>('[data-navfolio-zoomable]').forEach((item) => {
+      item.addEventListener('click', () => {
+        const source = item.querySelector('img');
+        if (!source || !preview) return;
+
+        preview.src = source.currentSrc || source.src;
+        preview.alt = source.alt;
+        dialog.showModal();
+      });
+    });
+
+    dialog.querySelector('[data-close]')?.addEventListener('click', () => dialog.close());
+    dialog.addEventListener('click', (event) => {
+      if (event.target === dialog) dialog.close();
+    });
+  };
+
+  document.addEventListener('astro:page-load', initializeZoomDialog);
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', initializeZoomDialog, { once: true });
+  } else {
+    initializeZoomDialog();
+  }
+</script>
+
+<style>
+  .zoom-dialog {
+    width: 100%;
+    max-width: none;
+    height: 100%;
+    max-height: none;
+    padding: 28px;
+    border: 0;
+    background: color-mix(in srgb, var(--paper-ink) 74%, transparent);
+  }
+
+  .zoom-dialog[open] {
+    display: grid;
+    place-items: center;
+  }
+
+  .zoom-dialog img {
+    max-width: min(100%, 1180px);
+    max-height: 86vh;
+    object-fit: contain;
+  }
+
+  .zoom-dialog button {
+    position: fixed;
+    top: 18px;
+    right: 18px;
+    display: grid;
+    width: 40px;
+    height: 40px;
+    place-items: center;
+    border: 1px solid var(--paper-line);
+    border-radius: 999px;
+    background: var(--paper-surface);
+    color: var(--paper-ink);
+    cursor: pointer;
+  }
+
+  .zoom-dialog button:focus-visible {
+    outline: 2px solid var(--paper-accent);
+    outline-offset: 3px;
+  }
+</style>

@@ -1,8 +1,65 @@
 ---
-import ThemeFooter from '@navfolio/theme-default/components/Footer.astro';
+import { Compass, Github, Mail } from 'lucide-astro';
 import { getSiteConfig } from '../data/site';
 
 const { profile, site } = await getSiteConfig();
+const year = new Date().getFullYear();
 ---
 
-<ThemeFooter site={site} profile={profile} />
+<footer>
+  <p>&copy; {year} {site.title}。{site.footerNote}</p>
+  <div class="social-links" aria-label="联系方式">
+    <a href={profile.website} target="_blank" rel="noreferrer">
+      <span class="sr-only">打开个人站</span>
+      <Compass size={18} stroke-width={1.9} aria-hidden="true" focusable="false" />
+    </a>
+    <a href={profile.github} target="_blank" rel="noreferrer">
+      <span class="sr-only">打开 GitHub 主页</span>
+      <Github size={18} stroke-width={1.9} aria-hidden="true" focusable="false" />
+    </a>
+    <a href={`mailto:${profile.email}`}>
+      <span class="sr-only">发送邮件</span>
+      <Mail size={18} stroke-width={1.9} aria-hidden="true" focusable="false" />
+    </a>
+  </div>
+</footer>
+
+<style>
+  footer {
+    padding: 3em 1em 6em;
+    color: var(--paper-ink-faint);
+    font-size: 0.88rem;
+    text-align: center;
+  }
+
+  p {
+    margin: 0;
+  }
+
+  .social-links {
+    display: flex;
+    justify-content: center;
+    gap: 1em;
+    margin-top: 1em;
+  }
+
+  .social-links a {
+    display: inline-grid;
+    place-items: center;
+    width: 40px;
+    height: 40px;
+    color: var(--paper-ink-soft);
+    text-decoration: none;
+  }
+
+  .social-links a:hover,
+  .social-links a:focus-visible {
+    color: var(--paper-accent);
+  }
+
+  .social-links a:focus-visible {
+    outline: 2px solid var(--paper-accent);
+    outline-offset: 3px;
+    border-radius: 8px;
+  }
+</style>

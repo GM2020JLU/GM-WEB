@@ -12,16 +12,16 @@ function withBase(href: string) {
 }
 ---
 
-<BaseLayout title="404 Not Found" description="这页暂时没有找到，可能已经迁移或还没有写下。">
+<BaseLayout title="页面未找到｜Gou Min" description="这页暂时没有找到，可能已经迁移或还没有写下。">
   <div class="publication-bg" aria-hidden="true"></div>
   <main class="not-found-shell" aria-labelledby="not-found-title">
     <section class="not-found-panel">
-      <p class="not-found-kicker">404 Not Found</p>
+      <p class="not-found-kicker">错误 404</p>
       <h1 id="not-found-title">这页还没有落在纸上</h1>
       <p class="not-found-copy">
         也许链接换了位置，也许这只是一次走岔的小路。先回到熟悉的入口，继续慢慢翻。
       </p>
-      <nav class="not-found-actions" aria-label="404 page links">
+      <nav class="not-found-actions" aria-label="404 页面导航">
         <a class="primary-link" href={withBase('/')}>回到首页</a>
         <a href={withBase('/blog')}>去博客</a>
       </nav>

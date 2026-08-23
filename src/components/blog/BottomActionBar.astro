@@ -3,18 +3,18 @@ import { Heart, Link2, Share2, ThumbsDown } from 'lucide-astro';
 import '@navfolio/theme-default/styles/blog-bottom-action-bar.css';
 ---
 
-<div class="bottom-action-bar" aria-label="Article feedback actions">
-  <span>Was this helpful?</span>
-  <button type="button" aria-label="Like article">
+<div class="bottom-action-bar" aria-label="文章反馈">
+  <span>这篇文章有帮助吗？</span>
+  <button type="button" aria-label="赞同这篇文章">
     <Heart size={17} />
   </button>
-  <button type="button" aria-label="Dislike article">
+  <button type="button" aria-label="不赞同这篇文章">
     <ThumbsDown size={17} />
   </button>
-  <button type="button" aria-label="Share article">
+  <button type="button" aria-label="分享文章">
     <Share2 size={17} />
   </button>
-  <button type="button" aria-label="Copy article link">
+  <button type="button" aria-label="复制文章链接">
     <Link2 size={17} />
   </button>
 </div>

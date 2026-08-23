@@ -2,7 +2,6 @@
 import ThemeBaseLayout from '@navfolio/theme-default/components/BaseLayout.astro';
 import BaseHead from '../components/BaseHead.astro';
 import BlogTopNav from '../components/blog/BlogTopNav.astro';
-import FullFontWarmup from '../components/FullFontWarmup.astro';
 import ScrollToTopButton from '../components/ScrollToTopButton.astro';
 import { getSiteConfig } from '../data/site';
 import { getHtmlLang } from '../utils/ui-text';
@@ -28,6 +27,5 @@ const htmlLang = getHtmlLang(siteConfig);
   <slot />
   <Fragment slot="after-content">
     <ScrollToTopButton />
-    <FullFontWarmup />
   </Fragment>
 </ThemeBaseLayout>

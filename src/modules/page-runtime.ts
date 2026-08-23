@@ -1,4 +1,4 @@
-import vibeFlightIconUrl from '../assets/icons/flight.svg?url';
+import vibeFlightIconUrl from '../assets/icons/flight-compact.svg?url';
 
 export { default as BaseHead } from '../components/BaseHead.astro';
 export { default as Footer } from '../components/Footer.astro';

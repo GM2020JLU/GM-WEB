@@ -5,7 +5,7 @@ const { links } = Astro.props as { links: ConnectLink[] };
 ---
 
 <article class="connect-card" data-connect-card>
-  <div class="connect-list" aria-label="Connect links">
+  <div class="connect-list" aria-label="联系方式">
     {links.map((item) => <ConnectIcon item={item} />)}
   </div>
 </article>
@@ -56,9 +56,9 @@ const { links } = Astro.props as { links: ConnectLink[] };
       }
 
       await navigator.clipboard.writeText(value);
-      setCopyState(button, 'Copied');
+      setCopyState(button, '已复制');
     } catch {
-      setCopyState(button, 'Copy failed');
+      setCopyState(button, '复制失败');
     }
 
     const timeoutId = window.setTimeout(() => resetCopyState(button, originalTooltip), resetDelay);

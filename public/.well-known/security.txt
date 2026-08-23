@@ -1,0 +1,4 @@
+Contact: mailto:gouminjlu@gmail.com
+Preferred-Languages: zh-CN, en
+Canonical: https://goumin.work/.well-known/security.txt
+Expires: 2027-08-23T00:00:00.000Z

@@ -1,0 +1,19 @@
+.agents/
+.github/
+.venv/
+dist/
+node_modules/
+src/docs/
+
+# Navfolio demo-only assets are kept in Git for upstream documentation builds,
+# but are not needed by the personal production site.
+public/audio/
+public/images/
+public/fonts/ChillRoundM.ttf
+public/android-icon-*.png
+public/apple-icon-*.png
+public/apple-icon.png
+public/ms-icon-*.png
+public/browserconfig.xml
+public/site.webmanifest
+public/favicon-96x96.png

@@ -111,13 +111,19 @@ export function resolveTopNavLinks(
 
 export function getRouteLabels(): Record<string, string> {
   const routeLabels: Record<string, string> = {
-    '/blog': 'blog',
-    '/archive': 'archive',
-    '/about': 'about',
+    '/blog': '文章',
+    '/archive': '归档',
+    '/about': '关于',
+  };
+
+  const moduleLabels: Record<string, string> = {
+    projects: '项目',
+    vibe: '随记',
+    media: '书影音',
   };
 
   for (const module of getResolvedPageModules(navfolioConfig)) {
-    routeLabels[module.route] = module.id;
+    routeLabels[module.route] = moduleLabels[module.id] ?? module.id;
   }
 
   return routeLabels;

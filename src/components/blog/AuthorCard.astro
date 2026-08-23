@@ -6,16 +6,16 @@ const { profile } = await getSiteConfig();
 ---
 
 <aside class="author-card blog-card">
-  <img src={profile.avatar} alt={`${profile.name} avatar`} />
+  <img src={profile.avatar} alt={`${profile.name} 的头像`} />
   <h2>{profile.name}</h2>
   <p>{profile.handle}</p>
   <span>{profile.role}</span>
 
-  <div class="social-links" aria-label="Author links">
+  <div class="social-links" aria-label="作者链接">
     <a href={profile.github} aria-label="GitHub">
       <Github size={16} />
     </a>
-    <a href={`mailto:${profile.email}`} aria-label="Email">
+    <a href={`mailto:${profile.email}`} aria-label="邮件">
       <Mail size={16} />
     </a>
     <a href="/rss.xml" aria-label="RSS">

@@ -18,7 +18,7 @@ GitHub 登录。
 `/keystatic` 按官方引导创建 GitHub App：
 
 ```bash
-KEYSTATIC_STORAGE_KIND=github bun run dev
+PUBLIC_KEYSTATIC_STORAGE_KIND=github bun run dev
 ```
 
 引导会生成下列环境变量，它们只能写入本地 `.env` 和 Vercel，不得提交到

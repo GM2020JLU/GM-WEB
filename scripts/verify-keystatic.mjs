@@ -12,6 +12,11 @@ const root = process.cwd();
 const decoder = new TextDecoder('utf-8', { fatal: true });
 const encoder = new TextEncoder();
 const reader = createReader(root, keystaticConfig);
+const configSource = readFileSync(join(root, 'keystatic.config.ts'), 'utf8');
+assert(
+  !/\bprocess\.env\b/.test(configSource),
+  'keystatic.config.ts 会在浏览器端运行，不得使用 process.env',
+);
 const browserCoreUrl = pathToFileURL(
   join(root, 'node_modules', '@keystatic', 'core', 'dist', 'keystatic-core.js'),
 ).href;
@@ -100,9 +105,8 @@ entriesChecked += 1;
 
 assert.equal(
   keystaticConfig.storage.kind,
-  process.env.KEYSTATIC_STORAGE_KIND === 'github' ||
-    (process.env.KEYSTATIC_STORAGE_KIND !== 'local' &&
-      (process.env.VERCEL === '1' || process.env.NODE_ENV === 'production'))
+  import.meta.env.PUBLIC_KEYSTATIC_STORAGE_KIND === 'github' ||
+    (import.meta.env.PUBLIC_KEYSTATIC_STORAGE_KIND !== 'local' && import.meta.env.PROD)
     ? 'github'
     : 'local',
 );

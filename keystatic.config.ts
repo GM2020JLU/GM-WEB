@@ -7,11 +7,9 @@ const repository = {
   name: 'GM-WEB',
 } as const;
 
-const requestedStorage = process.env.KEYSTATIC_STORAGE_KIND;
+const requestedStorage = import.meta.env.PUBLIC_KEYSTATIC_STORAGE_KIND;
 const isGitHubStorage =
-  requestedStorage === 'github' ||
-  (requestedStorage !== 'local' &&
-    (process.env.VERCEL === '1' || process.env.NODE_ENV === 'production'));
+  requestedStorage === 'github' || (requestedStorage !== 'local' && import.meta.env.PROD);
 
 const editorOptions = {
   image: {

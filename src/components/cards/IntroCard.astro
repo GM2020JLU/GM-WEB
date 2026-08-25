@@ -21,10 +21,10 @@ const { intro, quote } = Astro.props as { intro: Intro; quote?: Quote };
         </div>
       )
     }
-    <h2>
+    <h1>
       <span aria-hidden="true">你好，</span>
       {intro.title.replace(intro.name, '')}<em>{intro.name}</em>
-    </h2>
+    </h1>
     {
       quote && (
         <blockquote>
@@ -72,7 +72,7 @@ const { intro, quote } = Astro.props as { intro: Intro; quote?: Quote };
     line-height: 0.7;
   }
 
-  h2 {
+  h1 {
     margin: 0 0 18px;
     color: var(--paper-ink);
     max-width: none;
@@ -81,13 +81,13 @@ const { intro, quote } = Astro.props as { intro: Intro; quote?: Quote };
     white-space: nowrap;
   }
 
-  h2 span {
+  h1 span {
     margin-right: 0.35rem;
     color: var(--paper-accent);
     font-style: normal;
   }
 
-  h2 em {
+  h1 em {
     color: var(--paper-accent);
     font-style: italic;
   }
@@ -128,7 +128,7 @@ const { intro, quote } = Astro.props as { intro: Intro; quote?: Quote };
       padding: 0;
     }
 
-    h2 {
+    h1 {
       font-size: 1.7rem;
       white-space: normal;
     }

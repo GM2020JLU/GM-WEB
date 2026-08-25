@@ -25,7 +25,7 @@ const { profile } = Astro.props as { profile: Profile };
   </div>
 
   <div class="profile-heading">
-    <h1>{profile.name}</h1>
+    <h2>{profile.name}</h2>
     <p>{profile.handle}</p>
     <span><Icon name="sparkle" /> {profile.role}</span>
   </div>
@@ -60,7 +60,7 @@ const { profile } = Astro.props as { profile: Profile };
     border-radius: inherit;
   }
 
-  .profile-heading h1 {
+  .profile-heading h2 {
     margin: 0;
     color: var(--paper-ink);
     font-size: 1.42rem;

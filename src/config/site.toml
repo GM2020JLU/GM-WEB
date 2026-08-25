@@ -216,21 +216,16 @@ tooltip = "gouminjlu@gmail.com"
 copy = true
 
 [[config.home.doing]]
-text = "整理嵌入式与 Linux 调试笔记"
-mark = "01"
+text = "重建个人站：内容、性能与写作体验"
+mark = "进行中"
+href = "/projects/personal-site"
 
 [[config.home.doing]]
-text = "维护个人网站与写作后台"
-mark = "02"
+text = "记录为什么重新做了个人站"
+mark = "08.23"
+href = "/blog/rebuild-personal-site"
 
 [[config.home.doing]]
-text = "折腾开发板、存储与家庭网络"
-mark = "03"
-
-[[config.home.doing]]
-text = "把解决过的问题写成可复用的记录"
-mark = "04"
-
-[[config.home.doing]]
-text = "给值得留下的生活片段留个位置"
-mark = "05"
+text = "整理嵌入式 Linux 与存储调试笔记"
+mark = "写作中"
+href = "/blog"

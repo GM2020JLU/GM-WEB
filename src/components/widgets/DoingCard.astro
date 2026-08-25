@@ -6,22 +6,38 @@ import { getUiText } from '../../utils/ui-text';
 interface DoingItem {
   text: string;
   mark: string;
+  href?: string;
 }
 
 const { items } = Astro.props as { items: DoingItem[] };
 const ui = getUiText(await getSiteConfig());
+const basePath = import.meta.env.BASE_URL.replace(/\/$/, '');
+
+function withBase(href: string) {
+  if (href.startsWith('http') || href.startsWith('mailto:') || href.startsWith('#')) {
+    return href;
+  }
+
+  if (href === '/') return `${basePath}/` || '/';
+
+  return `${basePath}${href.startsWith('/') ? href : `/${href}`}`;
+}
 ---
 
 <article class="glass-card doing-card">
   <h2><Icon name="calendar" /> {ui.doing.recently}</h2>
   <ul>
     {
-      items.map((item) => (
-        <li>
-          <span>{item.text}</span>
-          <strong aria-hidden="true">{item.mark}</strong>
-        </li>
-      ))
+      items.map((item) => {
+        const content = (
+          <>
+            <span>{item.text}</span>
+            <strong>{item.mark}</strong>
+          </>
+        );
+
+        return <li>{item.href ? <a href={withBase(item.href)}>{content}</a> : content}</li>;
+      })
     }
   </ul>
 </article>
@@ -75,18 +91,48 @@ const ui = getUiText(await getSiteConfig());
     font-size: 0.98rem;
   }
 
+  li:has(a) {
+    display: block;
+    padding: 0;
+  }
+
+  li a {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) max-content;
+    gap: 12px;
+    align-items: center;
+    padding: 14px 0 14px 18px;
+    border-radius: 6px;
+    color: inherit;
+    text-decoration: none;
+  }
+
+  li a:hover,
+  li a:focus-visible {
+    color: var(--paper-accent);
+  }
+
+  li a:focus-visible {
+    outline: 2px solid color-mix(in srgb, var(--paper-accent) 32%, transparent);
+    outline-offset: 3px;
+  }
+
   li::before {
     position: absolute;
+    top: 50%;
     left: 0;
     width: 5px;
     height: 5px;
     border-radius: 50%;
     background: var(--paper-accent);
     content: '';
+    transform: translateY(-50%);
   }
 
   strong {
+    color: var(--paper-ink-soft);
     font-size: 0.82rem;
     text-align: right;
+    white-space: nowrap;
   }
 </style>

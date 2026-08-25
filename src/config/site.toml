@@ -125,7 +125,7 @@ role = "嵌入式系统 / Linux"
 email = "gouminjlu@gmail.com"
 website = "https://goumin.work/"
 github = "https://github.com/GM2020JLU"
-avatar = "https://avatars.githubusercontent.com/u/66173922?v=4"
+avatar = "https://goumin.work/images/goumin-avatar-352.webp"
 
 [[config.topNav.links]]
 label = "首页"

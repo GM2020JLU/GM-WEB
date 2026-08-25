@@ -60,6 +60,7 @@ const requiredFiles = [
   'favicon.svg',
   'manifest.json',
   'og-card.png',
+  'images/goumin-avatar-352.webp',
   '.well-known/security.txt',
 ];
 
@@ -117,6 +118,10 @@ for (const marker of ['Gou Min', '嵌入式系统工程师', '文章', '项目',
 if (home.includes('data-navfolio-full-font-warmup')) fail('首页仍在预取完整中文字体');
 if (home.includes('href="/media"')) fail('首页仍展示空的书影音入口');
 if (!home.includes('https://goumin.work/og-card.png')) fail('首页未使用自定义 OG 图');
+if (!home.includes('https://goumin.work/images/goumin-avatar-352.webp')) {
+  fail('首页未使用本地优化头像');
+}
+if (home.includes('avatars.githubusercontent.com')) fail('首页仍依赖 GitHub 头像');
 if (home.includes('keystatic-page') || home.includes('react-dom')) {
   fail('公开首页意外加载了 Keystatic/React 后台资源');
 }

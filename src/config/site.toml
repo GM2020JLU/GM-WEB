@@ -22,7 +22,7 @@ code = "Monaco"
 # 中文阅读字体
 zh = "LXGW WenKai"
 # 浏览器使用的完整 WOFF2，以及构建子集时使用的 TTF 源文件。
-file = "/fonts/LXGWWenKai-Regular.woff2"
+file = "/fonts/LXGWWenKai-Regular-content-subset.woff2"
 source = "/fonts/LXGWWenKai-Regular.ttf"
 
 [config.code]

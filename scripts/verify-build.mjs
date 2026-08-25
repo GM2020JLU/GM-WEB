@@ -162,8 +162,8 @@ if (existsSync(vercelStatic)) {
 
 const sizeBudgets = [
   ['og-card.png', 200 * 1024],
-  ['fonts/LXGWWenKai-Regular-ui-subset.woff2', 500 * 1024],
-  ['fonts/LXGWWenKai-Regular.woff2', 10 * 1024 * 1024],
+  ['fonts/LXGWWenKai-Regular-content-subset-ui-subset.woff2', 500 * 1024],
+  ['fonts/LXGWWenKai-Regular-content-subset.woff2', 500 * 1024],
 ];
 
 for (const [file, maxBytes] of sizeBudgets) {

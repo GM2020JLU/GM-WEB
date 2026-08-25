@@ -23,6 +23,7 @@ const friendCirclePath = join(projectRoot, 'public/friend-circle.json');
 const fontConfig = readFontConfig();
 const subsetFontUrl = getSubsetFontUrl(fontConfig.file);
 const outputFontPath = resolveProjectPath(subsetFontUrl);
+const contentFontPath = resolveProjectPath(fontConfig.file);
 const sourceFontPath = resolveProjectPath(fontConfig.source);
 const subsetFontName = `${fontConfig.zh} UI Subset`;
 const isWindows = process.platform === 'win32';
@@ -72,16 +73,11 @@ const contentFrontmatterDirs = [
 ];
 const lightweightContentDirs = [
   `${contentRoot}/blog`,
+  ...(projectsModuleEnabled ? [`${contentRoot}/projects`] : []),
   ...(vibeModuleEnabled ? [`${contentRoot}/vibe`] : []),
   ...(mediaModuleEnabled ? [`${contentRoot}/media`] : []),
 ];
-const lightweightContentFiles = [
-  `${contentRoot}/about.mdx`,
-  `${contentRoot}/about.md`,
-  ...(projectsModuleEnabled
-    ? [`${contentRoot}/projects/index.mdx`, `${contentRoot}/projects/index.md`]
-    : []),
-];
+const lightweightContentFiles = [`${contentRoot}/about.mdx`, `${contentRoot}/about.md`];
 const sourceExtensions = new Set(['.astro', '.ts', '.js', '.mjs', '.cjs', '.json', '.toml']);
 const frontmatterExtensions = new Set(['.md', '.mdx']);
 const frontmatterKeys = new Set([
@@ -223,11 +219,11 @@ function collectFriendCircleChars(chars: Set<string>) {
   }
 }
 
-function runSubset() {
+function runSubset(targetPath: string) {
   const args = [
     sourceFontPath,
     `--text-file=${uiCharsPath}`,
-    `--output-file=${outputFontPath}`,
+    `--output-file=${targetPath}`,
     '--flavor=woff2',
     '--with-zopfli',
     '--layout-features=*',
@@ -258,7 +254,7 @@ function runSubset() {
   );
 }
 
-function syncSubsetFontName() {
+function syncFontName(targetPath: string, familyName: string) {
   const script = `
 from fontTools.ttLib import TTFont
 import sys
@@ -282,14 +278,14 @@ font.save(path)
 `;
   let result;
   for (const command of pythonCommands) {
-    result = spawnSync(command, ['-c', script, outputFontPath, subsetFontName], {
+    result = spawnSync(command, ['-c', script, targetPath, familyName], {
       stdio: 'inherit',
     });
     if (result.status === 0) return;
   }
 
   throw new Error(
-    `Generated subset font, but failed to sync its internal name to ${subsetFontName}. Ensure Python 3 and fonttools are installed. Error: ${result?.error?.message ?? `status ${result?.status}`}`,
+    `Generated subset font, but failed to sync its internal name to ${familyName}. Ensure Python 3 and fonttools are installed. Error: ${result?.error?.message ?? `status ${result?.status}`}`,
   );
 }
 
@@ -336,6 +332,7 @@ if (!uiChars) throw new Error('No CJK UI characters were found for font subsetti
 
 mkdirSync(join(projectRoot, 'scripts/fonts'), { recursive: true });
 mkdirSync(dirname(outputFontPath), { recursive: true });
+mkdirSync(dirname(contentFontPath), { recursive: true });
 writeFileSync(uiCharsPath, `${uiChars}\n`, 'utf8');
 
 if (!existsSync(sourceFontPath)) {
@@ -344,8 +341,11 @@ if (!existsSync(sourceFontPath)) {
   );
 }
 
-runSubset();
-syncSubsetFontName();
+runSubset(outputFontPath);
+syncFontName(outputFontPath, subsetFontName);
+runSubset(contentFontPath);
+syncFontName(contentFontPath, fontConfig.zh);
 
-console.log(`Generated ${uiCharsPath} with ${uiChars.length} CJK UI characters.`);
+console.log(`Generated ${uiCharsPath} with ${uiChars.length} CJK site characters.`);
 console.log(`Generated ${subsetFontName} at ${outputFontPath} from ${sourceFontPath}.`);
+console.log(`Generated ${fontConfig.zh} content subset at ${contentFontPath}.`);

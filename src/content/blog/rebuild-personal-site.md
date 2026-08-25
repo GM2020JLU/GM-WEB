@@ -2,6 +2,8 @@
 title: '我为什么重新做了个人站'
 description: '从功能堆叠回到内容优先：这次个人站重建想解决什么问题。'
 date: '2026-08-23T00:00:00+08:00'
+updatedDate: '2026-08-25T23:40:00+08:00'
+publicationStatus: published
 draft: false
 sticky: true
 showHeroImage: false

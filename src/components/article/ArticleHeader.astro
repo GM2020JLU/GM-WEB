@@ -20,6 +20,7 @@ interface Props {
   categories?: { name: string; slug: string }[];
   series?: { name: string; slug: string; current?: number; total?: number }[];
   heroImage?: ImageMetadata | string;
+  heroImageAlt?: string;
   showHeroImage?: boolean;
   variant?: 'default' | 'archive';
   kicker?: string;
@@ -38,6 +39,7 @@ const {
   categories = [],
   series = [],
   heroImage,
+  heroImageAlt = '',
   showHeroImage = true,
   variant = 'default',
   kicker = 'Notebook entry',
@@ -195,7 +197,7 @@ const wordCountLabel = ui.article.wordCount(wordCount);
   {
     showHeroImage && heroImage && (
       <figure class="article-hero-image">
-        <SmartImage width={1020} height={510} src={heroImage} alt="" />
+        <SmartImage width={1020} height={510} src={heroImage} alt={heroImageAlt} />
       </figure>
     )
   }

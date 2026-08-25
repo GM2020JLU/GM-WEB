@@ -1,4 +1,11 @@
-import { collection, config, fields, singleton } from '@keystatic/core';
+import {
+  collection,
+  config,
+  fields,
+  singleton,
+  type BasicFormField,
+  type FormFieldStoredValue,
+} from '@keystatic/core';
 import slugify from '@sindresorhus/slugify';
 import { pinyin } from 'pinyin-pro';
 
@@ -18,11 +25,6 @@ const editorOptions = {
   },
 } as const;
 
-const isoDateTimePattern = {
-  regex: /^\d{4}-\d{2}-\d{2}(?:T\d{2}:\d{2}(?::\d{2}(?:\.\d{1,3})?)?(?:Z|[+-]\d{2}:\d{2})?)?$/,
-  message: '请使用 YYYY-MM-DD 或带时区的 ISO 8601 时间。',
-};
-
 function localIsoDateTime() {
   const now = new Date();
   const pad = (value: number) => String(value).padStart(2, '0');
@@ -31,6 +33,50 @@ function localIsoDateTime() {
   const absoluteOffset = Math.abs(offsetMinutes);
 
   return `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}T${pad(now.getHours())}:${pad(now.getMinutes())}:${pad(now.getSeconds())}${sign}${pad(Math.floor(absoluteOffset / 60))}:${pad(absoluteOffset % 60)}`;
+}
+
+const publicationStatusOptions = [
+  { label: '草稿', value: 'draft' },
+  { label: '待发布', value: 'ready' },
+  { label: '已发布', value: 'published' },
+] as const;
+
+const publicationStatus = fields.select({
+  label: '发布状态',
+  options: publicationStatusOptions,
+  defaultValue: 'draft',
+  description: '待发布内容会参与检查，只有已发布内容会出现在公开站点。',
+});
+
+function autoUpdatedDate(): BasicFormField<string> {
+  const parse = (value: FormFieldStoredValue) => (typeof value === 'string' ? value : '');
+
+  return {
+    kind: 'form',
+    label: '自动更新时间',
+    Input: () => null,
+    defaultValue: localIsoDateTime,
+    parse,
+    serialize: () => ({ value: localIsoDateTime() }),
+    validate: (value) => value,
+    reader: { parse },
+  };
+}
+
+function chinaDateTime(label: string, description?: string): BasicFormField<string> {
+  const field = fields.datetime({ label, description, validation: { isRequired: true } });
+  const parseEditorValue = (value: FormFieldStoredValue) =>
+    typeof value === 'string' ? value.slice(0, 16) : '';
+
+  return {
+    ...field,
+    defaultValue: () => localIsoDateTime().slice(0, 16),
+    parse: parseEditorValue,
+    serialize: (value) => ({ value: value ? `${value}:00+08:00` : undefined }),
+    reader: {
+      parse: (value) => (typeof value === 'string' ? value : ''),
+    },
+  };
 }
 
 function stableSlug(title: string) {
@@ -62,10 +108,35 @@ const slugTitle = (label = '标题') =>
     },
   });
 
-const textList = (label: string, itemLabel: string) =>
-  fields.array(fields.text({ label: itemLabel }), {
+const taxonomyTitle = fields.slug({
+  name: {
+    label: '名称',
+    validation: { isRequired: true },
+  },
+  slug: {
+    label: '标识',
+    description: '保持与名称一致，建立后尽量不要修改。',
+    generate: (value) => value.trim().replace(/[\\/]/g, '-').slice(0, 64),
+    validation: {
+      pattern: {
+        regex: /^[^\\/]+$/u,
+        message: '不能包含路径分隔符。',
+      },
+    },
+  },
+});
+
+const taxonomyCollection = (label: string, path: string) =>
+  collection({
     label,
-    itemLabel: ({ value }) => value || itemLabel,
+    path,
+    slugField: 'title',
+    columns: ['title'],
+    format: 'yaml',
+    schema: {
+      title: taxonomyTitle,
+      description: fields.text({ label: '说明', multiline: true }),
+    },
   });
 
 const sidebar = fields.object(
@@ -88,26 +159,22 @@ const commonArticleFields = (extension: 'md' | 'mdx') => ({
     validation: { isRequired: true },
     description: '用于列表卡片和搜索引擎摘要。',
   }),
-  date: fields.text({
-    label: '发布时间',
-    defaultValue: localIsoDateTime,
-    validation: { isRequired: true, pattern: isoDateTimePattern },
-    description: '保留完整时区，例如 2026-08-23T12:30:00+08:00。',
-  }),
-  draft: fields.checkbox({
-    label: '草稿',
-    defaultValue: true,
-    description: '草稿不会出现在生产站点中。',
-  }),
+  date: chinaDateTime('发布时间', '用于公开页面排序和展示，保存时自动写入东八区。'),
+  updatedDate: autoUpdatedDate(),
+  publicationStatus,
+  draft: fields.ignored(),
   sticky: fields.ignored(),
-  heroImage: fields.text({
-    label: '封面图路径',
-    description: '可填 Astro 资源路径或 https:// 远程图片，留空表示不设置。',
+  heroImage: fields.image({
+    label: '封面图',
+    directory: 'src/assets/images/content',
+    publicPath: '@assets/images/content/',
+    description: '上传后会按内容网址分目录保存。',
   }),
+  heroImageAlt: fields.text({ label: '封面图替代文本', description: '封面包含信息时必填。' }),
   showHeroImage: fields.checkbox({ label: '在文章页显示封面', defaultValue: true }),
-  tags: textList('标签', '标签'),
-  categories: textList('分类', '分类'),
-  series: textList('系列', '系列'),
+  tags: fields.multiRelationship({ label: '标签', collection: 'tags' }),
+  categories: fields.multiRelationship({ label: '分类', collection: 'categories' }),
+  series: fields.multiRelationship({ label: '系列', collection: 'series' }),
   comments: fields.checkbox({ label: '开启评论', defaultValue: true }),
   sidebar,
   body: fields.mdx({
@@ -122,6 +189,8 @@ const projects = collection({
   path: 'src/content/projects/*',
   slugField: 'title',
   entryLayout: 'content',
+  previewUrl: '/preview/projects/{slug}',
+  columns: ['publicationStatus', 'date', 'updatedDate'],
   format: { data: 'yaml', contentField: 'body' },
   schema: {
     title: slugTitle(),
@@ -197,6 +266,7 @@ export default config({
       写作: ['blog', 'vibe'],
       展示: ['projects'],
       页面: ['about'],
+      分类管理: ['categories', 'series', 'tags'],
     },
   },
   collections: {
@@ -205,6 +275,8 @@ export default config({
       path: 'src/content/blog/*',
       slugField: 'title',
       entryLayout: 'content',
+      previewUrl: '/preview/blog/{slug}',
+      columns: ['publicationStatus', 'date', 'updatedDate'],
       format: { data: 'yaml', contentField: 'body' },
       schema: {
         title: slugTitle(),
@@ -217,21 +289,15 @@ export default config({
       path: 'src/content/vibe/*',
       slugField: 'title',
       entryLayout: 'content',
+      previewUrl: '/preview/vibe/{slug}',
+      columns: ['publicationStatus', 'date', 'updatedDate'],
       format: { data: 'yaml', contentField: 'body' },
       schema: {
         title: slugTitle('标题（可简短概括）'),
-        date: fields.text({
-          label: '发布时间',
-          defaultValue: localIsoDateTime,
-          validation: { isRequired: true, pattern: isoDateTimePattern },
-          description: '保留完整时区，例如 2026-08-23T12:30:00+08:00。',
-        }),
-        updatedDate: fields.text({
-          label: '更新时间',
-          validation: { pattern: isoDateTimePattern },
-          description: '未更新时可留空。',
-        }),
-        draft: fields.checkbox({ label: '草稿', defaultValue: true }),
+        date: chinaDateTime('发布时间', '保存时自动写入东八区。'),
+        updatedDate: autoUpdatedDate(),
+        publicationStatus,
+        draft: fields.ignored(),
         type: fields.select({
           label: '类型',
           defaultValue: 'text',
@@ -245,8 +311,15 @@ export default config({
         }),
         mood: fields.text({ label: '心情' }),
         location: fields.text({ label: '地点' }),
-        images: textList('图片路径', '图片路径或 https:// 网址'),
-        tags: textList('标签', '标签'),
+        images: fields.array(
+          fields.image({
+            label: '图片',
+            directory: 'src/assets/images/content',
+            publicPath: '@assets/images/content/',
+          }),
+          { label: '图片', itemLabel: () => '图片' },
+        ),
+        tags: fields.multiRelationship({ label: '标签', collection: 'tags' }),
         align: fields.select({
           label: '对齐',
           defaultValue: 'left',
@@ -268,12 +341,73 @@ export default config({
         body: fields.mdx({ label: '正文', extension: 'md', options: editorOptions }),
       },
     }),
+    media: collection({
+      label: '书影音',
+      path: 'src/content/media/*',
+      slugField: 'title',
+      columns: ['publicationStatus', 'type', 'status'],
+      previewUrl: '/preview/media/{slug}',
+      format: { data: 'yaml', contentField: 'body' },
+      schema: {
+        title: slugTitle(),
+        creator: fields.text({ label: '创作者', validation: { isRequired: true } }),
+        publicationStatus,
+        draft: fields.ignored(),
+        updatedDate: autoUpdatedDate(),
+        type: fields.select({
+          label: '类型',
+          defaultValue: 'book',
+          options: [
+            { label: '书籍', value: 'book' },
+            { label: '电影', value: 'film' },
+            { label: '剧集', value: 'series' },
+            { label: '专辑', value: 'album' },
+            { label: '播客', value: 'podcast' },
+          ],
+        }),
+        status: fields.select({
+          label: '进度',
+          defaultValue: 'completed',
+          options: [
+            { label: '已完成', value: 'completed' },
+            { label: '进行中', value: 'in-progress' },
+            { label: '计划中', value: 'planned' },
+            { label: '已放弃', value: 'abandoned' },
+          ],
+        }),
+        completedAt: fields.date({ label: '完成日期' }),
+        cover: fields.image({
+          label: '封面',
+          directory: 'src/assets/images/content',
+          publicPath: '@assets/images/content/',
+        }),
+        coverAspect: fields.select({
+          label: '封面比例',
+          defaultValue: 'portrait',
+          options: [
+            { label: '竖版', value: 'portrait' },
+            { label: '横版', value: 'landscape' },
+            { label: '方形', value: 'square' },
+            { label: '宽幅', value: 'wide' },
+          ],
+        }),
+        rating: fields.number({ label: '评分', validation: { min: 1, max: 5 } }),
+        review: fields.checkbox({ label: '显示长评', defaultValue: false }),
+        tags: fields.multiRelationship({ label: '标签', collection: 'tags' }),
+        externalUrl: fields.url({ label: '外部链接' }),
+        body: fields.mdx({ label: '评论', extension: 'md', options: editorOptions }),
+      },
+    }),
+    categories: taxonomyCollection('分类', 'src/content/taxonomies/categories/*'),
+    series: taxonomyCollection('系列', 'src/content/taxonomies/series/*'),
+    tags: taxonomyCollection('标签', 'src/content/taxonomies/tags/*'),
   },
   singletons: {
     about: singleton({
       label: '关于我',
       path: 'src/content/about',
       entryLayout: 'content',
+      previewUrl: '/preview/about',
       format: { data: 'yaml', contentField: 'body' },
       schema: {
         title: fields.text({ label: '标题', validation: { isRequired: true } }),

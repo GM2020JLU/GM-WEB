@@ -2,6 +2,8 @@
 title: CASDCV
 description: SCVASDV
 date: '2026-08-23T12:08:51+08:00'
+updatedDate: '2026-08-23T12:08:51+08:00'
+publicationStatus: draft
 draft: true
 showHeroImage: true
 tags: []

@@ -37,6 +37,7 @@ interface Props {
       description: string;
       date: Date;
       heroImage?: ImageMetadata | string;
+      heroImageAlt?: string;
       showHeroImage?: boolean;
       tags?: string[];
       categories?: string[];
@@ -55,6 +56,7 @@ interface Props {
   description?: string;
   date?: Date;
   heroImage?: ImageMetadata | string;
+  heroImageAlt?: string;
   showHeroImage?: boolean;
   tags?: string[];
   categories?: string[];
@@ -75,6 +77,7 @@ const post = props.post ?? {
     description: props.description ?? '',
     date: props.date ?? new Date(),
     heroImage: props.heroImage,
+    heroImageAlt: props.heroImageAlt,
     showHeroImage: props.showHeroImage ?? true,
     tags: props.tags ?? [],
     categories: props.categories ?? [],
@@ -85,7 +88,7 @@ const post = props.post ?? {
 };
 const isBlogPost = post.collection === 'blog';
 const shouldMountCommentSection = supportsCommentSection(post.collection);
-const { title, description, date, heroImage, showHeroImage = true } = post.data;
+const { title, description, date, heroImage, heroImageAlt, showHeroImage = true } = post.data;
 const contentFont = props.contentFont ?? 'article';
 const bodyText = 'body' in post && typeof post.body === 'string' ? post.body : description;
 const englishWords = bodyText.match(/[A-Za-z0-9]+(?:['’-][A-Za-z0-9]+)*/g) ?? [];
@@ -165,6 +168,7 @@ const hasSidebar = shouldRenderSidebar && hasToc;
             categories={categoryLinks}
             series={seriesLinks}
             heroImage={heroImage}
+            heroImageAlt={heroImageAlt}
             showHeroImage={showHeroImage}
             variant={props.headerVariant}
             kicker={props.headerKicker}

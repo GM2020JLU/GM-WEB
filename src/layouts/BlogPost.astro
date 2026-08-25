@@ -12,7 +12,7 @@ import { getHtmlLang } from '../utils/ui-text';
 
 type Props = CollectionEntry<'blog'>['data'];
 
-const { title, description, date, heroImage } = Astro.props;
+const { title, description, date, heroImage, heroImageAlt } = Astro.props;
 const siteConfig = await getSiteConfig();
 const palette = siteConfig.theme.palette;
 const htmlLang = getHtmlLang(siteConfig);
@@ -29,7 +29,7 @@ const htmlLang = getHtmlLang(siteConfig);
     <FormattedDate date={date} />
   </Fragment>
   <Fragment slot="hero-image">
-    {heroImage && <SmartImage width={1020} height={510} src={heroImage} alt="" />}
+    {heroImage && <SmartImage width={1020} height={510} src={heroImage} alt={heroImageAlt ?? ''} />}
   </Fragment>
   <slot />
   <Fragment slot="after-content">

@@ -33,14 +33,31 @@ const siteUrlSchema = z.preprocess((value) => {
 const contentImageSchema = ({ image }: Parameters<CollectionSchemaFactory>[0]) =>
   z.union([image(), remoteImageSchema]);
 
+const publicationStatusSchema = z.enum(['draft', 'ready', 'published']);
+
+function normalizePublicationState<
+  T extends { publicationStatus?: z.infer<typeof publicationStatusSchema>; draft?: boolean },
+>(data: T) {
+  const publicationStatus = data.publicationStatus ?? (data.draft ? 'draft' : 'published');
+
+  return {
+    ...data,
+    publicationStatus,
+    draft: publicationStatus !== 'published',
+  };
+}
+
 const articleSchema = ({ image }: Parameters<CollectionSchemaFactory>[0]) =>
   z.object({
     title: z.string(),
     description: z.string(),
     // Creation date. Accepts ISO 8601 strings and plain dates such as YYYY-MM-DD.
     date: z.coerce.date(),
+    updatedDate: z.coerce.date().optional(),
+    publicationStatus: publicationStatusSchema.optional(),
     draft: z.boolean().optional().default(false),
     heroImage: z.optional(contentImageSchema({ image })),
+    heroImageAlt: z.string().optional().default(''),
     showHeroImage: z.boolean().optional().default(true),
     tags: z.array(z.string()).optional().default([]),
     categories: z.array(z.string()).optional().default([]),
@@ -50,15 +67,16 @@ const articleSchema = ({ image }: Parameters<CollectionSchemaFactory>[0]) =>
   });
 
 const blogArticleSchema = (context: Parameters<CollectionSchemaFactory>[0]) =>
-  articleSchema(context).extend({
-    sticky: z.union([z.boolean(), z.number().positive()]).optional().default(false),
-  });
+  articleSchema(context)
+    .extend({
+      sticky: z.union([z.boolean(), z.number().positive()]).optional().default(false),
+    })
+    .transform(normalizePublicationState);
 
 const contentSource = process.env.NAVFOLIO_CONTENT_SOURCE === 'docs' ? 'docs' : 'content';
 const contentBase = contentSource === 'docs' ? './src/docs' : './src/content';
 const projectsModuleEnabled = isPageModuleEnabled(navfolioConfig, 'projects');
 const vibeModuleEnabled = isPageModuleEnabled(navfolioConfig, 'vibe');
-const mediaModuleEnabled = isPageModuleEnabled(navfolioConfig, 'media');
 
 const commentProviderSchema = z.enum(['giscus', 'utterances', 'waline', 'none']);
 const mathRendererSchema = z.enum(['katex', 'mathjax']);
@@ -460,98 +478,107 @@ const blog = defineCollection({
 
 const about = defineCollection({
   loader: glob({ base: contentBase, pattern: 'about.{md,mdx}' }),
-  schema: articleSchema,
+  schema: (context) => articleSchema(context).transform(normalizePublicationState),
 });
 
 const projects = defineCollection({
   loader: glob({ base: `${contentBase}/projects`, pattern: '**/*.{md,mdx}' }),
   schema: (context) =>
-    articleSchema(context).extend({
-      sticky: z.union([z.boolean(), z.number().positive()]).optional().default(false),
-      icon: z
-        .enum([
-          'github',
-          'box',
-          'code-2',
-          'database',
-          'file-code-2',
-          'globe-2',
-          'layers-3',
-          'palette',
-          'rocket',
-          'sparkles',
-          'terminal',
-          'wand-sparkles',
-        ])
-        .optional()
-        .default('github'),
-      iconColor: z
-        .string()
-        .regex(
-          /^(#[0-9a-f]{3,8}|var\(--[a-z0-9-]+\)|[a-z]+)$/i,
-          'Use a CSS color, hex color, or CSS variable.',
-        )
-        .optional(),
-      authors: z
-        .array(
-          z.object({
-            name: z.string(),
-            url: z.url().optional(),
-          }),
-        )
-        .optional()
-        .default([]),
-      links: z
-        .array(
-          z.object({
-            label: z.string(),
-            href: z.url(),
-            kind: z
-              .enum(['github', 'website', 'platform', 'docs', 'demo'])
-              .optional()
-              .default('website'),
-          }),
-        )
-        .optional()
-        .default([]),
-    }),
+    articleSchema(context)
+      .extend({
+        sticky: z.union([z.boolean(), z.number().positive()]).optional().default(false),
+        icon: z
+          .enum([
+            'github',
+            'box',
+            'code-2',
+            'database',
+            'file-code-2',
+            'globe-2',
+            'layers-3',
+            'palette',
+            'rocket',
+            'sparkles',
+            'terminal',
+            'wand-sparkles',
+          ])
+          .optional()
+          .default('github'),
+        iconColor: z
+          .string()
+          .regex(
+            /^(#[0-9a-f]{3,8}|var\(--[a-z0-9-]+\)|[a-z]+)$/i,
+            'Use a CSS color, hex color, or CSS variable.',
+          )
+          .optional(),
+        authors: z
+          .array(
+            z.object({
+              name: z.string(),
+              url: z.url().optional(),
+            }),
+          )
+          .optional()
+          .default([]),
+        links: z
+          .array(
+            z.object({
+              label: z.string(),
+              href: z.url(),
+              kind: z
+                .enum(['github', 'website', 'platform', 'docs', 'demo'])
+                .optional()
+                .default('website'),
+            }),
+          )
+          .optional()
+          .default([]),
+      })
+      .transform(normalizePublicationState),
 });
 
 const vibe = defineCollection({
   loader: glob({ base: `${contentBase}/vibe`, pattern: '**/*.{md,mdx}' }),
   schema: ({ image }) =>
-    z.object({
-      title: z.string().optional(),
-      date: z.coerce.date(),
-      updatedDate: z.coerce.date().optional(),
-      draft: z.boolean().optional().default(false),
-      type: z.enum(['text', 'photo', 'quote', 'code', 'mixed']).optional().default('text'),
-      mood: z.string().optional(),
-      location: z.string().optional(),
-      images: z.array(contentImageSchema({ image })).optional().default([]),
-      tags: z.array(z.string()).optional().default([]),
-      align: z.enum(['left', 'right', 'center']).optional(),
-      size: z.enum(['sm', 'md', 'lg']).optional().default('md'),
-    }),
+    z
+      .object({
+        title: z.string().optional(),
+        date: z.coerce.date(),
+        updatedDate: z.coerce.date().optional(),
+        publicationStatus: publicationStatusSchema.optional(),
+        draft: z.boolean().optional().default(false),
+        type: z.enum(['text', 'photo', 'quote', 'code', 'mixed']).optional().default('text'),
+        mood: z.string().optional(),
+        location: z.string().optional(),
+        images: z.array(contentImageSchema({ image })).optional().default([]),
+        tags: z.array(z.string()).optional().default([]),
+        align: z.enum(['left', 'right', 'center']).optional(),
+        size: z.enum(['sm', 'md', 'lg']).optional().default('md'),
+      })
+      .transform(normalizePublicationState),
 });
 
 const media = defineCollection({
   loader: glob({ base: `${contentBase}/media`, pattern: '**/*.{md,mdx}' }),
   schema: ({ image }) =>
-    z.object({
-      title: z.string(),
-      creator: z.string(),
-      type: z.enum(['book', 'film', 'series', 'album', 'podcast']),
-      status: z.enum(['completed', 'in-progress', 'planned', 'abandoned']).default('completed'),
-      completedAt: z.coerce.date().optional(),
-      draft: z.boolean().optional().default(false),
-      cover: contentImageSchema({ image }).optional(),
-      coverAspect: z.enum(['portrait', 'landscape', 'square', 'wide']).optional(),
-      rating: z.number().min(1).max(5).optional(),
-      review: z.boolean().optional().default(false),
-      tags: z.array(z.string()).optional().default([]),
-      externalUrl: z.url().optional(),
-    }),
+    z
+      .object({
+        title: z.string(),
+        creator: z.string(),
+        type: z.enum(['book', 'film', 'series', 'album', 'podcast']),
+        status: z.enum(['completed', 'in-progress', 'planned', 'abandoned']).default('completed'),
+        completedAt: z.coerce.date().optional(),
+        publicationStatus: publicationStatusSchema.optional(),
+        updatedDate: z.coerce.date().optional(),
+        draft: z.boolean().optional().default(false),
+        cover: contentImageSchema({ image }).optional(),
+        coverAspect: z.enum(['portrait', 'landscape', 'square', 'wide']).optional(),
+        rating: z.number().min(1).max(5).optional(),
+        review: z.boolean().optional().default(false),
+        tags: z.array(z.string()).optional().default([]),
+        externalUrl: z.url().optional(),
+      })
+      .transform(normalizePublicationState),
 });
 
 export const collections = {
@@ -560,5 +587,6 @@ export const collections = {
   siteConfig,
   ...(projectsModuleEnabled ? { projects } : {}),
   ...(vibeModuleEnabled ? { vibe } : {}),
-  ...(mediaModuleEnabled ? { media } : {}),
+  // Keep media registered for Keystatic, Studio, and previews even when its public page is hidden.
+  media,
 };

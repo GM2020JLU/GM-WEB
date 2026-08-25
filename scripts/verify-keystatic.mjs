@@ -33,10 +33,27 @@ for (const key of ['categories', 'series', 'tags']) {
   assert(keystaticConfig.collections[key], `缺少受控分类集合：${key}`);
 }
 assert.equal(keystaticConfig.singletons.about.previewUrl, '/preview/about');
+assert.equal(keystaticConfig.ui.brand.name, 'Gou Min · 创作后台');
+assert.equal(typeof keystaticConfig.ui.brand.mark, 'function', '后台缺少自定义品牌标识');
+assert.deepEqual(keystaticConfig.ui.navigation['创作与发布'], [
+  'blog',
+  'vibe',
+  'projects',
+  'media',
+]);
 
 const blogSchema = keystaticConfig.collections.blog.schema;
 assert.equal(blogSchema.heroImage.formKind, 'asset', '博客封面未使用媒体选择字段');
 assert.equal(blogSchema.heroImage.directory, 'src/assets/images/content');
+const serializedImage = blogSchema.heroImage.serialize(
+  { data: new Uint8Array([137, 80, 78, 71]), filename: 'cover.png', extension: 'png' },
+  { slug: 'quality-check', suggestedFilenamePrefix: 'heroImage' },
+);
+assert.equal(serializedImage.value, '@assets/images/content/quality-check/heroImage.png');
+assert.equal(serializedImage.asset.filename, 'heroImage.png');
+assert.deepEqual(blogSchema.tags.serialize(['Astro', 'Navfolio']), {
+  value: ['Astro', 'Navfolio'],
+});
 assert.equal(blogSchema.date.parse('2026-08-25T12:34:56+08:00'), '2026-08-25T12:34');
 assert.deepEqual(blogSchema.date.serialize('2026-08-25T12:34'), {
   value: '2026-08-25T12:34:00+08:00',
@@ -137,6 +154,6 @@ assert.equal(
 );
 
 console.log(
-  `Keystatic 兼容验证通过：${entriesChecked} 份内容均可读取，UTF-8 和 Markdown 语义往返一致。`,
+  `Keystatic 兼容验证通过：${entriesChecked} 份内容均可读取，品牌、导航、字段和 Markdown 往返一致。`,
 );
 process.exit(0);

@@ -38,7 +38,7 @@ import {
   type Props as LucideProps,
 } from 'lucide-astro';
 
-interface Props extends Omit<LucideProps, 'name'> {
+interface Props extends Omit<LucideProps, 'name' | 'size'> {
   name: string;
   size?: number | string;
   class?: string;

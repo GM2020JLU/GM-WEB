@@ -10,7 +10,7 @@ const { config } = Astro.props;
 
 <div class="comment-provider" data-comment-provider="giscus"></div>
 
-<script type="module" define:vars={{ config }}>
+<script is:inline type="module" define:vars={{ config }}>
   const mountGiscus = () => {
     const container = document.querySelector('[data-comment-provider="giscus"]');
 

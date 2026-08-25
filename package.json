@@ -16,7 +16,10 @@
     "verify:keystatic": "bun scripts/verify-keystatic.mjs",
     "verify:content": "node scripts/audit-content.mjs",
     "test": "bun test",
-    "check": "bun run format:check && bun run build && bun run verify:build",
+    "test:keystatic-crud": "bun scripts/test-keystatic-crud.mjs",
+    "types:check": "astro check",
+    "test:full": "bun run check && bun test && bun run test:keystatic-crud && bun run docs:build",
+    "check": "bun run format:check && bun run types:check && bun run build && bun run verify:build",
     "preview": "astro preview",
     "docs:dev": "NAVFOLIO_CONTENT_SOURCE=docs astro dev",
     "docs:build": "NAVFOLIO_CONTENT_SOURCE=docs bun run build",
@@ -66,7 +69,9 @@
     "tailwindcss": "^4.3.3"
   },
   "devDependencies": {
+    "@astrojs/check": "^0.9.10",
     "@astrojs/compiler": "^4.0.0",
+    "@types/bun": "^1.4.0",
     "@typescript-eslint/eslint-plugin": "^8.65.0",
     "@typescript-eslint/parser": "^8.65.0",
     "@typescript/native": "npm:typescript@^7.0.2",

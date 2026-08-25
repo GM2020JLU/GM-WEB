@@ -25,9 +25,10 @@ function getFontMimeType(url: string) {
 }
 ---
 
-<script define:vars={{ fullFontUrl: resolvedFullFontUrl, fullFontType }}>
-  const FULL_FONT_URL = fullFontUrl;
-  const FULL_FONT_TYPE = fullFontType;
+<script is:inline data-full-font-url={resolvedFullFontUrl} data-full-font-type={fullFontType}>
+  const warmupScript = document.currentScript;
+  const FULL_FONT_URL = warmupScript?.dataset.fullFontUrl ?? '';
+  const FULL_FONT_TYPE = warmupScript?.dataset.fullFontType ?? 'font/ttf';
   const WARMUP_ATTR = 'data-navfolio-full-font-warmup';
 
   /**

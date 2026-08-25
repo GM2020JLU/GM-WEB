@@ -82,37 +82,25 @@ const shouldShowTocAction = showTocIcon && tocItems.length > 0;
 
   <nav class="nav-links" aria-label="文章导航">
     {
-      links.map((link) =>
-        link.disabled ? (
-          <span class="nav-link nav-link-placeholder" aria-disabled="true" title="内容尚未发布">
-            {link.label}
-          </span>
-        ) : (
-          <a class:list={['nav-link', { active: isActive(link.href) }]} href={withBase(link.href)}>
-            {link.label}
-          </a>
-        ),
-      )
+      links.map((link) => (
+        <a class:list={['nav-link', { active: isActive(link.href) }]} href={withBase(link.href)}>
+          {link.label}
+        </a>
+      ))
     }
   </nav>
 
   <nav class="mobile-menu-panel" id="mobile-nav-menu" aria-label="移动端导航" data-mobile-menu>
     {
-      links.map((link) =>
-        link.disabled ? (
-          <span class="mobile-menu-link mobile-menu-placeholder" aria-disabled="true">
-            {link.label}
-          </span>
-        ) : (
-          <a
-            class:list={['mobile-menu-link', { active: isActive(link.href) }]}
-            href={withBase(link.href)}
-            data-mobile-menu-link
-          >
-            {link.label}
-          </a>
-        ),
-      )
+      links.map((link) => (
+        <a
+          class:list={['mobile-menu-link', { active: isActive(link.href) }]}
+          href={withBase(link.href)}
+          data-mobile-menu-link
+        >
+          {link.label}
+        </a>
+      ))
     }
   </nav>
 

@@ -10,7 +10,7 @@ const { config } = Astro.props;
 
 <div id="waline" class="waline-comment-provider"></div>
 
-<script type="module" define:vars={{ config }}>
+<script is:inline type="module" define:vars={{ config }}>
   import { init } from 'https://unpkg.com/@waline/client@v3/dist/waline.js';
 
   let walineInstance;

@@ -135,7 +135,17 @@ if (home.includes('keystatic-page') || home.includes('react-dom')) {
 if (existsSync(join(dist, 'blog/casdcv/index.html'))) fail('草稿文章意外出现在公开路由');
 
 const studio = readFileSync(join(dist, 'studio/index.html'), 'utf8');
-for (const marker of ['内容工作台', '进入写作后台', '继续编辑', 'data-deploy-label']) {
+for (const marker of [
+  '今天写点什么？',
+  '打开内容编辑器',
+  '新建内容',
+  '三步发布',
+  '继续编辑',
+  'data-deploy-label',
+  'data-search',
+  '/keystatic/collection/blog/create',
+  '/keystatic/collection/media/create',
+]) {
   if (!studio.includes(marker)) fail(`内容工作台缺少：${marker}`);
 }
 if (!studio.includes('noindex,nofollow,noarchive')) fail('内容工作台缺少 noindex');

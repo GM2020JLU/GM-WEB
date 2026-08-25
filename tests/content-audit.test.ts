@@ -4,6 +4,7 @@ import {
   countWords,
   estimateReadingMinutes,
   getPublicationStatus,
+  matchesContentFilters,
 } from '../src/utils/content-metrics';
 
 const taxonomies = {
@@ -54,5 +55,22 @@ describe('篇幅估算', () => {
   test('统计中英文并至少返回一分钟', () => {
     expect(countWords('你好 Astro world')).toBe(4);
     expect(estimateReadingMinutes('短文')).toBe(1);
+  });
+});
+
+describe('后台内容筛选', () => {
+  const article = { status: 'draft', type: '博客', text: '个人站 Astro 站点日志' };
+
+  test('组合状态、类型和中文搜索', () => {
+    expect(matchesContentFilters(article, { status: 'draft', type: '博客', query: 'astro' })).toBe(
+      true,
+    );
+    expect(matchesContentFilters(article, { status: 'published', type: '博客', query: '' })).toBe(
+      false,
+    );
+    expect(matchesContentFilters(article, { status: 'all', type: '随记', query: '' })).toBe(false);
+    expect(matchesContentFilters(article, { status: 'all', type: 'all', query: '站点日志' })).toBe(
+      true,
+    );
   });
 });

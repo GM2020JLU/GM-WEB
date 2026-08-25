@@ -1,6 +1,7 @@
 ---
 import IntroCard from '../components/cards/IntroCard.astro';
 import ConnectCard from '../components/cards/ConnectCard.astro';
+import FeaturedCard from '../components/cards/FeaturedCard.astro';
 import NavigationCard from '../components/cards/NavigationCard.astro';
 import ProfileCard from '../components/cards/ProfileCard.astro';
 import DashboardFlow from '../components/layout/DashboardFlow.astro';
@@ -35,6 +36,7 @@ const { home, profile, site } = await getSiteConfig();
     </Fragment>
 
     <Fragment slot="navigation">
+      <FeaturedCard />
       <NavigationCard items={home.navigation} />
     </Fragment>
 

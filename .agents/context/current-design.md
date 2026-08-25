@@ -1,6 +1,6 @@
 # 当前设计与架构
 
-最后核对：2026-08-23
+最后核对：2026-08-26
 证据：当前功能分支、`package.json`、`bun.lock`、当前源码、deploy workflow
 与上层生态地图。
 
@@ -45,8 +45,9 @@ resolved modules
 `<command>:new <filename> [output-directory]` 参数、模板渲染和安全写入；Blog 的
 宿主模板位于 `scripts/templates/post.md`。
 
-`src/content.config.ts` 当前仍拥有具体 schemas。关闭 module 后，对应 route、
-collection、默认 navigation、scaffold 和 i18n contribution 都应消失。
+`src/content.config.ts` 当前仍拥有具体 schemas。关闭 module 后，对应公开 route、默认
+navigation、scaffold 和 i18n contribution 会消失；Media collection 仍注册给私有后台、
+工作台与预览使用。
 
 ## Core、Theme 与 Runtime
 
@@ -73,6 +74,13 @@ collection、默认 navigation、scaffold 和 i18n contribution 都应消失。
 - 写作后台：开源 Keystatic，通过官方 Astro/React 集成注入
   `/keystatic` 和 `/api/keystatic`；本地直接读写文件，Vercel 使用 GitHub 模式
 - 内容文件仍是 Astro 直接消费的 Markdown/MDX，Keystatic 不成为公开页运行时依赖
+- 内容状态以 `publicationStatus`（draft/ready/published）为主，schema 向下兼容旧
+  `draft` 字段并为公开路由派生布尔值；后台保存自动写入 `updatedDate`
+- `src/content/taxonomies` 保存受控标签、分类和系列；图片统一写入
+  `src/assets/images/content`
+- `/studio` 是只读静态运营工作台，`/preview/**` 是同源 iframe 预览壳与真实渲染页；
+  两者均 noindex/no-store，不包含密钥或写接口
+- 发布审计先于 Astro 构建，待发布与已发布内容的结构、分类和资产错误会阻止部署
 - docs/demo 内容：`src/docs` submodule，由
   `NAVFOLIO_CONTENT_SOURCE=docs` 选择
 - docs 发布：先推送 `astro-navfolio-docs`，再更新 gitlink 并运行 docs build

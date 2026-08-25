@@ -34,9 +34,33 @@ Git：
 - `KEYSTATIC_SECRET`
 - `PUBLIC_KEYSTATIC_GITHUB_APP_SLUG`
 
-配置完成后，打开 `https://goumin.work/keystatic`。只有对
+配置完成后，先打开 `https://goumin.work/studio` 查看内容队列和部署状态，再进入
+`https://goumin.work/keystatic`。只有对
 `GM2020JLU/GM-WEB` 有写权限的 GitHub 用户才能登录和保存。保存会更新 GitHub
 中的 Markdown/MDX 文件；Vercel 连接该仓库后会自动重新部署。
+
+## 推荐发布流程
+
+每条内容有三个状态：
+
+1. **草稿**：可以不完整，不会进入公开页面；构建检查只给提醒。
+2. **待发布**：进入严格检查，但暂不公开。先用编辑页右上角的“预览”检查桌面、平板、
+   手机和深浅主题。
+3. **已发布**：通过检查后进入公开页面，保存到 GitHub 会触发 Vercel 部署。
+
+`/studio` 会把 Blog、Projects、Vibe、Media 和 About 汇总在一起，按草稿、待发布、
+已发布及内容类型筛选，并显示更新时间、字数、预计阅读时间和分类。它还会比较当前
+Vercel 构建提交与 GitHub `main` 最新提交；两者一致时显示“最新版本已上线”。
+
+## 图片与分类
+
+- 封面、随记图片和书影音封面都使用后台图片选择器，文件统一保存到
+  `src/assets/images/content`。
+- 封面包含有效信息时填写“封面图替代文本”；发布检查也会检查 Markdown 图片的 alt。
+- 标签、分类和系列先在“分类管理”中建立，再在文章中选择，避免同义词和错别字形成
+  重复入口。
+- 每次后台保存会自动刷新 `updatedDate`；发布时间使用可视化日期时间控件，并统一保存
+  为 `+08:00`。
 
 ## 内容兼容边界
 
@@ -51,6 +75,15 @@ Git：
 
 ## 发布前门禁
 
-`bun run build` 会先执行 Keystatic 兼容测试，再构建站点。它会检查所有现有内容
-可被官方 Reader 读取、UTF-8 无乱码，以及正文经官方编辑器往返后 Markdown
-语义树一致。
+`bun run build` 会依次执行内容发布审计和 Keystatic 兼容测试，再构建站点。
+
+- `bun run verify:content`：检查发布状态、必填字段、日期、自动更新时间、重复网址别名、
+  分类引用、图片文件、图片替代文本和测试占位内容。待发布/已发布内容有错误时阻止构建；
+  草稿只提醒。
+- `bun run verify:keystatic`：检查所有现有内容可被官方 Reader 读取、UTF-8 无乱码、
+  日期与自动字段序列化、预览和列表配置，以及正文经官方编辑器往返后 Markdown 语义树
+  一致。
+- `bun test`：运行发布规则与站点工具的单元测试。
+
+预览和工作台会同时通过 HTML、`robots.txt` 与 Vercel 响应头禁止索引和缓存；后台
+密钥只存在于环境变量中，不会进入静态页面。

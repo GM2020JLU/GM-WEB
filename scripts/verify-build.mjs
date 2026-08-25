@@ -37,6 +37,7 @@ function resolvePublicPath(value) {
   }
 
   if (!decoded || !decoded.startsWith('/') || decoded.startsWith('//')) return null;
+  if (decoded === '/keystatic' || decoded.startsWith('/keystatic/')) return null;
 
   if (decoded === '/') return join(dist, 'index.html');
   if (decoded.endsWith('/')) return join(dist, decoded, 'index.html');
@@ -53,6 +54,12 @@ const requiredFiles = [
   'projects/index.html',
   'projects/personal-site/index.html',
   'vibe/index.html',
+  'studio/index.html',
+  'preview/about/index.html',
+  'preview/blog/casdcv/index.html',
+  'preview/render/blog/casdcv/index.html',
+  'preview/vibe/2026-08-23-new-site/index.html',
+  'preview/render/vibe/2026-08-23-new-site/index.html',
   'rss.xml',
   'robots.txt',
   'sitemap-index.xml',
@@ -125,6 +132,18 @@ if (home.includes('avatars.githubusercontent.com')) fail('首页仍依赖 GitHub
 if (home.includes('keystatic-page') || home.includes('react-dom')) {
   fail('公开首页意外加载了 Keystatic/React 后台资源');
 }
+if (existsSync(join(dist, 'blog/casdcv/index.html'))) fail('草稿文章意外出现在公开路由');
+
+const studio = readFileSync(join(dist, 'studio/index.html'), 'utf8');
+for (const marker of ['内容工作台', '进入写作后台', '继续编辑', 'data-deploy-label']) {
+  if (!studio.includes(marker)) fail(`内容工作台缺少：${marker}`);
+}
+if (!studio.includes('noindex,nofollow,noarchive')) fail('内容工作台缺少 noindex');
+
+const preview = readFileSync(join(dist, 'preview/blog/casdcv/index.html'), 'utf8');
+for (const marker of ['页面预览', '桌面', '平板', '手机', '/preview/render/blog/casdcv']) {
+  if (!preview.includes(marker)) fail(`预览工作台缺少：${marker}`);
+}
 
 const manifest = JSON.parse(readFileSync(join(dist, 'manifest.json'), 'utf8'));
 if (manifest.name !== 'Gou Min 的个人站') fail('Web App Manifest 名称不正确');
@@ -137,7 +156,7 @@ const rss = readFileSync(join(dist, 'rss.xml'), 'utf8');
 if (!rss.includes('我为什么重新做了个人站')) fail('RSS 缺少已发布文章');
 
 const robots = readFileSync(join(dist, 'robots.txt'), 'utf8');
-for (const route of ['/keystatic/', '/api/keystatic/']) {
+for (const route of ['/keystatic/', '/api/keystatic/', '/studio', '/preview/']) {
   if (!robots.includes(`Disallow: ${route}`)) fail(`robots.txt 未禁止索引 ${route}`);
 }
 
@@ -157,6 +176,23 @@ if (existsSync(join(vercelOutput, 'config.json'))) {
   for (const route of ['/keystatic', '/api/keystatic']) {
     if (!vercelConfig.includes(route)) fail(`Vercel 未配置后台动态路由：${route}`);
   }
+}
+
+const vercelSourceConfig = JSON.parse(readFileSync(join(root, 'vercel.json'), 'utf8'));
+for (const route of ['/studio', '/preview/(.*)']) {
+  const header = vercelSourceConfig.headers.find((item) => item.source === route);
+  if (!header) fail(`Vercel 缺少私有页面响应头：${route}`);
+  if (!header?.headers.some((item) => item.key === 'X-Robots-Tag')) {
+    fail(`Vercel 私有页面缺少 X-Robots-Tag：${route}`);
+  }
+}
+const globalHeaders = vercelSourceConfig.headers.find((item) => item.source === '/(.*)');
+if (
+  !globalHeaders?.headers.some(
+    (item) => item.key === 'X-Frame-Options' && item.value === 'SAMEORIGIN',
+  )
+) {
+  fail('真实预览需要 X-Frame-Options: SAMEORIGIN');
 }
 
 if (existsSync(vercelStatic)) {

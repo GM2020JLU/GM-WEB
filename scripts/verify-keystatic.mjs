@@ -22,6 +22,31 @@ const browserCoreUrl = pathToFileURL(
 ).href;
 const { fields: browserFields } = await import(browserCoreUrl);
 
+for (const key of ['blog', 'projects', 'vibe', 'media']) {
+  const configured = keystaticConfig.collections[key];
+  assert(configured.previewUrl?.startsWith(`/preview/${key}`), `${key} 未配置真实预览地址`);
+  assert(configured.columns?.includes('publicationStatus'), `${key} 内容列表缺少发布状态列`);
+  assert(configured.schema.publicationStatus, `${key} 缺少发布状态字段`);
+  assert(configured.schema.updatedDate, `${key} 缺少自动更新时间字段`);
+}
+for (const key of ['categories', 'series', 'tags']) {
+  assert(keystaticConfig.collections[key], `缺少受控分类集合：${key}`);
+}
+assert.equal(keystaticConfig.singletons.about.previewUrl, '/preview/about');
+
+const blogSchema = keystaticConfig.collections.blog.schema;
+assert.equal(blogSchema.heroImage.formKind, 'asset', '博客封面未使用媒体选择字段');
+assert.equal(blogSchema.heroImage.directory, 'src/assets/images/content');
+assert.equal(blogSchema.date.parse('2026-08-25T12:34:56+08:00'), '2026-08-25T12:34');
+assert.deepEqual(blogSchema.date.serialize('2026-08-25T12:34'), {
+  value: '2026-08-25T12:34:00+08:00',
+});
+assert.match(
+  blogSchema.updatedDate.serialize('ignored').value,
+  /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}[+-]\d{2}:\d{2}$/u,
+  '自动更新时间格式无效',
+);
+
 function withoutPositions(value) {
   if (Array.isArray(value)) return value.map(withoutPositions);
   if (!value || typeof value !== 'object') return value;

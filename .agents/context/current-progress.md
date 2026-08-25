@@ -1,6 +1,6 @@
 # 当前进度
 
-最后核对：2026-08-23
+最后核对：2026-08-26
 证据：当前功能分支、当前 manifests、lockfile、source、deploy workflow 与上层
 生态地图。
 
@@ -29,6 +29,13 @@
   Astro 内容同步与 Vercel GitHub 模式构建验证。
 - 公开页继续静态预渲染，Keystatic/React 资源不会被首页加载；搜索、
   中文化和资源精简产物会同步到 Vercel Build Output。
+- 内容后台具备草稿、待发布、已发布三段状态，自动更新时间和东八区发布时间控件。
+- 标签、分类、系列改为受控集合；文章封面、随记图片和书影音封面使用媒体字段。
+- `/preview/**` 提供基于真实内容与站点样式的响应式、深浅主题预览，包含未发布内容。
+- `/studio` 汇总内容状态、更新时间、字数、阅读时间与分类，并比较 Vercel 构建提交和
+  GitHub `main` 提交判断上线状态。
+- 构建前内容审计覆盖必填字段、日期、分类引用、图片文件/替代文本、重复 slug 和占位
+  内容；草稿告警，待发布和已发布内容阻止式检查。
 
 ## 过渡中
 
@@ -40,7 +47,7 @@
 - GitHub dependencies 通过远端 commit 和 lockfile 集成，没有统一的 sibling
   workspace linking。
 - deploy 使用 docs submodule `--remote`，但本地可复现仍依赖正确提交 gitlink。
-- 线上 Keystatic 还需要仓库拥有者完成一次 GitHub App 创建/授权，并将生成的
+- 线上 Keystatic 若尚未完成授权，仍需要仓库拥有者创建/授权 GitHub App，并将生成的
   4 个环境变量写入 Vercel；密钥不进入仓库。
 
 ## 已存在但未接入主站

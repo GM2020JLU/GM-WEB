@@ -21,10 +21,25 @@ export function estimateReadingMinutes(source = '') {
   return Math.max(1, Math.ceil(latin / 220 + cjk / 500));
 }
 
-export function getPublicationStatus(data: { publicationStatus?: string; draft?: boolean }) {
+export function getPublicationStatus(data: {
+  publicationStatus?: string;
+  draft?: boolean;
+}): PublicationStatus {
   if (data.publicationStatus === 'ready' || data.publicationStatus === 'published') {
     return data.publicationStatus;
   }
 
   return data.draft ? 'draft' : 'published';
+}
+
+export function matchesContentFilters(
+  item: { status?: string; type?: string; text?: string },
+  filters: { status: string; type: string; query: string },
+) {
+  const query = filters.query.trim().toLocaleLowerCase('zh-CN');
+  return (
+    (filters.status === 'all' || item.status === filters.status) &&
+    (filters.type === 'all' || item.type === filters.type) &&
+    (!query || item.text?.toLocaleLowerCase('zh-CN').includes(query) === true)
+  );
 }

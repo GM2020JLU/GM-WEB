@@ -8,6 +8,7 @@ import {
 } from '@keystatic/core';
 import slugify from '@sindresorhus/slugify';
 import { pinyin } from 'pinyin-pro';
+import { createElement } from 'react';
 
 const repository = {
   owner: 'GM2020JLU',
@@ -47,6 +48,31 @@ const publicationStatus = fields.select({
   defaultValue: 'draft',
   description: '待发布内容会参与检查，只有已发布内容会出现在公开站点。',
 });
+
+function GouminBrandMark({ colorScheme }: { colorScheme: 'light' | 'dark' }) {
+  const ink = colorScheme === 'dark' ? '#dce8df' : '#294331';
+  const paper = colorScheme === 'dark' ? '#243128' : '#eef5ef';
+
+  return createElement(
+    'svg',
+    {
+      'aria-hidden': true,
+      viewBox: '0 0 36 36',
+      width: 32,
+      height: 32,
+      fill: 'none',
+    },
+    createElement('rect', { width: 36, height: 36, rx: 11, fill: ink }),
+    createElement('path', {
+      d: 'M11 23.5V12.8c0-1 .8-1.8 1.8-1.8H24l-2.7 3H15v6.3h4.2v-3h3.6v6.5c-1.8 1.1-3.8 1.7-6 1.7-2.3 0-4.2-.7-5.8-2Z',
+      fill: paper,
+    }),
+    createElement('path', {
+      d: 'M23.5 8.5c1.8 2.7 1.5 5.2-.8 7.5-.4-2.4-1.6-4.1-3.6-5.1 1.4-1.3 2.9-2.1 4.4-2.4Z',
+      fill: '#86b891',
+    }),
+  );
+}
 
 function autoUpdatedDate(): BasicFormField<string> {
   const parse = (value: FormFieldStoredValue) => (typeof value === 'string' ? value : '');
@@ -126,7 +152,7 @@ const taxonomyTitle = fields.slug({
   },
 });
 
-const taxonomyCollection = (label: string, path: string) =>
+const taxonomyCollection = (label: string, path: `${string}/*`) =>
   collection({
     label,
     path,
@@ -172,9 +198,21 @@ const commonArticleFields = (extension: 'md' | 'mdx') => ({
   }),
   heroImageAlt: fields.text({ label: '封面图替代文本', description: '封面包含信息时必填。' }),
   showHeroImage: fields.checkbox({ label: '在文章页显示封面', defaultValue: true }),
-  tags: fields.multiRelationship({ label: '标签', collection: 'tags' }),
-  categories: fields.multiRelationship({ label: '分类', collection: 'categories' }),
-  series: fields.multiRelationship({ label: '系列', collection: 'series' }),
+  tags: fields.multiRelationship({
+    label: '标签',
+    collection: 'tags',
+    description: '描述具体技术或主题，可以选择多个。',
+  }),
+  categories: fields.multiRelationship({
+    label: '分类',
+    collection: 'categories',
+    description: '文章所属的主要栏目，通常只选一个。',
+  }),
+  series: fields.multiRelationship({
+    label: '系列',
+    collection: 'series',
+    description: '只有连续文章需要选择系列。',
+  }),
   comments: fields.checkbox({ label: '开启评论', defaultValue: true }),
   sidebar,
   body: fields.mdx({
@@ -185,7 +223,7 @@ const commonArticleFields = (extension: 'md' | 'mdx') => ({
 });
 
 const projects = collection({
-  label: '项目',
+  label: '项目案例',
   path: 'src/content/projects/*',
   slugField: 'title',
   entryLayout: 'content',
@@ -261,17 +299,16 @@ export default config({
   storage: isGitHubStorage ? { kind: 'github', repo: repository } : { kind: 'local' },
   locale: 'zh-CN',
   ui: {
-    brand: { name: 'Gou Min 写作后台' },
+    brand: { name: 'Gou Min · 创作后台', mark: GouminBrandMark },
     navigation: {
-      写作: ['blog', 'vibe'],
-      展示: ['projects'],
-      页面: ['about'],
-      分类管理: ['categories', 'series', 'tags'],
+      创作与发布: ['blog', 'vibe', 'projects', 'media'],
+      站点页面: ['about'],
+      内容组织: ['categories', 'series', 'tags'],
     },
   },
   collections: {
     blog: collection({
-      label: '博客文章',
+      label: '博客 · 长文',
       path: 'src/content/blog/*',
       slugField: 'title',
       entryLayout: 'content',
@@ -285,7 +322,7 @@ export default config({
     }),
     projects,
     vibe: collection({
-      label: '随记',
+      label: '随记 · 短内容',
       path: 'src/content/vibe/*',
       slugField: 'title',
       entryLayout: 'content',
@@ -319,7 +356,11 @@ export default config({
           }),
           { label: '图片', itemLabel: () => '图片' },
         ),
-        tags: fields.multiRelationship({ label: '标签', collection: 'tags' }),
+        tags: fields.multiRelationship({
+          label: '标签',
+          collection: 'tags',
+          description: '选择已有标签；新标签请先到“内容组织”建立。',
+        }),
         align: fields.select({
           label: '对齐',
           defaultValue: 'left',
@@ -342,7 +383,7 @@ export default config({
       },
     }),
     media: collection({
-      label: '书影音',
+      label: '书影音记录',
       path: 'src/content/media/*',
       slugField: 'title',
       columns: ['publicationStatus', 'type', 'status'],
@@ -393,7 +434,11 @@ export default config({
         }),
         rating: fields.number({ label: '评分', validation: { min: 1, max: 5 } }),
         review: fields.checkbox({ label: '显示长评', defaultValue: false }),
-        tags: fields.multiRelationship({ label: '标签', collection: 'tags' }),
+        tags: fields.multiRelationship({
+          label: '标签',
+          collection: 'tags',
+          description: '选择已有标签；新标签请先到“内容组织”建立。',
+        }),
         externalUrl: fields.url({ label: '外部链接' }),
         body: fields.mdx({ label: '评论', extension: 'md', options: editorOptions }),
       },

@@ -54,6 +54,33 @@ const totals = Object.fromEntries(
 );
 const deployedSha = import.meta.env.VERCEL_GIT_COMMIT_SHA || 'local';
 const builtAt = new Date().toISOString();
+const needsAttention = totals.draft + totals.ready;
+const quickActions = [
+  {
+    label: '写博客',
+    note: '完整文章与技术笔记',
+    href: '/keystatic/collection/blog/create',
+    icon: '文',
+  },
+  {
+    label: '记随记',
+    note: '短想法、照片与片段',
+    href: '/keystatic/collection/vibe/create',
+    icon: '记',
+  },
+  {
+    label: '建项目',
+    note: '项目背景、过程与结果',
+    href: '/keystatic/collection/projects/create',
+    icon: '项',
+  },
+  {
+    label: '加书影音',
+    note: '阅读、电影与音乐记录',
+    href: '/keystatic/collection/media/create',
+    icon: '藏',
+  },
+];
 ---
 
 <!doctype html>
@@ -64,17 +91,81 @@ const builtAt = new Date().toISOString();
   </head>
   <body>
     <main class="shell">
+      <nav class="topbar" aria-label="后台导航">
+        <a class="brand" href="/studio" aria-current="page">
+          <span aria-hidden="true">GM</span>
+          <strong>创作中心</strong>
+        </a>
+        <div>
+          <a href="#create">新建内容</a>
+          <a href="#queue">内容队列</a>
+          <a href="/keystatic">编辑器</a>
+        </div>
+      </nav>
+
       <header class="hero">
         <div>
-          <p class="eyebrow">GOU MIN · PUBLISHING</p>
-          <h1>内容工作台</h1>
-          <p>先看状态和检查结果，再进入编辑器。这里不保存密钥，也不直接修改内容。</p>
+          <p class="eyebrow">GOU MIN · PUBLISHING DESK</p>
+          <h1>今天写点什么？</h1>
+          <p>从这里新建、检查和预览内容；进入编辑器后保存草稿，再按发布流程逐步推进。</p>
         </div>
         <div class="actions">
-          <a class="primary" href="/keystatic">进入写作后台</a>
+          <a class="primary" href="/keystatic">打开内容编辑器</a>
           <a href="/">查看网站</a>
         </div>
       </header>
+
+      <section class="notice" aria-label="待办提醒">
+        <span class="notice-icon" aria-hidden="true">{needsAttention > 0 ? '!' : '✓'}</span>
+        <div>
+          <strong
+            >{
+              needsAttention > 0 ? `${needsAttention} 条内容需要继续处理` : '内容队列已经清空'
+            }</strong
+          >
+          <p>{totals.draft} 条草稿 · {totals.ready} 条待发布；待发布内容会接受完整门禁检查。</p>
+        </div>
+        <a href="#queue">查看队列</a>
+      </section>
+
+      <section class="create-section" id="create">
+        <div class="section-heading">
+          <div><p class="eyebrow">QUICK START</p><h2>新建内容</h2></div>
+          <p>选择内容类型，编辑器会准备对应字段。</p>
+        </div>
+        <div class="quick-grid">
+          {
+            quickActions.map((action) => (
+              <a href={action.href} class="quick-card">
+                <span aria-hidden="true">{action.icon}</span>
+                <div>
+                  <>
+                    <strong>{action.label}</strong>
+                    <small>{action.note}</small>
+                  </>
+                </div>
+                <b aria-hidden="true">→</b>
+              </a>
+            ))
+          }
+        </div>
+      </section>
+
+      <section class="workflow" aria-labelledby="workflow-title">
+        <div>
+          <p class="eyebrow">PUBLISHING FLOW</p>
+          <h2 id="workflow-title">三步发布，不会误上线</h2>
+        </div>
+        <ol>
+          <li><span>1</span><div><strong>草稿</strong><small>放心记录，可以不完整</small></div></li>
+          <li>
+            <span>2</span><div><strong>待发布</strong><small>触发字段、图片与分类检查</small></div>
+          </li>
+          <li>
+            <span>3</span><div><strong>已发布</strong><small>保存后自动部署到网站</small></div>
+          </li>
+        </ol>
+      </section>
 
       <section class="summary" aria-label="内容统计">
         {
@@ -105,18 +196,27 @@ const builtAt = new Date().toISOString();
         </p>
       </section>
 
-      <section class="content-section">
+      <section class="content-section" id="queue">
         <div class="section-heading">
           <div><p class="eyebrow">CONTENT QUEUE</p><h2>继续编辑</h2></div>
-          <label
-            >类型 <select data-type-filter
-              ><option value="all">全部</option>{
-                [...new Set(items.map((item) => item.type))].map((type) => (
-                  <option value={type}>{type}</option>
-                ))
-              }</select
-            ></label
-          >
+          <div class="table-controls">
+            <label class="search-label"
+              ><span class="sr-only">搜索内容</span><input
+                type="search"
+                placeholder="搜索标题或分类"
+                data-search
+              /></label
+            >
+            <label
+              >类型 <select data-type-filter
+                ><option value="all">全部</option>{
+                  [...new Set(items.map((item) => item.type))].map((type) => (
+                    <option value={type}>{type}</option>
+                  ))
+                }</select
+              ></label
+            >
+          </div>
         </div>
         <div class="table-wrap">
           <table>
@@ -131,30 +231,30 @@ const builtAt = new Date().toISOString();
               {
                 items.map((item) => (
                   <tr data-row data-status={item.status} data-type={item.type}>
-                    <td>
+                    <td data-label="内容">
                       <>
                         <span class="kind">{item.type}</span>
                         <strong>{item.title}</strong>
                         <small>{item.id}</small>
                       </>
                     </td>
-                    <td>
+                    <td data-label="状态">
                       <span class:list={['badge', `badge-${item.status}`]}>
                         {statusLabels[item.status]}
                       </span>
                     </td>
-                    <td>
+                    <td data-label="更新时间">
                       {item.date
                         ? item.date.toLocaleDateString('zh-CN', { timeZone: 'Asia/Shanghai' })
                         : '—'}
                     </td>
-                    <td>
+                    <td data-label="篇幅">
                       {item.words} 字 · {item.minutes} 分钟
                     </td>
-                    <td>
+                    <td data-label="分类">
                       <span class="taxonomy">{item.taxonomy.slice(0, 3).join(' · ') || '—'}</span>
                     </td>
-                    <td>
+                    <td data-label="操作">
                       <div class="row-actions">
                         <>
                           <a href={item.previewUrl}>预览</a>
@@ -175,19 +275,27 @@ const builtAt = new Date().toISOString();
     </main>
 
     <script>
+      import { matchesContentFilters } from '../utils/content-metrics';
+
       const filters = document.querySelectorAll('[data-filter]');
       const typeFilter = document.querySelector('[data-type-filter]');
+      const searchInput = document.querySelector('[data-search]');
       const rows = [...document.querySelectorAll('[data-row]')];
       const empty = document.querySelector('[data-empty]');
       let activeStatus = 'all';
       const applyFilters = () => {
         const activeType = typeFilter instanceof HTMLSelectElement ? typeFilter.value : 'all';
+        const query =
+          searchInput instanceof HTMLInputElement
+            ? searchInput.value.trim().toLocaleLowerCase('zh-CN')
+            : '';
         let visible = 0;
         for (const row of rows) {
           if (!(row instanceof HTMLElement)) continue;
-          const show =
-            (activeStatus === 'all' || row.dataset.status === activeStatus) &&
-            (activeType === 'all' || row.dataset.type === activeType);
+          const show = matchesContentFilters(
+            { status: row.dataset.status, type: row.dataset.type, text: row.textContent ?? '' },
+            { status: activeStatus, type: activeType, query },
+          );
           row.hidden = !show;
           if (show) visible++;
         }
@@ -202,6 +310,7 @@ const builtAt = new Date().toISOString();
         }),
       );
       typeFilter?.addEventListener('change', applyFilters);
+      searchInput?.addEventListener('input', applyFilters);
 
       const deployment = document.querySelector('[data-deployed-sha]');
       const deployedSha =
@@ -246,7 +355,42 @@ const builtAt = new Date().toISOString();
   .shell {
     width: min(1180px, calc(100% - 32px));
     margin: 0 auto;
-    padding: 68px 0 96px;
+    padding: 24px 0 96px;
+  }
+  .topbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 72px;
+    padding-bottom: 18px;
+    border-bottom: 1px solid var(--paper-line);
+  }
+  .topbar > div,
+  .brand {
+    display: flex;
+    align-items: center;
+    gap: 18px;
+  }
+  .brand {
+    gap: 10px;
+    padding: 0;
+    border: 0;
+  }
+  .brand > span {
+    display: grid;
+    width: 34px;
+    height: 34px;
+    place-items: center;
+    border-radius: 10px;
+    background: var(--paper-ink);
+    color: var(--paper-bg);
+    font: 700 0.72rem/1 var(--font-meta);
+  }
+  .topbar > div a {
+    padding: 6px 2px;
+    border: 0;
+    color: var(--paper-ink-soft);
+    font-size: 0.83rem;
   }
   .hero,
   .section-heading,
@@ -264,6 +408,40 @@ const builtAt = new Date().toISOString();
     max-width: 56ch;
     color: var(--paper-ink-soft);
     line-height: 1.7;
+  }
+  .notice {
+    display: grid;
+    grid-template-columns: auto 1fr auto;
+    gap: 14px;
+    align-items: center;
+    margin-top: 42px;
+    padding: 17px 18px;
+    border: 1px solid color-mix(in srgb, var(--paper-accent) 35%, var(--paper-line));
+    border-radius: 13px;
+    background: color-mix(in srgb, var(--paper-bg) 90%, var(--paper-accent) 10%);
+  }
+  .notice-icon {
+    display: grid;
+    width: 34px;
+    height: 34px;
+    place-items: center;
+    border-radius: 50%;
+    background: var(--paper-accent);
+    color: white;
+    font-weight: 800;
+  }
+  .notice p,
+  .notice strong {
+    margin: 0;
+  }
+  .notice p {
+    margin-top: 3px;
+    color: var(--paper-ink-soft);
+    font-size: 0.83rem;
+  }
+  .notice > a {
+    padding: 7px 10px;
+    font-size: 0.8rem;
   }
   .eyebrow {
     margin: 0;
@@ -297,11 +475,135 @@ const builtAt = new Date().toISOString();
     background: var(--paper-accent);
     color: white;
   }
+  a:focus-visible,
+  button:focus-visible,
+  input:focus-visible,
+  select:focus-visible {
+    outline: 3px solid color-mix(in srgb, var(--paper-accent) 38%, transparent);
+    outline-offset: 2px;
+  }
+  .create-section {
+    margin-top: 64px;
+  }
+  .section-heading > p {
+    max-width: 34ch;
+    margin: 0;
+    color: var(--paper-ink-soft);
+    font-size: 0.84rem;
+    line-height: 1.6;
+    text-align: right;
+  }
+  .quick-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 12px;
+    margin-top: 20px;
+  }
+  .quick-card {
+    display: grid;
+    grid-template-columns: auto 1fr auto;
+    gap: 12px;
+    align-items: center;
+    padding: 18px;
+    border-color: var(--paper-line);
+    background: color-mix(in srgb, var(--paper-bg) 96%, var(--paper-accent) 4%);
+    transition:
+      border-color 160ms ease,
+      transform 160ms ease,
+      box-shadow 160ms ease;
+  }
+  .quick-card:hover {
+    border-color: var(--paper-accent);
+    box-shadow: 0 10px 28px rgba(31, 57, 38, 0.08);
+    transform: translateY(-2px);
+  }
+  .quick-card > span {
+    display: grid;
+    width: 36px;
+    height: 36px;
+    place-items: center;
+    border-radius: 10px;
+    background: color-mix(in srgb, var(--paper-accent) 13%, var(--paper-bg));
+    color: var(--paper-accent);
+    font-family: var(--font-page-heading);
+  }
+  .quick-card div {
+    display: grid;
+    gap: 3px;
+  }
+  .quick-card small {
+    color: var(--paper-ink-faint);
+    font-size: 0.72rem;
+    line-height: 1.45;
+  }
+  .quick-card b {
+    color: var(--paper-accent);
+    font-weight: 500;
+  }
+  .workflow {
+    display: grid;
+    grid-template-columns: minmax(220px, 0.8fr) 2fr;
+    gap: 42px;
+    align-items: center;
+    margin-top: 34px;
+    padding: 30px;
+    border: 1px solid var(--paper-line);
+    border-radius: 16px;
+  }
+  .workflow ol {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 0;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+  .workflow li {
+    position: relative;
+    display: flex;
+    gap: 10px;
+    align-items: center;
+  }
+  .workflow li:not(:last-child)::after {
+    position: absolute;
+    top: 17px;
+    right: 12px;
+    left: 44px;
+    z-index: 0;
+    height: 1px;
+    background: var(--paper-line-strong);
+    content: '';
+  }
+  .workflow li > span {
+    z-index: 1;
+    display: grid;
+    flex: 0 0 auto;
+    width: 34px;
+    height: 34px;
+    place-items: center;
+    border: 1px solid var(--paper-line-strong);
+    border-radius: 50%;
+    background: var(--paper-bg);
+    color: var(--paper-accent);
+    font-weight: 700;
+  }
+  .workflow li div {
+    z-index: 1;
+    display: grid;
+    gap: 3px;
+    padding-right: 10px;
+    background: var(--paper-bg);
+  }
+  .workflow small {
+    color: var(--paper-ink-faint);
+    font-size: 0.7rem;
+    line-height: 1.4;
+  }
   .summary {
     display: grid;
     grid-template-columns: repeat(4, 1fr);
     gap: 12px;
-    margin: 48px 0 18px;
+    margin: 34px 0 18px;
   }
   .summary button {
     display: flex;
@@ -359,6 +661,20 @@ const builtAt = new Date().toISOString();
   .section-heading label {
     color: var(--paper-ink-soft);
     font-size: 0.85rem;
+  }
+  .table-controls {
+    display: flex;
+    gap: 10px;
+    align-items: center;
+  }
+  .search-label input {
+    width: 210px;
+    padding: 9px 11px;
+    border: 1px solid var(--paper-line-strong);
+    border-radius: 9px;
+    background: var(--paper-bg);
+    color: inherit;
+    font: inherit;
   }
   select {
     margin-left: 8px;
@@ -446,7 +762,17 @@ const builtAt = new Date().toISOString();
   }
   @media (max-width: 720px) {
     .shell {
-      padding-top: 34px;
+      padding-top: 16px;
+    }
+    .topbar {
+      align-items: flex-start;
+      flex-direction: column;
+      margin-bottom: 42px;
+    }
+    .topbar > div {
+      width: 100%;
+      justify-content: space-between;
+      gap: 8px;
     }
     .hero,
     .section-heading,
@@ -457,8 +783,95 @@ const builtAt = new Date().toISOString();
     .summary {
       grid-template-columns: repeat(2, 1fr);
     }
+    .notice {
+      grid-template-columns: auto 1fr;
+    }
+    .notice > a {
+      grid-column: 2;
+      justify-self: start;
+    }
     .actions {
       flex-wrap: wrap;
+    }
+    .quick-grid {
+      grid-template-columns: 1fr;
+    }
+    .workflow {
+      grid-template-columns: 1fr;
+      gap: 22px;
+      padding: 22px;
+    }
+    .workflow ol {
+      grid-template-columns: 1fr;
+      gap: 18px;
+    }
+    .workflow li:not(:last-child)::after {
+      top: 34px;
+      bottom: -18px;
+      left: 17px;
+      width: 1px;
+      height: auto;
+    }
+    .section-heading > p {
+      text-align: left;
+    }
+    .table-controls {
+      width: 100%;
+      align-items: stretch;
+      flex-direction: column;
+    }
+    .search-label input {
+      width: 100%;
+    }
+    .table-wrap {
+      overflow: visible;
+      border: 0;
+    }
+    table,
+    tbody,
+    tr,
+    td {
+      display: block;
+      width: 100%;
+      min-width: 0;
+    }
+    thead {
+      display: none;
+    }
+    tbody {
+      display: grid;
+      gap: 12px;
+    }
+    tbody tr {
+      padding: 14px;
+      border: 1px solid var(--paper-line);
+      border-radius: 13px;
+    }
+    td,
+    td:first-child {
+      display: grid;
+      grid-template-columns: 88px 1fr;
+      gap: 6px 10px;
+      padding: 9px 4px;
+      border-bottom: 1px dashed var(--paper-line);
+    }
+    td::before {
+      color: var(--paper-ink-faint);
+      font-size: 0.72rem;
+      content: attr(data-label);
+    }
+    td:first-child .kind {
+      display: none;
+    }
+    td:first-child strong,
+    td:first-child small {
+      grid-column: 2;
+    }
+    td:last-child {
+      border-bottom: 0;
+    }
+    .row-actions {
+      grid-column: 2;
     }
   }
 </style>

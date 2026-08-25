@@ -34,7 +34,8 @@ Git：
 - `KEYSTATIC_SECRET`
 - `PUBLIC_KEYSTATIC_GITHUB_APP_SLUG`
 
-配置完成后，先打开 `https://goumin.work/studio` 查看内容队列和部署状态，再进入
+配置完成后，先打开 `https://goumin.work/studio`。工作台首页提供四类内容的“新建”
+快捷入口、草稿/待发布提醒、发布流程、搜索和筛选；需要管理全部内容或分类时，再进入
 `https://goumin.work/keystatic`。只有对
 `GM2020JLU/GM-WEB` 有写权限的 GitHub 用户才能登录和保存。保存会更新 GitHub
 中的 Markdown/MDX 文件；Vercel 连接该仓库后会自动重新部署。
@@ -48,9 +49,13 @@ Git：
    手机和深浅主题。
 3. **已发布**：通过检查后进入公开页面，保存到 GitHub 会触发 Vercel 部署。
 
-`/studio` 会把 Blog、Projects、Vibe、Media 和 About 汇总在一起，按草稿、待发布、
-已发布及内容类型筛选，并显示更新时间、字数、预计阅读时间和分类。它还会比较当前
+`/studio` 会把 Blog、Projects、Vibe、Media 和 About 汇总在一起，支持关键词、状态与
+内容类型的组合筛选，并显示更新时间、字数、预计阅读时间和分类。它还会比较当前
 Vercel 构建提交与 GitHub `main` 最新提交；两者一致时显示“最新版本已上线”。
+
+Keystatic 内部按“创作与发布 / 站点页面 / 内容组织”分组。新内容先进入草稿；正文完成
+后切换为待发布并打开预览，检查无误再切换为已发布。工作台和编辑器都使用中文名称，
+但仓库里的文件格式与目录保持不变。
 
 ## 图片与分类
 
@@ -84,6 +89,10 @@ Vercel 构建提交与 GitHub `main` 最新提交；两者一致时显示“最�
   日期与自动字段序列化、预览和列表配置，以及正文经官方编辑器往返后 Markdown 语义树
   一致。
 - `bun test`：运行发布规则与站点工具的单元测试。
+- `bun run test:keystatic-crud`：在独立临时目录中创建、读取、二次保存和删除所有内容
+  类型，同时检查图片、分类关系、目录树、跨域头与路径穿越保护，不修改真实文章。
+- `bun run test:full`：一次执行格式与静态检查、TypeScript/Astro 检查、主站构建、构建
+  产物验证、全部单元测试、Keystatic CRUD 回归及 docs 内容构建；发布前以它为准。
 
 预览和工作台会同时通过 HTML、`robots.txt` 与 Vercel 响应头禁止索引和缓存；后台
 密钥只存在于环境变量中，不会进入静态页面。

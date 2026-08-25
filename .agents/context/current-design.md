@@ -45,9 +45,9 @@ resolved modules
 `<command>:new <filename> [output-directory]` 参数、模板渲染和安全写入；Blog 的
 宿主模板位于 `scripts/templates/post.md`。
 
-`src/content.config.ts` 当前仍拥有具体 schemas。关闭 module 后，对应公开 route、默认
-navigation、scaffold 和 i18n contribution 会消失；Media collection 仍注册给私有后台、
-工作台与预览使用。
+`src/content.config.ts` 当前仍拥有具体 schemas。Projects、Vibe 和 Media collection
+始终注册给私有后台、工作台与预览使用；关闭 module 后，仅对应公开 route、默认
+navigation、scaffold 和 i18n contribution 消失。
 
 ## Core、Theme 与 Runtime
 
@@ -78,8 +78,9 @@ navigation、scaffold 和 i18n contribution 会消失；Media collection 仍注�
   `draft` 字段并为公开路由派生布尔值；后台保存自动写入 `updatedDate`
 - `src/content/taxonomies` 保存受控标签、分类和系列；图片统一写入
   `src/assets/images/content`
-- `/studio` 是只读静态运营工作台，`/preview/**` 是同源 iframe 预览壳与真实渲染页；
-  两者均 noindex/no-store，不包含密钥或写接口
+- `/studio` 是只读静态运营工作台，提供快捷创建、发布指引、状态汇总和组合筛选；
+  `/preview/**` 是同源 iframe 预览壳与真实渲染页；两者均 noindex/no-store，不包含密钥
+  或写接口
 - 发布审计先于 Astro 构建，待发布与已发布内容的结构、分类和资产错误会阻止部署
 - docs/demo 内容：`src/docs` submodule，由
   `NAVFOLIO_CONTENT_SOURCE=docs` 选择

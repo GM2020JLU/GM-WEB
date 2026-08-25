@@ -1,0 +1,22 @@
+---
+import { getCollection, render } from 'astro:content';
+import EntryPreview from '../../../../components/studio/EntryPreview.astro';
+
+export async function getStaticPaths() {
+  return (await getCollection('vibe')).map((entry) => ({
+    params: { slug: entry.id },
+    props: entry,
+  }));
+}
+const entry = Astro.props;
+const { Content } = await render(entry);
+---
+
+<EntryPreview
+  title={entry.data.title || '未命名随记'}
+  date={entry.data.date}
+  mood={entry.data.mood}
+  location={entry.data.location}
+  tags={entry.data.tags}
+  images={entry.data.images}><Content /></EntryPreview
+>

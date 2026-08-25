@@ -1,0 +1,13 @@
+---
+import { getCollection } from 'astro:content';
+import PreviewWorkbench from '../../components/studio/PreviewWorkbench.astro';
+const [entry] = await getCollection('about');
+if (!entry) throw new Error('Missing about entry');
+---
+
+<PreviewWorkbench
+  title={entry.data.title}
+  status={entry.data.publicationStatus}
+  renderUrl="/preview/render/about"
+  editorUrl="/keystatic/singleton/about"
+/>

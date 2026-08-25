@@ -1,0 +1,186 @@
+---
+import BaseHead from '../BaseHead.astro';
+
+interface Props {
+  title: string;
+  renderUrl: string;
+  editorUrl: string;
+  status?: string;
+}
+
+const { title, renderUrl, editorUrl, status = 'draft' } = Astro.props;
+const statusLabels: Record<string, string> = {
+  draft: '草稿',
+  ready: '待发布',
+  published: '已发布',
+};
+---
+
+<!doctype html>
+<html lang="zh-CN" data-palette="green-soft">
+  <head>
+    <BaseHead title={`预览：${title}`} description="内容发布前预览" />
+    <meta name="robots" content="noindex,nofollow,noarchive" />
+  </head>
+  <body>
+    <header class="toolbar">
+      <div class="identity">
+        <a href="/studio" class="back">工作台</a>
+        <span class:list={['status', `status-${status}`]}>{statusLabels[status] ?? status}</span>
+        <strong>{title}</strong>
+      </div>
+      <div class="controls" aria-label="预览设置">
+        <div class="segmented" role="group" aria-label="设备宽度">
+          <button type="button" data-width="100%" aria-pressed="true">桌面</button>
+          <button type="button" data-width="820px" aria-pressed="false">平板</button>
+          <button type="button" data-width="390px" aria-pressed="false">手机</button>
+        </div>
+        <button type="button" class="theme" data-preview-theme>深色</button>
+        <a href={editorUrl} class="edit">返回编辑</a>
+      </div>
+    </header>
+    <main class="stage">
+      <iframe title={`${title} 页面预览`} src={renderUrl}></iframe>
+    </main>
+    <script>
+      const frame = document.querySelector('iframe');
+      const widthButtons = document.querySelectorAll('[data-width]');
+      const themeButton = document.querySelector('[data-preview-theme]');
+      let theme = 'light';
+
+      for (const button of widthButtons) {
+        button.addEventListener('click', () => {
+          if (!(button instanceof HTMLButtonElement) || !(frame instanceof HTMLIFrameElement))
+            return;
+          frame.style.width = button.dataset.width ?? '100%';
+          widthButtons.forEach((item) =>
+            item.setAttribute('aria-pressed', String(item === button)),
+          );
+        });
+      }
+
+      const applyTheme = () => {
+        if (!(frame instanceof HTMLIFrameElement)) return;
+        const root = frame.contentDocument?.documentElement;
+        if (root) {
+          root.dataset.theme = theme;
+          root.classList.toggle('dark', theme === 'dark');
+        }
+      };
+
+      frame?.addEventListener('load', applyTheme);
+      themeButton?.addEventListener('click', () => {
+        theme = theme === 'light' ? 'dark' : 'light';
+        themeButton.textContent = theme === 'light' ? '深色' : '浅色';
+        applyTheme();
+      });
+    </script>
+  </body>
+</html>
+
+<style>
+  :global(*) {
+    box-sizing: border-box;
+  }
+  :global(html),
+  :global(body) {
+    height: 100%;
+    margin: 0;
+  }
+  body {
+    display: grid;
+    grid-template-rows: auto 1fr;
+    background: #e8ebe7;
+    color: #243128;
+    font-family: system-ui, sans-serif;
+  }
+  .toolbar {
+    display: flex;
+    gap: 18px;
+    align-items: center;
+    justify-content: space-between;
+    min-height: 64px;
+    padding: 10px 18px;
+    border-bottom: 1px solid #cad1cb;
+    background: rgba(250, 252, 249, 0.96);
+  }
+  .identity,
+  .controls,
+  .segmented {
+    display: flex;
+    gap: 10px;
+    align-items: center;
+  }
+  .identity strong {
+    max-width: 36vw;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  a,
+  button {
+    border: 1px solid #bdc8bf;
+    border-radius: 8px;
+    background: white;
+    color: inherit;
+    font: inherit;
+    text-decoration: none;
+    cursor: pointer;
+  }
+  a,
+  button {
+    padding: 8px 11px;
+  }
+  .status {
+    padding: 4px 8px;
+    border-radius: 999px;
+    font-size: 0.78rem;
+    background: #e5e8e5;
+  }
+  .status-ready {
+    background: #fff1bd;
+    color: #725800;
+  }
+  .status-published {
+    background: #d7efdd;
+    color: #185b2b;
+  }
+  button[aria-pressed='true'],
+  .edit {
+    border-color: #53795d;
+    background: #53795d;
+    color: white;
+  }
+  .stage {
+    display: flex;
+    overflow: auto;
+    justify-content: center;
+    padding: 18px;
+  }
+  iframe {
+    width: 100%;
+    height: 100%;
+    min-height: 640px;
+    border: 0;
+    border-radius: 10px;
+    background: white;
+    box-shadow: 0 12px 36px rgba(28, 42, 32, 0.16);
+    transition: width 180ms ease;
+  }
+  @media (max-width: 760px) {
+    .toolbar {
+      align-items: stretch;
+      flex-direction: column;
+    }
+    .identity,
+    .controls {
+      flex-wrap: wrap;
+    }
+    .identity strong {
+      max-width: 70vw;
+    }
+    .stage {
+      padding: 8px;
+    }
+  }
+</style>

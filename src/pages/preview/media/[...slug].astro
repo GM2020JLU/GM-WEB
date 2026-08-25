@@ -1,0 +1,21 @@
+---
+import { getCollection } from 'astro:content';
+import PreviewWorkbench from '../../../components/studio/PreviewWorkbench.astro';
+import { hasContentFiles } from '../../../utils/content-source';
+
+export async function getStaticPaths() {
+  const entries = hasContentFiles('media') ? await getCollection('media') : [];
+  return entries.map((entry) => ({
+    params: { slug: entry.id },
+    props: entry,
+  }));
+}
+const entry = Astro.props;
+---
+
+<PreviewWorkbench
+  title={entry.data.title}
+  status={entry.data.publicationStatus}
+  renderUrl={`/preview/render/media/${entry.id}`}
+  editorUrl={`/keystatic/collection/media/item/${entry.id}`}
+/>

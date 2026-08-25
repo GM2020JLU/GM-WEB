@@ -1,0 +1,23 @@
+---
+import { getCollection, render } from 'astro:content';
+import EntryPreview from '../../../../components/studio/EntryPreview.astro';
+import { hasContentFiles } from '../../../../utils/content-source';
+
+export async function getStaticPaths() {
+  const entries = hasContentFiles('media') ? await getCollection('media') : [];
+  return entries.map((entry) => ({
+    params: { slug: entry.id },
+    props: entry,
+  }));
+}
+const entry = Astro.props;
+const { Content } = await render(entry);
+---
+
+<EntryPreview
+  title={entry.data.title}
+  creator={entry.data.creator}
+  tags={entry.data.tags}
+  cover={entry.data.cover}
+  rating={entry.data.rating}><Content /></EntryPreview
+>

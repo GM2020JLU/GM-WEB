@@ -1,0 +1,146 @@
+---
+import type { ImageMetadata } from 'astro';
+import FormattedDate from '../FormattedDate.astro';
+import SmartImage from '../SmartImage.astro';
+import BaseLayout from '../../layouts/BaseLayout.astro';
+
+interface Props {
+  title: string;
+  description?: string;
+  date?: Date;
+  creator?: string;
+  mood?: string;
+  location?: string;
+  tags?: string[];
+  images?: Array<ImageMetadata | string>;
+  cover?: ImageMetadata | string;
+  rating?: number;
+}
+
+const {
+  title,
+  description = '后台真实样式预览',
+  date,
+  creator,
+  mood,
+  location,
+  tags = [],
+  images = [],
+  cover,
+  rating,
+} = Astro.props;
+---
+
+<BaseLayout title={title} description={description}>
+  <main class="preview-page" data-pagefind-ignore>
+    <article class="preview-card">
+      <header>
+        <p class="eyebrow">内容预览</p>
+        <h1>{title}</h1>
+        <div class="meta">
+          {date && <FormattedDate date={date} />}
+          {creator && <span>{creator}</span>}
+          {mood && <span>{mood}</span>}
+          {location && <span>{location}</span>}
+          {rating && <span aria-label={`评分 ${rating} 星`}>{'★'.repeat(rating)}</span>}
+        </div>
+        {
+          tags.length > 0 && (
+            <p class="tags">
+              {tags.map((tag) => (
+                <span>#{tag}</span>
+              ))}
+            </p>
+          )
+        }
+      </header>
+      {cover && <SmartImage src={cover} width={420} height={560} alt={`${title}封面`} />}
+      <div class="prose"><slot /></div>
+      {
+        images.length > 0 && (
+          <div class="gallery">
+            {images.map((image, index) => (
+              <SmartImage src={image} width={1020} height={680} alt={`${title}配图 ${index + 1}`} />
+            ))}
+          </div>
+        )
+      }
+    </article>
+  </main>
+</BaseLayout>
+
+<style>
+  .preview-page {
+    width: min(100% - 32px, 820px);
+    margin: 0 auto;
+    padding: 118px 0 72px;
+  }
+  .preview-card {
+    padding: clamp(24px, 6vw, 58px);
+    border: 1px solid var(--paper-line);
+    border-radius: 18px;
+    background: color-mix(in srgb, var(--paper-bg) 94%, transparent);
+    box-shadow: 0 18px 60px rgba(26, 42, 30, 0.08);
+  }
+  .eyebrow {
+    margin: 0 0 12px;
+    color: var(--paper-accent);
+    font: 700 0.72rem/1.4 var(--font-meta);
+    letter-spacing: 0.16em;
+  }
+  h1 {
+    margin: 0;
+    color: var(--paper-ink);
+    font-family: var(--font-page-heading);
+    font-size: clamp(2rem, 6vw, 3.7rem);
+    font-weight: 400;
+    line-height: 1.08;
+  }
+  .meta,
+  .tags {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px 16px;
+    color: var(--paper-ink-faint);
+    font: 600 0.78rem/1.6 var(--font-meta);
+  }
+  .meta {
+    margin-top: 16px;
+  }
+  .meta > * + *::before {
+    margin-right: 16px;
+    content: '/';
+  }
+  .tags {
+    margin: 8px 0 0;
+    color: var(--paper-accent);
+  }
+  .preview-card > :global(img) {
+    width: min(100%, 300px);
+    margin: 30px 0;
+    border-radius: 10px;
+  }
+  .prose {
+    margin-top: 36px;
+    color: var(--paper-ink);
+    font-family: var(--font-serif-cn);
+    font-size: 1.05rem;
+    line-height: 1.9;
+  }
+  .prose :global(h2) {
+    margin-top: 2em;
+    font-family: var(--font-page-heading);
+    font-weight: 500;
+  }
+  .gallery {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: 14px;
+    margin-top: 28px;
+  }
+  .gallery :global(img) {
+    width: 100%;
+    height: auto;
+    border-radius: 10px;
+  }
+</style>

@@ -1,0 +1,19 @@
+---
+import { getCollection } from 'astro:content';
+import PreviewWorkbench from '../../../components/studio/PreviewWorkbench.astro';
+
+export async function getStaticPaths() {
+  return (await getCollection('vibe')).map((entry) => ({
+    params: { slug: entry.id },
+    props: entry,
+  }));
+}
+const entry = Astro.props;
+---
+
+<PreviewWorkbench
+  title={entry.data.title || '未命名随记'}
+  status={entry.data.publicationStatus}
+  renderUrl={`/preview/render/vibe/${entry.id}`}
+  editorUrl={`/keystatic/collection/vibe/item/${entry.id}`}
+/>

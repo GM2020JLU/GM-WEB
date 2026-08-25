@@ -1,0 +1,19 @@
+---
+import { getCollection } from 'astro:content';
+import PreviewWorkbench from '../../../components/studio/PreviewWorkbench.astro';
+
+export async function getStaticPaths() {
+  return (await getCollection('blog')).map((entry) => ({
+    params: { slug: entry.id },
+    props: entry,
+  }));
+}
+const entry = Astro.props;
+---
+
+<PreviewWorkbench
+  title={entry.data.title}
+  status={entry.data.publicationStatus}
+  renderUrl={`/preview/render/blog/${entry.id}`}
+  editorUrl={`/keystatic/collection/blog/item/${entry.id}`}
+/>

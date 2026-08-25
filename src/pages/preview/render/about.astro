@@ -1,0 +1,14 @@
+---
+import { getCollection, render } from 'astro:content';
+import BlogArticle from '../../../layouts/BlogArticle.astro';
+const [entry] = await getCollection('about');
+if (!entry) throw new Error('Missing about entry');
+const { Content, headings } = await render(entry);
+---
+
+<BlogArticle
+  post={{ ...entry, data: { ...entry.data, comments: false } }}
+  headings={headings}
+  sidebar={{ enable: false }}
+  contentFont="ui"><Content /></BlogArticle
+>

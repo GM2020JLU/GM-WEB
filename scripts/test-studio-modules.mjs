@@ -5,8 +5,16 @@ import { spawn, spawnSync } from 'node:child_process';
 const port = 4393;
 const origin = `http://127.0.0.1:${port}`;
 const definitions = [
-  { collection: 'blog', title: '模块回归博客', description: '博客模块回归内容。' },
-  { collection: 'projects', title: '模块回归项目', description: '项目模块回归内容。' },
+  {
+    collection: 'blog',
+    title: '模块回归博客',
+    description: '这是用于验证博客模块发布流程的完整摘要。',
+  },
+  {
+    collection: 'projects',
+    title: '模块回归项目',
+    description: '这是用于验证项目模块发布流程的完整摘要。',
+  },
   { collection: 'vibe', title: '模块回归随记', description: '' },
   { collection: 'media', title: '模块回归书影音', description: '', creator: '回归作者' },
 ];

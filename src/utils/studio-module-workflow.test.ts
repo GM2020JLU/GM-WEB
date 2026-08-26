@@ -8,8 +8,8 @@ const definitions: Array<{
   description: string;
   extension: 'md' | 'mdx';
 }> = [
-  { collection: 'blog', description: '博客摘要', extension: 'md' },
-  { collection: 'projects', description: '项目摘要', extension: 'mdx' },
+  { collection: 'blog', description: '这是用于验证博客发布流程的完整摘要。', extension: 'md' },
+  { collection: 'projects', description: '这是用于验证项目发布流程的完整摘要。', extension: 'mdx' },
   { collection: 'vibe', description: '', extension: 'md' },
   { collection: 'media', creator: '测试作者', description: '', extension: 'md' },
 ];
@@ -52,7 +52,7 @@ describe('Studio 各内容模块完整工作流', () => {
   }
 
   test('关于页完成编辑与发布', () => {
-    const source = `---\ntitle: 关于我\ndescription: 关于页摘要\ndate: '2026-08-26T10:00:00+08:00'\npublicationStatus: draft\ndraft: true\n---\n\n# 关于正文`;
+    const source = `---\ntitle: 关于我\ndescription: 这是用于验证关于页面发布流程的完整摘要。\ndate: '2026-08-26T10:00:00+08:00'\npublicationStatus: draft\ndraft: true\n---\n\n# 关于正文`;
     const document = parseStudioDocument('about', 'about', source);
     const published = serializeStudioDocument(
       'about',

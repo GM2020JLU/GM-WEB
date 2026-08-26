@@ -74,6 +74,7 @@ export function setupMarkdownImport(
   const title = requiredElement<HTMLInputElement>(document, '[data-title]');
   const slug = requiredElement<HTMLInputElement>(document, '[data-slug]');
   const description = requiredElement<HTMLTextAreaElement>(document, '[data-description]');
+  const descriptionField = requiredElement<HTMLElement>(document, '[data-description-field]');
   const creator = requiredElement<HTMLInputElement>(document, '[data-creator]');
   const creatorField = requiredElement<HTMLElement>(document, '[data-creator-field]');
   const parseState = requiredElement<HTMLElement>(document, '[data-parse-state]');
@@ -115,7 +116,9 @@ export function setupMarkdownImport(
     const isMedia = collection.value === 'media';
     creatorField.hidden = !isMedia;
     creator.required = isMedia;
-    description.required = collection.value === 'blog' || collection.value === 'projects';
+    const needsDescription = collection.value === 'blog' || collection.value === 'projects';
+    descriptionField.hidden = !needsDescription;
+    description.required = needsDescription;
   };
 
   const loadFile = async (file: File) => {

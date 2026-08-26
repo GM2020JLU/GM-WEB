@@ -220,7 +220,7 @@ export async function readStudioFileAtRef(path: string, ref: string, token: stri
 
 export async function getStudioDeployment(token?: string, targetSha?: string, runtimeSha?: string) {
   const client = publicOrAuthenticatedGitHub(token);
-  const [commit, deployments] = await Promise.all([
+  const [commit, deployments, combinedStatus] = await Promise.all([
     client.request('GET /repos/{owner}/{repo}/commits/{ref}', {
       ...repository,
       ref: repository.branch,
@@ -232,10 +232,17 @@ export async function getStudioDeployment(token?: string, targetSha?: string, ru
       per_page: 10,
       headers: { 'X-GitHub-Api-Version': '2022-11-28' },
     }),
+    targetSha
+      ? client.request('GET /repos/{owner}/{repo}/commits/{ref}/status', {
+          ...repository,
+          ref: targetSha,
+          headers: { 'X-GitHub-Api-Version': '2022-11-28' },
+        })
+      : Promise.resolve(undefined),
   ]);
   const allDeployments = deployments.data as any[];
   const latest = targetSha
-    ? (allDeployments.find((deployment) => deployment.sha === targetSha) ?? allDeployments[0])
+    ? allDeployments.find((deployment) => deployment.sha === targetSha)
     : allDeployments[0];
   let status: any;
   if (latest) {
@@ -253,6 +260,10 @@ export async function getStudioDeployment(token?: string, targetSha?: string, ru
   const repositorySha = (commit.data as any).sha as string;
   const deploymentSha = latest?.sha as string | undefined;
   const deploymentState = status?.state as string | undefined;
+  const commitState = (combinedStatus?.data as any)?.state as string | undefined;
+  const vercelStatus = ((combinedStatus?.data as any)?.statuses as any[] | undefined)?.find(
+    (entry) => String(entry.context).toLowerCase() === 'vercel',
+  );
   const phase = targetSha
     ? resolveStudioDeploymentPhase({
         targetSha,
@@ -260,6 +271,7 @@ export async function getStudioDeployment(token?: string, targetSha?: string, ru
         repositorySha,
         deploymentSha,
         deploymentState,
+        commitState,
       })
     : 'submitted';
   return {
@@ -268,10 +280,10 @@ export async function getStudioDeployment(token?: string, targetSha?: string, ru
     runtimeSha,
     repositorySha,
     deploymentSha,
-    state: status?.state ?? (latest ? 'pending' : 'unknown'),
+    state: status?.state ?? commitState ?? (latest ? 'pending' : 'unknown'),
     environment: latest?.environment ?? 'Production',
     updatedAt: status?.updated_at ?? latest?.updated_at,
-    logUrl: status?.log_url ?? latest?.statuses_url,
+    logUrl: status?.log_url ?? vercelStatus?.target_url ?? latest?.statuses_url,
   };
 }
 

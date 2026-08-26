@@ -48,6 +48,8 @@ describe('Studio 发布进度', () => {
         deploymentState: 'failure',
       }),
     ).toBe('error');
+    expect(resolveStudioDeploymentPhase({ targetSha, commitState: 'failure' })).toBe('error');
+    expect(resolveStudioDeploymentPhase({ targetSha, commitState: 'pending' })).toBe('building');
     expect(resolveStudioDeploymentPhase({ targetSha, runtimeSha: targetSha })).toBe('ready');
   });
 });

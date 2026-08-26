@@ -20,6 +20,7 @@ export interface PendingStudioDeployment {
 export const STUDIO_DEPLOYMENT_STORAGE_KEY = 'gm-studio-pending-deployment';
 
 export function resolveStudioDeploymentPhase(input: {
+  commitState?: string;
   deploymentSha?: string;
   deploymentState?: string;
   repositorySha?: string;
@@ -27,13 +28,14 @@ export function resolveStudioDeploymentPhase(input: {
   targetSha: string;
 }): StudioDeploymentPhase {
   if (input.runtimeSha === input.targetSha) return 'ready';
+  if (['error', 'failure'].includes(input.commitState ?? '')) return 'error';
   if (
     input.deploymentSha === input.targetSha &&
     ['error', 'failure'].includes(input.deploymentState ?? '')
   ) {
     return 'error';
   }
-  if (input.deploymentSha === input.targetSha) return 'building';
+  if (input.deploymentSha === input.targetSha || input.commitState === 'pending') return 'building';
   if (input.repositorySha === input.targetSha) return 'queued';
   return 'submitted';
 }

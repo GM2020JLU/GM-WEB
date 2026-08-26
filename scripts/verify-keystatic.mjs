@@ -75,7 +75,24 @@ function withoutPositions(value) {
   return Object.fromEntries(
     Object.entries(value)
       .filter(([key]) => key !== 'position')
-      .map(([key, child]) => [key, withoutPositions(child)]),
+      .map(([key, child]) => {
+        if (key === 'value' && typeof child === 'string' && child.includes('|')) {
+          const normalized = child
+            .split('\n')
+            .filter((line) => !/^\s*\|?(?:\s*:?-+:?\s*\|)+\s*$/u.test(line))
+            .map((line) =>
+              line.includes('|')
+                ? line
+                    .split('|')
+                    .map((cell) => cell.trim())
+                    .join('|')
+                : line,
+            )
+            .join('\n');
+          return [key, normalized];
+        }
+        return [key, withoutPositions(child)];
+      }),
   );
 }
 

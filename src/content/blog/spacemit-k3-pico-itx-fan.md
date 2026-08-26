@@ -1,13 +1,9 @@
 ---
-images: []
-align: left
-size: md
 title: K3 Pico-ITX 风扇策略与配置指南
 publicationStatus: published
 draft: false
-description: xascasca
+description: K3 Pico-ITX Linux 自动温控、sysfs 与 ectool 风扇调试，以及 DTS 配置的完整指南。
 date: 2026-08-26T15:22:00+08:00
-type: text
 tags: []
 updatedDate: 2026-08-26T15:23:15+08:00
 ---
@@ -250,7 +246,7 @@ echo disabled > "$TZ/mode"
 核心设备树配置如下。示例只展示前两个 trip 和 cooling map，其余温度点使用
 相同结构继续定义：
 
-```dts
+```c
 fan0: pwm-fan {
     compatible = "pwm-fan";
     pwms = <&cros_ec_pwm 0>;
@@ -315,7 +311,7 @@ thermal_cluster0 {
 提高 `cooling-levels` 的首个非零值可以改善低档起转能力，但会增加低温时的
 底噪和功耗。更合适的做法是在 `pwm-fan` 节点配置从停止到启动时的 boost：
 
-```dts
+```c
 fan-stop-to-start-percent = <40>; /* 启动时使用 40% 占空比 */
 fan-stop-to-start-us = <3000000>; /* 保持 3 秒 */
 ```

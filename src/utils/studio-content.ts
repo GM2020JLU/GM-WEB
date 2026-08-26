@@ -31,6 +31,174 @@ export class StudioValidationError extends Error {
   }
 }
 
+const sharedArticleFields = [
+  'title',
+  'description',
+  'date',
+  'updatedDate',
+  'publicationStatus',
+  'scheduledAt',
+  'draft',
+  'sticky',
+  'heroImage',
+  'heroImageAlt',
+  'showHeroImage',
+  'tags',
+  'categories',
+  'series',
+  'comments',
+  'sidebar',
+] as const;
+
+const allowedMetadataFields: Record<StudioCollection, ReadonlySet<string>> = {
+  blog: new Set(sharedArticleFields),
+  projects: new Set([
+    ...sharedArticleFields,
+    'icon',
+    'iconColor',
+    'role',
+    'period',
+    'highlights',
+    'authors',
+    'links',
+  ]),
+  about: new Set(sharedArticleFields),
+  vibe: new Set([
+    'title',
+    'date',
+    'updatedDate',
+    'publicationStatus',
+    'scheduledAt',
+    'draft',
+    'type',
+    'mood',
+    'location',
+    'images',
+    'tags',
+    'align',
+    'size',
+  ]),
+  media: new Set([
+    'title',
+    'creator',
+    'type',
+    'status',
+    'completedAt',
+    'publicationStatus',
+    'scheduledAt',
+    'updatedDate',
+    'draft',
+    'cover',
+    'coverAspect',
+    'rating',
+    'review',
+    'tags',
+    'externalUrl',
+  ]),
+  categories: new Set(['title', 'description']),
+  series: new Set(['title', 'description']),
+  tags: new Set(['title', 'description']),
+};
+
+const collectionLabels: Record<StudioCollection, string> = {
+  blog: '博客文章',
+  projects: '项目案例',
+  vibe: '随记',
+  media: '书影音',
+  about: '关于页',
+  categories: '分类',
+  series: '系列',
+  tags: '标签',
+};
+
+const fieldLabels: Record<string, string> = {
+  description: '摘要',
+  creator: '创作者',
+  date: '发布时间',
+  type: '内容类型',
+  status: '阅读/观看进度',
+  categories: '分类',
+  series: '系列',
+};
+
+function validateStudioMetadataFields(
+  collection: StudioCollection,
+  metadata: Record<string, unknown>,
+) {
+  const unsupported = Object.keys(metadata).filter(
+    (key) => !allowedMetadataFields[collection].has(key),
+  );
+  if (unsupported.length) {
+    const fields = unsupported
+      .map((key) => `“${key}${fieldLabels[key] ? `（${fieldLabels[key]}）` : ''}”`)
+      .join('、');
+    throw new StudioValidationError(
+      `${collectionLabels[collection]}不支持字段 ${fields}。请检查字段名称，或改用对应的内容模块。`,
+    );
+  }
+
+  const stringFields = [
+    'title',
+    'description',
+    'date',
+    'updatedDate',
+    'scheduledAt',
+    'creator',
+    'mood',
+    'location',
+    'heroImageAlt',
+    'iconColor',
+    'role',
+    'period',
+    'completedAt',
+    'coverAspect',
+    'externalUrl',
+  ];
+  const wrongString = stringFields.find(
+    (key) => key in metadata && typeof metadata[key] !== 'string',
+  );
+  if (wrongString) {
+    throw new StudioValidationError(`字段“${wrongString}”应填写文字，当前值类型不正确。`);
+  }
+  const listFields = ['tags', 'categories', 'series', 'images', 'highlights', 'authors', 'links'];
+  const wrongList = listFields.find((key) => key in metadata && !Array.isArray(metadata[key]));
+  if (wrongList) {
+    throw new StudioValidationError(`字段“${wrongList}”应为列表，请检查填写格式。`);
+  }
+  const booleanFields = ['draft', 'showHeroImage', 'comments', 'review'];
+  const wrongBoolean = booleanFields.find(
+    (key) => key in metadata && typeof metadata[key] !== 'boolean',
+  );
+  if (wrongBoolean) {
+    throw new StudioValidationError(`字段“${wrongBoolean}”只能填写开启或关闭。`);
+  }
+
+  const enumFields: Record<string, readonly string[]> = {
+    publicationStatus: ['draft', 'ready', 'published'],
+    type:
+      collection === 'media'
+        ? ['book', 'film', 'series', 'album', 'podcast']
+        : ['text', 'photo', 'quote', 'code', 'mixed'],
+    status: ['completed', 'in-progress', 'planned', 'abandoned'],
+    align: ['left', 'right', 'center'],
+    size: ['sm', 'md', 'lg'],
+    coverAspect: ['portrait', 'landscape', 'square', 'wide'],
+  };
+  for (const [key, values] of Object.entries(enumFields)) {
+    if (key in metadata && !values.includes(String(metadata[key]))) {
+      throw new StudioValidationError(
+        `字段“${key}”的值“${String(metadata[key])}”无效，可用值：${values.join('、')}。`,
+      );
+    }
+  }
+  if (
+    'rating' in metadata &&
+    (typeof metadata.rating !== 'number' || metadata.rating < 1 || metadata.rating > 5)
+  ) {
+    throw new StudioValidationError('字段“rating（评分）”必须是 1 到 5 之间的数字。');
+  }
+}
+
 const slugSchema = z
   .string()
   .trim()
@@ -130,6 +298,7 @@ export function validateStudioDocument(
   status: StudioPublicationStatus,
 ) {
   studioContentPath(collection, slug);
+  validateStudioMetadataFields(collection, metadata);
   const errors: string[] = [];
   if (typeof metadata.title !== 'string' || !metadata.title.trim()) errors.push('请填写标题。');
   if (collection === 'media' && (!metadata.creator || typeof metadata.creator !== 'string')) {
@@ -141,6 +310,14 @@ export function validateStudioDocument(
     (typeof metadata.description !== 'string' || !metadata.description.trim())
   ) {
     errors.push('待发布或已发布内容必须填写摘要。');
+  }
+  if (
+    status !== 'draft' &&
+    ['blog', 'projects', 'about'].includes(collection) &&
+    typeof metadata.description === 'string' &&
+    metadata.description.replace(/\s/g, '').length < 12
+  ) {
+    errors.push('摘要过短，请用至少 12 个字符说明内容重点。');
   }
   if (
     status !== 'draft' &&
@@ -175,8 +352,8 @@ export function serializeStudioDocument(
   status?: StudioPublicationStatus,
 ) {
   if (isTaxonomyCollection(collection)) {
-    validateStudioDocument(collection, slug, metadata, 'published');
     const { publicationStatus: _publicationStatus, draft: _draft, ...taxonomy } = metadata;
+    validateStudioDocument(collection, slug, taxonomy, 'published');
     return stringify(cleanMetadata(taxonomy), { lineWidth: 0 });
   }
 
@@ -192,6 +369,15 @@ export function serializeStudioDocument(
     publicationStatus,
     draft: publicationStatus !== 'published',
   });
+  const bodyLength = body.replace(/\s/g, '').length;
+  if (publicationStatus !== 'draft' && ['blog', 'projects', 'vibe', 'about'].includes(collection)) {
+    if (!bodyLength) throw new StudioValidationError('待发布或已发布内容必须填写正文。');
+    if (collection === 'vibe' && bodyLength > 1600) {
+      throw new StudioValidationError(
+        `这篇随记有 ${bodyLength.toLocaleString('zh-CN')} 个字符，已经超出短内容范围，请改用“博客文章”模块。`,
+      );
+    }
+  }
   validateStudioDocument(collection, slug, next, publicationStatus);
   return `---\n${stringify(next, { lineWidth: 0 })}---\n${body.trim() ? `\n${body.trim()}\n` : ''}`;
 }

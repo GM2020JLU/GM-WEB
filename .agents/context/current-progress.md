@@ -61,6 +61,8 @@
   与待部署记录清理；本地同源 HTTP 回归已验证发布、回读和删除闭环。
 - 单条与批量发布会在提交前读取当前 taxonomy 并拒绝未登记引用；定时字段已加入 Astro/
   Keystatic schema，正式发布时清除，避免内容已写入但生产构建随后失败。
+- Studio 会在保存前拒绝拼错字段、跨模块字段、错误类型/选项、过短摘要、空正文和超长随记；
+  部署追踪读取 GitHub 的 Vercel commit status，构建失败会显示失败链接，不再停留在排队状态。
 - `test:studio-modules` 通过真实同源 HTTP 对 Blog、Projects、Vibe、Media 逐一执行导入、
   编辑、发布、回读与清理；纯内容模型另覆盖 About 编辑发布和四模块生命周期。
 

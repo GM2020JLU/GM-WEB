@@ -129,8 +129,10 @@ export function setupStudioEditor(document: Document, options: StudioEditorOptio
     deploymentTitle.textContent = copy.title;
     deploymentDetail.textContent = copy.detail;
     deploymentProgress.style.width = `${copy.progress}%`;
-    deploymentLink.hidden = state.phase !== 'ready' || !pending.publicUrl;
-    if (pending.publicUrl) deploymentLink.href = pending.publicUrl;
+    const link = state.phase === 'error' ? state.logUrl : pending.publicUrl;
+    deploymentLink.hidden = (state.phase !== 'ready' && state.phase !== 'error') || !link;
+    if (link) deploymentLink.href = link;
+    deploymentLink.textContent = state.phase === 'error' ? '查看失败原因' : '打开线上页面';
   };
 
   const trackDeployment = async (pending: PendingStudioDeployment) => {
@@ -223,12 +225,18 @@ export function setupStudioEditor(document: Document, options: StudioEditorOptio
       publicationStatus: status.value,
       draft: status.value !== 'published',
     };
-    if (description.value.trim()) metadata.description = description.value.trim();
-    if (date.value) metadata.date = `${date.value}:00+08:00`;
+    if (!description.closest<HTMLElement>('[data-for]')?.hidden && description.value.trim()) {
+      metadata.description = description.value.trim();
+    }
+    if (!date.closest<HTMLElement>('[data-for]')?.hidden && date.value) {
+      metadata.date = `${date.value}:00+08:00`;
+    }
     if (!creator.closest<HTMLElement>('[data-for]')?.hidden && creator.value.trim()) {
       metadata.creator = creator.value.trim();
     }
-    if (scheduledAt.value) metadata.scheduledAt = `${scheduledAt.value}:00+08:00`;
+    if (!scheduledAt.closest<HTMLElement>('[data-for]')?.hidden && scheduledAt.value) {
+      metadata.scheduledAt = `${scheduledAt.value}:00+08:00`;
+    }
     if (!contentType.closest<HTMLElement>('[data-for]')?.hidden) metadata.type = contentType.value;
     if (!progress.closest<HTMLElement>('[data-for]')?.hidden) metadata.status = progress.value;
     if (!tags.closest<HTMLElement>('[data-for]')?.hidden) metadata.tags = parseList(tags.value);

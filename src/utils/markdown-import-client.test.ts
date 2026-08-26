@@ -6,9 +6,9 @@ import { renderMarkdownPreview } from './markdown-preview';
 const page = `
   <form data-import-form>
     <label data-dropzone><input type="file" data-file><strong data-file-label>选择文件</strong></label>
-    <select data-collection><option value="blog">博客</option><option value="projects">项目</option><option value="media">媒体</option></select>
+    <select data-collection><option value="blog">博客</option><option value="projects">项目</option><option value="vibe">随记</option><option value="media">媒体</option></select>
     <input data-title required><input data-slug required pattern="[a-z0-9-]+">
-    <textarea data-description></textarea>
+    <label data-description-field><textarea data-description></textarea></label>
     <label data-creator-field hidden><input data-creator></label>
     <span data-parse-state>等待文件</span>
     <div data-empty-preview></div><div data-preview-content hidden></div>
@@ -139,6 +139,15 @@ describe('Markdown 导入浏览器交互', () => {
     element(window, '[data-title]').value = '开发板 Bring-up';
     element(window, '[data-title]').dispatchEvent(new window.Event('input'));
     expect(element(window, '[data-slug]').value).toMatch(/^kai-fa-ban-bring-up/);
+  });
+
+  test('随记和书影音不会显示或提交摘要字段', async () => {
+    const window = new Window({ url: 'https://goumin.work/studio/import?collection=vibe' });
+    window.document.body.innerHTML = page;
+    setupMarkdownImport(browserDocument(window), { fetch: async () => new Response() });
+    expect(element(window, '[data-collection]').value).toBe('vibe');
+    expect(element(window, '[data-description-field]').hidden).toBe(true);
+    expect(element(window, '[data-description]').required).toBe(false);
   });
 
   test('仓库权限不足时显示 GitHub App 配置入口', async () => {

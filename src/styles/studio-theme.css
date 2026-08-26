@@ -1,5 +1,11 @@
 body.studio-with-navigation {
   --studio-shell-max-width: min(1180px, calc(100% - 32px));
+  --studio-success: #43a364;
+  --studio-success-bg: color-mix(in srgb, var(--paper-accent) 12%, transparent);
+  --studio-warning: #f5b63b;
+  --studio-warning-bg: color-mix(in srgb, #f5b63b 14%, transparent);
+  --studio-danger: #d24d4d;
+  --studio-danger-bg: color-mix(in srgb, #d24d4d 10%, transparent);
 }
 
 body.studio-with-navigation .studio-topbar-theme {
@@ -19,9 +25,11 @@ body.studio-with-navigation .studio-topbar-theme:hover {
 }
 
 body.studio-with-navigation .studio-nav-theme {
-  display: inline-flex;
-  padding: 8px 10px;
-  justify-content: center;
+  display: inline-grid;
+  width: 38px;
+  height: 38px;
+  padding: 0;
+  place-items: center;
 }
 
 body.studio-with-navigation .topbar,

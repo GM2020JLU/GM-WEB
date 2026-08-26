@@ -1,4 +1,6 @@
 ---
+import { Moon, Sun } from 'lucide-astro';
+
 const pathname = Astro.url.pathname;
 const groups = [
   {
@@ -71,7 +73,17 @@ const groups = [
   <div class="studio-nav-footer">
     <a href="/studio/import">导入 Markdown</a>
     <a href="/" target="_blank">查看网站 ↗</a>
-    <button class="studio-nav-theme" type="button" data-theme-toggle> 切换主题 </button>
+    <button
+      class="studio-nav-theme"
+      type="button"
+      data-theme-toggle
+      aria-label="切换明暗主题"
+      title="切换明暗主题"
+    >
+      <Moon class="theme-icon-moon" size={17} stroke-width={2} />
+      <Sun class="theme-icon-sun" size={17} stroke-width={2} />
+      <span class="sr-only">切换明暗主题</span>
+    </button>
   </div>
 </aside>
 
@@ -147,18 +159,26 @@ const groups = [
   }
 
   .studio-nav-footer button {
+    display: inline-grid;
+    width: 38px;
+    height: 38px;
+    place-items: center;
+    padding: 0;
     border: 1px solid var(--paper-line-strong);
     border-radius: 8px;
-    background: var(--paper-bg);
-    color: var(--paper-ink-soft);
+    background: var(--paper-control);
+    color: var(--paper-ink);
     font: inherit;
-    font-size: 0.72rem;
-    text-align: left;
     cursor: pointer;
   }
 
   .studio-nav-footer button[data-theme-toggle] {
-    border-color: var(--paper-accent);
+    border-color: var(--paper-line);
+  }
+
+  .studio-nav-footer button[data-theme-toggle]:hover {
+    border-color: var(--paper-line-strong);
+    background: var(--paper-control-hover);
     color: var(--paper-accent);
   }
   :global(body.studio-with-navigation) {

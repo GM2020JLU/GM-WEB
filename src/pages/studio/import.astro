@@ -400,9 +400,9 @@ const palette = await getThemePalette();
   .warnings {
     margin-bottom: 16px;
     padding: 14px 16px;
-    border: 1px solid color-mix(in srgb, #ead8ad 70%, var(--paper-line) 30%);
+    border: 1px solid color-mix(in srgb, var(--studio-warning) 58%, var(--paper-line) 42%);
     border-radius: 11px;
-    background: color-mix(in srgb, #fff8e6 80%, var(--paper-bg) 20%);
+    background: var(--studio-warning-bg);
     color: var(--paper-ink-soft);
     font-size: 0.78rem;
   }
@@ -526,7 +526,7 @@ const palette = await getThemePalette();
     color: var(--paper-ink-soft);
   }
   .result.error strong {
-    color: #d24d4d;
+    color: var(--studio-danger);
   }
   .result.success strong {
     color: var(--paper-accent);

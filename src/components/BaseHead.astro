@@ -53,14 +53,10 @@ const structuredData = {
     const syncThemeLabel = () => {
       const isDark = document.documentElement.dataset.theme === 'dark';
       const label = isDark ? '切换到浅色主题' : '切换到深色主题';
-      const themeText = isDark ? '☀ 深色已开' : '☾ 深色';
 
       for (const button of document.querySelectorAll('[data-theme-toggle]')) {
         button.setAttribute('aria-label', label);
         button.setAttribute('title', label);
-        if (button.classList.contains('studio-topbar-theme')) {
-          button.textContent = themeText;
-        }
       }
     };
 
@@ -72,38 +68,10 @@ const structuredData = {
       document.addEventListener('astro:page-load', syncThemeLabel);
     }
 
-    const ensureStudioThemeButton = () => {
-      if (!location.pathname.startsWith('/studio')) return;
-      if (document.querySelector('.studio-topbar-theme[data-theme-toggle]')) return;
-
-      const topbar = document.querySelector('nav.topbar');
-      if (!(topbar instanceof HTMLElement)) return;
-
-      const button = document.createElement('button');
-      button.type = 'button';
-      button.className = 'studio-topbar-theme';
-      button.setAttribute('data-theme-toggle', 'studio');
-      button.setAttribute(
-        'aria-label',
-        document.documentElement.dataset.theme === 'dark' ? '切换到浅色主题' : '切换到深色主题',
-      );
-      button.textContent =
-        document.documentElement.dataset.theme === 'dark' ? '☀ 深色已开' : '☾ 深色';
-
-      topbar.append(button);
-    };
-
-    const initStudioTheme = () => {
-      syncThemeLabel();
-      ensureStudioThemeButton();
-    };
-
     if (document.readyState === 'loading') {
-      document.addEventListener('DOMContentLoaded', initStudioTheme, { once: true });
+      document.addEventListener('DOMContentLoaded', syncThemeLabel, { once: true });
     } else {
-      initStudioTheme();
+      syncThemeLabel();
     }
-
-    document.addEventListener('astro:page-load', initStudioTheme);
   })();
 </script>

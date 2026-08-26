@@ -4,4 +4,6 @@ credentials-file: /Users/goumin/.cloudflared/f714836f-59c5-4592-9172-7669a7cadfe
 ingress:
   - hostname: mac-preview.goumin.work
     service: http://127.0.0.1:8080
+  - hostname: studio.goumin.work
+    service: http://127.0.0.1:8081
   - service: http_status:404

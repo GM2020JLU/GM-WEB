@@ -50,6 +50,23 @@ const structuredData = {
 
 <script is:inline>
   (() => {
+    const markStudioTransition = (documentElement = document.documentElement) => {
+      if (location.pathname.startsWith('/studio')) {
+        documentElement.dataset.studioTransition = 'none';
+      }
+    };
+
+    markStudioTransition();
+
+    document.addEventListener('astro:before-swap', (event) => {
+      const currentTheme = document.documentElement.dataset.theme;
+      if (currentTheme) {
+        event.newDocument.documentElement.dataset.theme = currentTheme;
+        event.newDocument.documentElement.style.colorScheme = currentTheme;
+      }
+      markStudioTransition(event.newDocument.documentElement);
+    });
+
     const syncThemeLabel = () => {
       const isDark = document.documentElement.dataset.theme === 'dark';
       const label = isDark ? '切换到浅色主题' : '切换到深色主题';

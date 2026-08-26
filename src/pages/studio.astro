@@ -90,6 +90,12 @@ const needsAttention = totals.draft + totals.ready;
 const unhealthyTotal = items.filter((item) => item.healthIssues.length > 0).length;
 const quickActions = [
   {
+    label: '导入 Markdown',
+    note: '先检查，再安全创建草稿',
+    href: '/studio/import',
+    icon: '导',
+  },
+  {
     label: '写博客',
     note: '完整文章与技术笔记',
     href: getKeystaticCreateUrl('blog', keystaticContext),
@@ -131,6 +137,7 @@ const quickActions = [
         </a>
         <div>
           <a href="#create">新建内容</a>
+          <a href="/studio/import">导入</a>
           <a href="#queue">内容队列</a>
           <a href="/keystatic">编辑器</a>
         </div>
@@ -562,7 +569,7 @@ const quickActions = [
   }
   .quick-grid {
     display: grid;
-    grid-template-columns: repeat(4, 1fr);
+    grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
     gap: 12px;
     margin-top: 20px;
   }

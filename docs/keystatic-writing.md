@@ -34,7 +34,7 @@ Git：
 - `KEYSTATIC_SECRET`
 - `PUBLIC_KEYSTATIC_GITHUB_APP_SLUG`
 
-配置完成后，先打开 `https://goumin.work/studio`。工作台首页提供四类内容的“新建”
+配置完成后，先打开 `https://goumin.work/studio`。工作台首页提供四类内容的“新建”和 Markdown 导入
 快捷入口、草稿/待发布提醒、发布流程、搜索和筛选；需要管理全部内容或分类时，再进入
 `https://goumin.work/keystatic`。只有对
 `GM2020JLU/GM-WEB` 有写权限的 GitHub 用户才能登录和保存。保存会更新 GitHub
@@ -56,6 +56,22 @@ Vercel 构建提交与 GitHub `main` 最新提交；两者一致时显示“最�
 Keystatic 内部按“创作与发布 / 站点页面 / 内容组织”分组。新内容先进入草稿；正文完成
 后切换为待发布并打开预览，检查无误再切换为已发布。工作台和编辑器都使用中文名称，
 但仓库里的文件格式与目录保持不变。
+
+## Markdown 导入
+
+`/studio/import` 可导入单个 `.md` 文件，当前支持 Blog、Vibe 和 Media。项目与
+关于页使用 `.mdx`，不在第一版导入范围内。流程为：选择文件、解析 YAML
+frontmatter 与正文、校对类型/标题/slug，再创建草稿并进入 Keystatic 编辑器。
+
+- 语法识别复用 unified 生态的 `mdast-util-from-markdown` 和
+  `mdast-util-frontmatter`；YAML 使用 `yaml` 并禁止别名，不使用正则手写 frontmatter
+  切割。
+- 服务端会重新解析和 Zod 校验，只保留本站 schema 认识的字段；来源文件的
+  `publicationStatus`、`draft` 和 `updatedDate` 会被安全的草稿值替换。
+- 线上写入复用 Keystatic 的 GitHub OAuth cookie，并通过 Octokit 调用 GitHub
+  Contents API；同名 slug 在预检查或并发写入时都会被拒绝，不会覆盖。
+- 单文件最大 1 MB，只接受 `.md`；预览使用纯文本显示，不执行导入内容中的
+  HTML 或脚本。
 
 线上编辑地址会自动带上 GitHub 分支，例如
 `/keystatic/branch/main/collection/blog/item/example`；本地编辑地址不带分支。不要手工拼接

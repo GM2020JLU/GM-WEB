@@ -78,9 +78,10 @@ navigation、scaffold 和 i18n contribution 消失。
   `draft` 字段并为公开路由派生布尔值；后台保存自动写入 `updatedDate`
 - `src/content/taxonomies` 保存受控标签、分类和系列；图片统一写入
   `src/assets/images/content`
-- `/studio` 是只读静态运营工作台，提供快捷创建、发布指引、状态汇总和组合筛选；
-  `/preview/**` 是同源 iframe 预览壳与真实渲染页；两者均 noindex/no-store，不包含密钥
-  或写接口
+- `/studio` 主页是静态运营工作台，提供快捷创建、发布指引、状态汇总和组合筛选；
+  `/studio/import` 是静态导入 UI，只向同源 `/api/studio/import` 提交经服务端重新解析的
+  Markdown，线上写入复用 Keystatic GitHub 登录；`/preview/**` 为真实渲染预览。后台路由均
+  noindex/no-store，静态页不包含密钥
 - Keystatic 深链接由 `src/utils/keystatic-routes.ts` 统一生成：本地模式直接进入集合，
   GitHub 模式显式进入 `main` 分支，避免工作台和预览页各自拼接导致客户端 Not Found
 - 发布审计先于 Astro 构建，待发布与已发布内容的结构、分类和资产错误会阻止部署

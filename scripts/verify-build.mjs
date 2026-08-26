@@ -55,6 +55,7 @@ const requiredFiles = [
   'projects/personal-site/index.html',
   'vibe/index.html',
   'studio/index.html',
+  'studio/import/index.html',
   'preview/about/index.html',
   'preview/blog/casdcv/index.html',
   'preview/render/blog/casdcv/index.html',
@@ -161,6 +162,31 @@ for (const marker of [
 }
 if (!studio.includes('noindex,nofollow,noarchive')) fail('内容工作台缺少 noindex');
 
+const markdownImport = readFileSync(join(dist, 'studio/import/index.html'), 'utf8');
+for (const marker of [
+  '导入 Markdown',
+  '只创建草稿',
+  'accept=".md,text/markdown"',
+  'data-import-form',
+  'data-body-preview',
+]) {
+  if (!markdownImport.includes(marker)) fail(`Markdown 导入页缺少：${marker}`);
+}
+if (!markdownImport.includes('noindex,nofollow,noarchive')) fail('Markdown 导入页缺少 noindex');
+const markdownImportScripts = [...markdownImport.matchAll(/<script type="module" src="([^"]+)"/gi)]
+  .map((match) => match[1])
+  .filter((source) => source.startsWith('/'));
+if (!markdownImportScripts.length) {
+  fail('Markdown 导入页缺少客户端脚本');
+} else {
+  const script = markdownImportScripts
+    .map((source) => readFileSync(join(dist, source.replace(/^\//, '')), 'utf8'))
+    .join('\n');
+  for (const marker of ['/api/studio/import', '/keystatic/branch/']) {
+    if (!script.includes(marker)) fail(`Markdown 导入脚本缺少：${marker}`);
+  }
+}
+
 const project = readFileSync(join(dist, 'projects/personal-site/index.html'), 'utf8');
 for (const marker of ['项目概览', '我的角色', '项目周期', '关键成果', '独立产品设计']) {
   if (!project.includes(marker)) fail(`项目案例缺少证据内容：${marker}`);
@@ -209,13 +235,13 @@ for (const file of vercelRequiredFiles) {
 
 if (existsSync(join(vercelOutput, 'config.json'))) {
   const vercelConfig = readFileSync(join(vercelOutput, 'config.json'), 'utf8');
-  for (const route of ['/keystatic', '/api/keystatic']) {
+  for (const route of ['/keystatic', '/api/keystatic', '/api/studio/import']) {
     if (!vercelConfig.includes(route)) fail(`Vercel 未配置后台动态路由：${route}`);
   }
 }
 
 const vercelSourceConfig = JSON.parse(readFileSync(join(root, 'vercel.json'), 'utf8'));
-for (const route of ['/studio', '/preview/(.*)']) {
+for (const route of ['/studio', '/studio/(.*)', '/api/studio/(.*)', '/preview/(.*)']) {
   const header = vercelSourceConfig.headers.find((item) => item.source === route);
   if (!header) fail(`Vercel 缺少私有页面响应头：${route}`);
   if (!header?.headers.some((item) => item.key === 'X-Robots-Tag')) {

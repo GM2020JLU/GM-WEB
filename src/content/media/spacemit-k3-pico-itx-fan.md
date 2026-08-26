@@ -1,13 +1,14 @@
 ---
+review: false
 title: K3 Pico-ITX 风扇策略与配置指南
+publicationStatus: published
+draft: false
+description: xasxcas
 creator: cszsd
-publicationStatus: draft
-draft: true
-updatedDate: 2026-08-26T14:56:52+08:00
 type: book
 status: planned
 tags: []
-review: false
+updatedDate: 2026-08-26T14:57:08+08:00
 ---
 
 # K3 Pico-ITX 风扇策略与配置指南

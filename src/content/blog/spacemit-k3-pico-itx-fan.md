@@ -13,7 +13,7 @@ date: 2026-08-26T11:40:00+08:00
 tags: []
 categories: []
 series: []
-updatedDate: 2026-08-26T13:44:47+08:00
+updatedDate: 2026-08-26T13:44:52+08:00
 ---
 
 # K3 Pico-ITX 风扇策略与配置指南

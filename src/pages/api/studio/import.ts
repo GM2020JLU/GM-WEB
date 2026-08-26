@@ -3,6 +3,10 @@ import { writeFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
 import { ZodError } from 'zod';
 import {
+  diagnoseGitHubMarkdownAccess,
+  githubAccessErrorMessage,
+} from '../../../utils/github-app-access';
+import {
   createGitHubMarkdownFile,
   MarkdownImportConflictError,
   MarkdownImportPermissionError,
@@ -39,6 +43,7 @@ export const POST: APIRoute = async ({ request, cookies, url }) => {
   const contentLength = Number(request.headers.get('content-length') || 0);
   if (contentLength > 2_200_000) return json({ error: '导入请求过大。' }, 413);
 
+  let githubToken = '';
   try {
     const payload = markdownImportRequestSchema.parse(await request.json());
     const imported = createImportedMarkdown(payload);
@@ -54,6 +59,7 @@ export const POST: APIRoute = async ({ request, cookies, url }) => {
           401,
         );
       }
+      githubToken = token;
       await createGitHubMarkdownFile({ token, path: imported.path, content: imported.content });
     } else {
       const target = resolve(process.cwd(), imported.path);
@@ -78,11 +84,22 @@ export const POST: APIRoute = async ({ request, cookies, url }) => {
       return json({ error: '同名内容已存在，请更换网址别名。' }, 409);
     }
     if (error instanceof MarkdownImportPermissionError) {
+      let message = error.message;
+      let actionUrl = error.actionUrl;
+      if (githubToken) {
+        try {
+          const diagnosis = await diagnoseGitHubMarkdownAccess({ token: githubToken });
+          message = githubAccessErrorMessage(diagnosis);
+          actionUrl = diagnosis.installationSettingsUrl || actionUrl;
+        } catch {
+          // 权限诊断不可用时保留原始、可操作的 GitHub App 安装提示。
+        }
+      }
       return json(
         {
-          error: error.message,
+          error: message,
           actionLabel: error.actionLabel,
-          actionUrl: error.actionUrl,
+          actionUrl,
         },
         403,
       );

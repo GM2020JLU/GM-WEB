@@ -71,6 +71,7 @@ export default defineConfig({
   site: resolvedSite,
   base: resolvedBase,
   cacheDir: process.env.ASTRO_CACHE_DIR || `./node_modules/.astro-${contentSource}`,
+  devToolbar: { enabled: false },
   output: 'static',
   adapter: vercel(),
   security: {

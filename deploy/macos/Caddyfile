@@ -43,7 +43,12 @@ http://:8081 {
 	@immutable path /_astro/*
 	header @immutable Cache-Control "public, max-age=31536000, immutable"
 
-	@private not path /_astro/*
+	# The current local authoring server uses Vite modules. A short browser cache removes
+	# repeated cross-border requests while still picking up code changes within minutes.
+	@devAssets path /@vite/* /@id/* /@fs/* /node_modules/* /src/*
+	header @devAssets Cache-Control "private, max-age=300"
+
+	@private not path /_astro/* /@vite/* /@id/* /@fs/* /node_modules/* /src/*
 	header @private Cache-Control "private, no-store"
 
 	@keystatic path /keystatic /keystatic/* /api/keystatic /api/keystatic/*

@@ -40,9 +40,9 @@ import BaseHead from '../../components/BaseHead.astro';
           </div>
 
           <label class="dropzone" data-dropzone>
-            <input type="file" accept=".md,text/markdown" data-file required />
+            <input type="file" accept=".md,text/markdown" data-file />
             <span class="file-icon" aria-hidden="true">MD</span>
-            <strong data-file-label>选择 .md 文件</strong>
+            <strong data-file-label>点击选择或拖入 .md 文件</strong>
             <small>单文件，最大 1 MB；支持 YAML frontmatter</small>
           </label>
 
@@ -124,166 +124,18 @@ import BaseHead from '../../components/BaseHead.astro';
     </main>
 
     <script>
-      import { getKeystaticEntryUrl } from '../../utils/keystatic-routes';
-      import { parseMarkdownImport } from '../../utils/markdown-import';
+      import { setupMarkdownImport } from '../../utils/markdown-import-client';
 
-      const form = document.querySelector('[data-import-form]');
-      const fileInput = document.querySelector('[data-file]');
-      const fileLabel = document.querySelector('[data-file-label]');
-      const collection = document.querySelector('[data-collection]');
-      const title = document.querySelector('[data-title]');
-      const slug = document.querySelector('[data-slug]');
-      const description = document.querySelector('[data-description]');
-      const creator = document.querySelector('[data-creator]');
-      const creatorField = document.querySelector('[data-creator-field]');
-      const parseState = document.querySelector('[data-parse-state]');
-      const emptyPreview = document.querySelector('[data-empty-preview]');
-      const previewContent = document.querySelector('[data-preview-content]');
-      const previewFile = document.querySelector('[data-preview-file]');
-      const previewSize = document.querySelector('[data-preview-size]');
-      const warnings = document.querySelector('[data-warnings]');
-      const warningList = document.querySelector('[data-warning-list]');
-      const bodyPreview = document.querySelector('[data-body-preview]');
-      const submit = document.querySelector('[data-submit]');
-      const result = document.querySelector('[data-result]');
-      let selectedSource = '';
-      let selectedFilename = '';
-
-      const setResult = (heading: string, detail: string, kind = '') => {
-        if (!(result instanceof HTMLElement)) return;
-        result.className = `result ${kind}`.trim();
-        result.replaceChildren();
-        const strong = document.createElement('strong');
-        const small = document.createElement('small');
-        strong.textContent = heading;
-        small.textContent = detail;
-        result.append(strong, small);
-      };
-
-      const updateTypeFields = () => {
-        if (!(collection instanceof HTMLSelectElement)) return;
-        const isMedia = collection.value === 'media';
-        if (creatorField instanceof HTMLElement) creatorField.hidden = !isMedia;
-        if (creator instanceof HTMLInputElement) creator.required = isMedia;
-        if (description instanceof HTMLTextAreaElement)
-          description.required = collection.value === 'blog';
-      };
-
-      const loadFile = async (file: File) => {
-        try {
-          selectedSource = await file.text();
-          selectedFilename = file.name;
-          const parsed = parseMarkdownImport(file.name, selectedSource);
-          if (title instanceof HTMLInputElement) title.value = parsed.title;
-          if (slug instanceof HTMLInputElement) slug.value = parsed.slug;
-          if (description instanceof HTMLTextAreaElement) description.value = parsed.description;
-          if (creator instanceof HTMLInputElement && typeof parsed.data.creator === 'string') {
-            creator.value = parsed.data.creator;
-          }
-          if (fileLabel instanceof HTMLElement) fileLabel.textContent = file.name;
-          if (parseState instanceof HTMLElement) parseState.textContent = '解析完成';
-          if (emptyPreview instanceof HTMLElement) emptyPreview.hidden = true;
-          if (previewContent instanceof HTMLElement) previewContent.hidden = false;
-          if (previewFile instanceof HTMLElement) previewFile.textContent = file.name;
-          if (previewSize instanceof HTMLElement) {
-            previewSize.textContent = `${parsed.body.length.toLocaleString('zh-CN')} 字符`;
-          }
-          if (bodyPreview instanceof HTMLElement) {
-            bodyPreview.textContent = parsed.body.slice(0, 12000) || '（空正文）';
-          }
-          if (warningList instanceof HTMLElement && warnings instanceof HTMLElement) {
-            warningList.replaceChildren(
-              ...parsed.warnings.map((message) => {
-                const item = document.createElement('li');
-                item.textContent = message;
-                return item;
-              }),
-            );
-            warnings.hidden = parsed.warnings.length === 0;
-          }
-          if (submit instanceof HTMLButtonElement) submit.disabled = false;
-          setResult('已准备预览', '请确认内容类型、标题、别名和正文。');
-        } catch (error) {
-          selectedSource = '';
-          selectedFilename = '';
-          if (submit instanceof HTMLButtonElement) submit.disabled = true;
-          if (parseState instanceof HTMLElement) parseState.textContent = '解析失败';
-          setResult(
-            '无法读取文件',
-            error instanceof Error ? error.message : '请更换 Markdown 文件。',
-            'error',
-          );
+      try {
+        setupMarkdownImport(document, { isProduction: import.meta.env.PROD });
+      } catch (error) {
+        const result = document.querySelector('[data-result]');
+        if (result instanceof HTMLElement) {
+          result.className = 'result error';
+          result.textContent =
+            error instanceof Error ? error.message : '导入界面初始化失败，请刷新页面。';
         }
-      };
-
-      fileInput?.addEventListener('change', () => {
-        if (fileInput instanceof HTMLInputElement && fileInput.files?.[0]) {
-          void loadFile(fileInput.files[0]);
-        }
-      });
-      collection?.addEventListener('change', updateTypeFields);
-      updateTypeFields();
-
-      form?.addEventListener('submit', async (event) => {
-        event.preventDefault();
-        if (!(form instanceof HTMLFormElement) || !form.reportValidity() || !selectedSource) return;
-        if (!(submit instanceof HTMLButtonElement)) return;
-        submit.disabled = true;
-        submit.textContent = '正在导入…';
-        setResult('正在创建草稿', '将通过已登录的 Keystatic / GitHub 身份写入仓库。');
-        try {
-          const response = await fetch('/api/studio/import', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              collection: collection instanceof HTMLSelectElement ? collection.value : 'blog',
-              filename: selectedFilename,
-              source: selectedSource,
-              slug: slug instanceof HTMLInputElement ? slug.value : '',
-              title: title instanceof HTMLInputElement ? title.value : '',
-              description: description instanceof HTMLTextAreaElement ? description.value : '',
-              creator: creator instanceof HTMLInputElement ? creator.value : '',
-            }),
-          });
-          const payload = await response.json();
-          if (!response.ok) {
-            if (response.status === 401) {
-              setResult(
-                '需要登录 Keystatic',
-                '请在新窗口完成 GitHub 登录，回到本页后再次导入。',
-                'error',
-              );
-              if (result instanceof HTMLElement) {
-                const link = document.createElement('a');
-                link.href = payload.loginUrl || '/api/keystatic/github/login';
-                link.target = '_blank';
-                link.rel = 'noopener';
-                link.textContent = '在新窗口登录';
-                result.append(link);
-              }
-            } else {
-              setResult('导入未完成', payload.error || '请检查字段后重试。', 'error');
-            }
-            return;
-          }
-          setResult('导入成功', '草稿已写入仓库，正在进入编辑器…', 'success');
-          const editorUrl = getKeystaticEntryUrl(
-            payload.collection,
-            payload.slug,
-            import.meta.env.PROD ? { branch: 'main' } : {},
-          );
-          window.setTimeout(() => window.location.assign(editorUrl), 700);
-        } catch (error) {
-          setResult(
-            '网络请求失败',
-            error instanceof Error ? error.message : '请稍后重试。',
-            'error',
-          );
-        } finally {
-          submit.disabled = false;
-          submit.textContent = '确认导入为草稿';
-        }
-      });
+      }
     </script>
   </body>
 </html>
@@ -467,7 +319,8 @@ import BaseHead from '../../components/BaseHead.astro';
     text-align: center;
     cursor: pointer;
   }
-  .dropzone:hover {
+  .dropzone:hover,
+  .dropzone.is-dragging {
     border-color: var(--paper-accent);
     background: var(--paper-accent-soft);
   }

@@ -8,13 +8,6 @@ import {
   getPublicationStatus,
 } from '../utils/content-metrics';
 import { hasContentFiles } from '../utils/content-source';
-import {
-  getKeystaticCreateUrl,
-  getKeystaticEntryUrl,
-  getKeystaticSingletonUrl,
-} from '../utils/keystatic-routes';
-
-const keystaticContext = import.meta.env.PROD ? { branch: 'main' } : {};
 
 const [blog, projects, vibe, media, about] = await Promise.all([
   getCollection('blog'),
@@ -69,9 +62,7 @@ const items = definitions
       healthIssues,
       publicUrl,
       historyUrl: `https://github.com/GM2020JLU/GM-WEB/commits/main/${contentPath}`,
-      editorUrl: isSingleton
-        ? getKeystaticSingletonUrl('about', keystaticContext)
-        : getKeystaticEntryUrl(collection, entry.id, keystaticContext),
+      editorUrl: `/studio/edit/${collection}/${isSingleton ? 'about' : entry.id}`,
       previewUrl: isSingleton ? '/preview/about' : `/preview/${collection}/${entry.id}`,
     };
   })
@@ -98,25 +89,25 @@ const quickActions = [
   {
     label: '写博客',
     note: '完整文章与技术笔记',
-    href: getKeystaticCreateUrl('blog', keystaticContext),
+    href: '/studio/edit/blog/new?new=1',
     icon: '文',
   },
   {
     label: '记随记',
     note: '短想法、照片与片段',
-    href: getKeystaticCreateUrl('vibe', keystaticContext),
+    href: '/studio/edit/vibe/new?new=1',
     icon: '记',
   },
   {
     label: '建项目',
     note: '项目背景、过程与结果',
-    href: getKeystaticCreateUrl('projects', keystaticContext),
+    href: '/studio/edit/projects/new?new=1',
     icon: '项',
   },
   {
     label: '加书影音',
     note: '阅读、电影与音乐记录',
-    href: getKeystaticCreateUrl('media', keystaticContext),
+    href: '/studio/edit/media/new?new=1',
     icon: '藏',
   },
 ];
@@ -139,7 +130,8 @@ const quickActions = [
           <a href="#create">新建内容</a>
           <a href="/studio/import">导入</a>
           <a href="#queue">内容队列</a>
-          <a href="/keystatic">编辑器</a>
+          <a href="/studio/assets">素材</a>
+          <a href="/studio/organize">分类</a>
         </div>
       </nav>
 
@@ -147,10 +139,10 @@ const quickActions = [
         <div>
           <p class="eyebrow">GOU MIN · PUBLISHING DESK</p>
           <h1>今天写点什么？</h1>
-          <p>从这里新建、检查和预览内容；进入编辑器后保存草稿，再按发布流程逐步推进。</p>
+          <p>从这里新建、编辑、预览和发布内容；完整流程都留在 Studio，不再跳转其他后台。</p>
         </div>
         <div class="actions">
-          <a class="primary" href="/keystatic">打开内容编辑器</a>
+          <a class="primary" href="/studio/edit/blog/new?new=1">开始写作</a>
           <a href="/">查看网站</a>
         </div>
       </header>
@@ -263,12 +255,24 @@ const quickActions = [
             >
           </div>
         </div>
+        <div class="bulk-bar" data-bulk-bar hidden>
+          <strong><span data-selected-count>0</span> 条已选择</strong>
+          <div>
+            <button type="button" data-bulk-action="draft">转为草稿</button><button
+              type="button"
+              data-bulk-action="ready">设为待发布</button
+            ><button type="button" class="primary" data-bulk-action="publish">批量发布</button>
+          </div>
+        </div>
         <div class="table-wrap">
           <table>
             <thead
               ><tr
-                ><th>内容</th><th>状态</th><th>健康度</th><th>更新时间</th><th>篇幅</th><th>分类</th
-                ><th><span class="sr-only">操作</span></th></tr
+                ><th><input type="checkbox" data-select-all aria-label="选择全部内容" /></th><th
+                  >内容</th
+                ><th>状态</th><th>健康度</th><th>更新时间</th><th>篇幅</th><th>分类</th><th
+                  ><span class="sr-only">操作</span></th
+                ></tr
               ></thead
             >
             <tbody>
@@ -280,6 +284,15 @@ const quickActions = [
                     data-type={item.type}
                     data-health={item.healthIssues.length > 0 ? 'issues' : 'good'}
                   >
+                    <td>
+                      <input
+                        type="checkbox"
+                        data-select-item
+                        data-collection={item.collection}
+                        data-slug={item.id}
+                        aria-label={`选择 ${item.title}`}
+                      />
+                    </td>
                     <td data-label="内容">
                       <>
                         <span class="kind">{item.type}</span>
@@ -412,6 +425,53 @@ const quickActions = [
             if (label) label.textContent = '暂时无法确认部署状态';
           });
       }
+
+      const selectAll = document.querySelector('[data-select-all]');
+      const selectedItems = [...document.querySelectorAll('[data-select-item]')];
+      const bulkBar = document.querySelector('[data-bulk-bar]');
+      const selectedCount = document.querySelector('[data-selected-count]');
+      const updateSelection = () => {
+        const count = selectedItems.filter(
+          (item) => item instanceof HTMLInputElement && item.checked,
+        ).length;
+        if (bulkBar instanceof HTMLElement) bulkBar.hidden = count === 0;
+        if (selectedCount) selectedCount.textContent = String(count);
+        if (selectAll instanceof HTMLInputElement) {
+          selectAll.checked = count === selectedItems.length && count > 0;
+          selectAll.indeterminate = count > 0 && count < selectedItems.length;
+        }
+      };
+      selectAll?.addEventListener('change', () => {
+        if (!(selectAll instanceof HTMLInputElement)) return;
+        selectedItems.forEach((item) => {
+          if (item instanceof HTMLInputElement && !item.closest('tr')?.hidden)
+            item.checked = selectAll.checked;
+        });
+        updateSelection();
+      });
+      selectedItems.forEach((item) => item.addEventListener('change', updateSelection));
+      document.querySelectorAll('[data-bulk-action]').forEach((button) =>
+        button.addEventListener('click', async () => {
+          if (!(button instanceof HTMLButtonElement)) return;
+          const items = selectedItems.flatMap((item) =>
+            item instanceof HTMLInputElement && item.checked
+              ? [{ collection: item.dataset.collection, slug: item.dataset.slug }]
+              : [],
+          );
+          if (!items.length || !confirm(`确定对 ${items.length} 条内容执行此操作吗？`)) return;
+          button.disabled = true;
+          const response = await fetch('/api/studio/bulk', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ action: button.dataset.bulkAction, items }),
+          });
+          const result = await response.json();
+          button.disabled = false;
+          if (!response.ok) return alert(result.error || '批量操作失败。');
+          alert(`已更新 ${result.updated} 条内容；线上状态会在部署完成后刷新。`);
+          location.reload();
+        }),
+      );
     </script>
   </body>
 </html>
@@ -727,6 +787,24 @@ const quickActions = [
   }
   .content-section {
     margin-top: 58px;
+  }
+  .bulk-bar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    margin-top: 20px;
+    padding: 12px 14px;
+    border: 1px solid var(--paper-accent);
+    border-radius: 10px;
+    background: color-mix(in srgb, var(--paper-bg) 88%, var(--paper-accent) 12%);
+  }
+  .bulk-bar[hidden] {
+    display: none;
+  }
+  .bulk-bar > div {
+    display: flex;
+    gap: 8px;
   }
   h2 {
     margin: 4px 0 0;

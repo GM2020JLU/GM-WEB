@@ -1,0 +1,217 @@
+---
+import { readdir, readFile } from 'node:fs/promises';
+import { parse } from 'yaml';
+import BaseHead from '../../components/BaseHead.astro';
+
+const definitions = [
+  { key: 'categories', label: '分类', note: '文章所属的主要栏目' },
+  { key: 'series', label: '系列', note: '有阅读顺序的连续内容' },
+  { key: 'tags', label: '标签', note: '跨内容类型复用的主题关键词' },
+] as const;
+const groups = await Promise.all(
+  definitions.map(async (definition) => {
+    const directory = new URL(`../../content/taxonomies/${definition.key}/`, import.meta.url);
+    let files: string[] = [];
+    try {
+      files = (await readdir(directory)).filter((file) => file.endsWith('.yaml'));
+    } catch {}
+    const items = await Promise.all(
+      files.map(async (file) => {
+        const data = parse(await readFile(new URL(file, directory), 'utf8')) as Record<
+          string,
+          string
+        >;
+        return {
+          slug: file.replace(/\.yaml$/, ''),
+          title: data.title || file,
+          description: data.description || '',
+        };
+      }),
+    );
+    return { ...definition, items };
+  }),
+);
+---
+
+<!doctype html>
+<html lang="zh-CN" data-palette="green-soft">
+  <head
+    ><BaseHead title="内容组织" description="管理分类、系列和标签" /><meta
+      name="robots"
+      content="noindex,nofollow,noarchive"
+    /></head
+  ><body
+    ><main class="shell">
+      <nav class="topbar">
+        <a class="brand" href="/studio"><span>GM</span><strong>创作中心</strong></a><div>
+          <a href="/studio">内容</a><a href="/studio/import">导入</a><a href="/studio/assets"
+            >素材</a
+          >
+        </div>
+      </nav><header>
+        <p>CONTENT ORGANIZATION</p><h1>分类、系列与标签</h1><span
+          >统一维护内容关系，避免同义词和重复标识。</span
+        >
+      </header><div class="groups">
+        {
+          groups.map((group) => (
+            <section>
+              <>
+                <div class="heading">
+                  <>
+                    <div>
+                      <>
+                        <h2>{group.label}</h2>
+                        <p>{group.note}</p>
+                      </>
+                    </div>
+                    <a class="primary" href={`/studio/edit/${group.key}/new?new=1`}>
+                      新建{group.label}
+                    </a>
+                  </>
+                </div>
+                <div class="items">
+                  {group.items.map((item) => (
+                    <a href={`/studio/edit/${group.key}/${item.slug}`}>
+                      <strong>{item.title}</strong>
+                      <small>{item.description || '尚未填写说明'}</small>
+                      <span>编辑 →</span>
+                    </a>
+                  ))}
+                </div>
+              </>
+            </section>
+          ))
+        }
+      </div>
+    </main></body
+  >
+</html>
+<style>
+  :global(*) {
+    box-sizing: border-box;
+  }
+  :global(body) {
+    margin: 0;
+    background: var(--paper-bg);
+    color: var(--paper-ink);
+    font-family: var(--font-ui);
+  }
+  .shell {
+    width: min(1080px, calc(100% - 32px));
+    margin: auto;
+    padding: 22px 0 90px;
+  }
+  .topbar,
+  .heading {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 20px;
+  }
+  .topbar {
+    padding-bottom: 17px;
+    border-bottom: 1px solid var(--paper-line);
+  }
+  .topbar > div,
+  .brand {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+  .brand,
+  .topbar a {
+    color: inherit;
+    text-decoration: none;
+  }
+  .brand span {
+    display: grid;
+    width: 34px;
+    height: 34px;
+    place-items: center;
+    border-radius: 10px;
+    background: var(--paper-ink);
+    color: white;
+    font-size: 0.72rem;
+  }
+  .topbar > div a {
+    padding: 7px;
+    color: var(--paper-ink-soft);
+    font-size: 0.82rem;
+  }
+  header {
+    padding: 60px 0 42px;
+  }
+  header > p {
+    margin: 0;
+    color: var(--paper-accent);
+    font: 700 0.7rem var(--font-meta);
+    letter-spacing: 0.14em;
+  }
+  h1 {
+    margin: 8px 0 12px;
+    font: 400 clamp(2.5rem, 7vw, 5rem)/1 var(--font-page-heading);
+  }
+  header > span,
+  .heading p,
+  .items small {
+    color: var(--paper-ink-soft);
+  }
+  .groups {
+    display: grid;
+    gap: 20px;
+  }
+  .groups section {
+    padding: 26px;
+    border: 1px solid var(--paper-line);
+    border-radius: 16px;
+  }
+  .heading h2 {
+    margin: 0;
+    font: 400 2rem var(--font-page-heading);
+  }
+  .heading p {
+    margin: 6px 0 0;
+  }
+  .primary {
+    padding: 10px 13px;
+    border-radius: 9px;
+    background: var(--paper-accent);
+    color: white;
+    text-decoration: none;
+  }
+  .items {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+    gap: 10px;
+    margin-top: 22px;
+  }
+  .items a {
+    display: grid;
+    gap: 6px;
+    padding: 15px;
+    border: 1px solid var(--paper-line);
+    border-radius: 11px;
+    color: inherit;
+    text-decoration: none;
+  }
+  .items a:hover {
+    border-color: var(--paper-accent);
+  }
+  .items span {
+    margin-top: 5px;
+    color: var(--paper-accent);
+    font-size: 0.78rem;
+  }
+  @media (max-width: 600px) {
+    .groups section {
+      padding: 18px;
+    }
+    .heading {
+      align-items: flex-start;
+    }
+    .items {
+      grid-template-columns: 1fr;
+    }
+  }
+</style>

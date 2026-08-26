@@ -2,7 +2,6 @@
 import { getCollection } from 'astro:content';
 import PreviewWorkbench from '../../../components/studio/PreviewWorkbench.astro';
 import { hasContentFiles } from '../../../utils/content-source';
-import { getKeystaticEntryUrl } from '../../../utils/keystatic-routes';
 
 export async function getStaticPaths() {
   const entries = hasContentFiles('media') ? await getCollection('media') : [];
@@ -12,11 +11,7 @@ export async function getStaticPaths() {
   }));
 }
 const entry = Astro.props;
-const editorUrl = getKeystaticEntryUrl(
-  'media',
-  entry.id,
-  import.meta.env.PROD ? { branch: 'main' } : {},
-);
+const editorUrl = `/studio/edit/media/${entry.id}`;
 ---
 
 <PreviewWorkbench

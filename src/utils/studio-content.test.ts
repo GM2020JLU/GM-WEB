@@ -1,0 +1,92 @@
+import { describe, expect, test } from 'bun:test';
+import {
+  defaultStudioMetadata,
+  parseStudioDocument,
+  serializeStudioDocument,
+  studioContentPath,
+  studioPublicUrl,
+  isScheduledPublicationDue,
+  validateStudioDocument,
+} from './studio-content';
+
+describe('Studio 内容模型', () => {
+  test('为每种内容生成受限路径', () => {
+    expect(studioContentPath('blog', 'linux-notes')).toBe('src/content/blog/linux-notes.md');
+    expect(studioContentPath('projects', 'board-bringup')).toBe(
+      'src/content/projects/board-bringup.mdx',
+    );
+    expect(studioContentPath('about', 'ignored')).toBe('src/content/about.mdx');
+    expect(studioContentPath('tags', 'Linux')).toBe('src/content/taxonomies/tags/Linux.yaml');
+    expect(() => studioContentPath('blog', '../secret')).toThrow('网址别名');
+  });
+
+  test('解析与序列化 Markdown frontmatter 并同步发布状态', () => {
+    const source = `---\ntitle: 测试文章\ndescription: 完整摘要\ndate: '2026-08-26T10:00:00+08:00'\npublicationStatus: draft\ndraft: true\n---\n\n# 正文\n`;
+    const parsed = parseStudioDocument('blog', 'test-post', source, 'abc');
+    expect(parsed.metadata.title).toBe('测试文章');
+    expect(parsed.body.trim()).toBe('# 正文');
+    expect(parsed.sha).toBe('abc');
+
+    const published = serializeStudioDocument(
+      'blog',
+      'test-post',
+      parsed.metadata,
+      parsed.body,
+      'published',
+    );
+    expect(published).toContain('publicationStatus: published');
+    expect(published).toContain('draft: false');
+    expect(published).toContain('# 正文');
+  });
+
+  test('发布前校验摘要和日期，草稿允许逐步补充', () => {
+    const metadata = { title: '半成品', publicationStatus: 'draft' };
+    expect(() => validateStudioDocument('blog', 'draft-post', metadata, 'draft')).not.toThrow();
+    expect(() => validateStudioDocument('blog', 'draft-post', metadata, 'published')).toThrow(
+      '摘要',
+    );
+  });
+
+  test('分类文件不会混入发布字段', () => {
+    const source = serializeStudioDocument(
+      'tags',
+      'Astro',
+      { title: 'Astro', description: '框架', publicationStatus: 'draft', draft: true },
+      '',
+    );
+    expect(source).toBe('title: Astro\ndescription: 框架\n');
+  });
+
+  test('提供安全默认值和公开地址', () => {
+    expect(defaultStudioMetadata('vibe')).toMatchObject({
+      publicationStatus: 'draft',
+      draft: true,
+      type: 'text',
+    });
+    expect(studioPublicUrl('blog', 'hello')).toBe('/blog/hello');
+    expect(studioPublicUrl('about', 'about')).toBe('/about');
+    expect(studioPublicUrl('tags', 'Astro')).toBeUndefined();
+  });
+
+  test('只发布已经到期的待发布内容', () => {
+    const now = new Date('2026-08-26T12:00:00+08:00');
+    expect(
+      isScheduledPublicationDue(
+        { publicationStatus: 'ready', scheduledAt: '2026-08-26T11:45:00+08:00' },
+        now,
+      ),
+    ).toBeTrue();
+    expect(
+      isScheduledPublicationDue(
+        { publicationStatus: 'ready', scheduledAt: '2026-08-26T12:15:00+08:00' },
+        now,
+      ),
+    ).toBeFalse();
+    expect(
+      isScheduledPublicationDue(
+        { publicationStatus: 'draft', scheduledAt: '2026-08-26T11:45:00+08:00' },
+        now,
+      ),
+    ).toBeFalse();
+  });
+});

@@ -1,7 +1,6 @@
 ---
 import { getCollection } from 'astro:content';
 import PreviewWorkbench from '../../../components/studio/PreviewWorkbench.astro';
-import { getKeystaticEntryUrl } from '../../../utils/keystatic-routes';
 
 export async function getStaticPaths() {
   return (await getCollection('vibe')).map((entry) => ({
@@ -10,11 +9,7 @@ export async function getStaticPaths() {
   }));
 }
 const entry = Astro.props;
-const editorUrl = getKeystaticEntryUrl(
-  'vibe',
-  entry.id,
-  import.meta.env.PROD ? { branch: 'main' } : {},
-);
+const editorUrl = `/studio/edit/vibe/${entry.id}`;
 ---
 
 <PreviewWorkbench

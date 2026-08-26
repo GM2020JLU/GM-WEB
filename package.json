@@ -31,6 +31,7 @@
     "project:new": "bun scripts/new-content.ts project",
     "vibe:new": "bun scripts/new-content.ts vibe",
     "media:new": "bun scripts/new-content.ts media",
+    "publish:scheduled": "bun scripts/publish-scheduled.ts",
     "lint": "eslint .",
     "format": "prettier --write --ignore-unknown .",
     "format:check": "bun run lint && prettier --check --ignore-unknown .",

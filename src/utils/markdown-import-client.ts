@@ -1,4 +1,3 @@
-import { getKeystaticEntryUrl } from './keystatic-routes';
 import { parseMarkdownImport } from './markdown-import';
 import { renderMarkdownPreview } from './markdown-preview';
 
@@ -59,7 +58,6 @@ export function setupMarkdownImport(
   document: Document,
   {
     fetch: request = globalThis.fetch,
-    isProduction = false,
     navigate = (url) => document.defaultView?.location.assign(url),
     setTimeout: defer = globalThis.setTimeout,
   }: MarkdownImportClientOptions = {},
@@ -248,12 +246,8 @@ export function setupMarkdownImport(
       if (!payload.collection || !payload.slug) {
         throw new Error('服务器未返回草稿位置，请刷新后确认仓库内容。');
       }
-      setResult('导入成功', '草稿已写入仓库，正在进入编辑器…', 'success');
-      const editorUrl = getKeystaticEntryUrl(
-        payload.collection,
-        payload.slug,
-        isProduction ? { branch: 'main' } : {},
-      );
+      setResult('导入成功', '草稿已写入仓库，正在进入 Studio 编辑器…', 'success');
+      const editorUrl = `/studio/edit/${encodeURIComponent(payload.collection)}/${encodeURIComponent(payload.slug)}`;
       defer(() => navigate(editorUrl), 700);
     } catch (error) {
       setResult('网络请求失败', error instanceof Error ? error.message : '请稍后重试。', 'error');

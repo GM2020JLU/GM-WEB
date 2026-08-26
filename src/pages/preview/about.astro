@@ -1,10 +1,9 @@
 ---
 import { getCollection } from 'astro:content';
 import PreviewWorkbench from '../../components/studio/PreviewWorkbench.astro';
-import { getKeystaticSingletonUrl } from '../../utils/keystatic-routes';
 const [entry] = await getCollection('about');
 if (!entry) throw new Error('Missing about entry');
-const editorUrl = getKeystaticSingletonUrl('about', import.meta.env.PROD ? { branch: 'main' } : {});
+const editorUrl = '/studio/edit/about/about';
 ---
 
 <PreviewWorkbench

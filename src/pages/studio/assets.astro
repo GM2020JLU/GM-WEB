@@ -1,0 +1,302 @@
+---
+import BaseHead from '../../components/BaseHead.astro';
+---
+
+<!doctype html>
+<html lang="zh-CN" data-palette="green-soft">
+  <head
+    ><BaseHead title="素材库" description="上传和复用内容图片" /><meta
+      name="robots"
+      content="noindex,nofollow,noarchive"
+    /></head
+  >
+  <body>
+    <main class="shell">
+      <nav class="topbar">
+        <a class="brand" href="/studio"><span>GM</span><strong>创作中心</strong></a><div>
+          <a href="/studio">内容</a><a href="/studio/import">导入</a><a href="/studio/organize"
+            >分类</a
+          >
+        </div>
+      </nav>
+      <header class="hero">
+        <div>
+          <p>MEDIA LIBRARY</p><h1>素材库</h1><span
+            >统一管理文章图片；上传前校验真实图片格式和大小。</span
+          >
+        </div><label class="upload"
+          ><input
+            type="file"
+            accept="image/jpeg,image/png,image/webp,image/gif,image/avif"
+            data-file
+          /><strong>上传图片</strong><small>JPG / PNG / WebP / GIF / AVIF，最大 5 MB</small></label
+        >
+      </header>
+      <div class="notice" data-notice role="status">
+        <strong>正在加载素材</strong><small>请稍候…</small>
+      </div>
+      <section>
+        <div class="section-title">
+          <h2>全部素材</h2><input type="search" placeholder="搜索文件名" data-search />
+        </div><div class="asset-grid" data-assets></div><p data-empty hidden>
+          还没有素材，可以上传第一张图片。
+        </p>
+      </section>
+    </main>
+    <script>
+      type Asset = { name: string; path: string; sha?: string; size: number; url: string };
+      const file = document.querySelector('[data-file]');
+      const grid = document.querySelector('[data-assets]');
+      const notice = document.querySelector('[data-notice]');
+      const empty = document.querySelector('[data-empty]');
+      const search = document.querySelector('[data-search]');
+      let assets: Asset[] = [];
+      const message = (title: string, detail: string, kind = '') => {
+        if (!(notice instanceof HTMLElement)) return;
+        notice.className = `notice ${kind}`;
+        notice.innerHTML = '<strong></strong><small></small>';
+        const heading = notice.querySelector('strong');
+        const copy = notice.querySelector('small');
+        if (heading) heading.textContent = title;
+        if (copy) copy.textContent = detail;
+      };
+      const render = () => {
+        if (!(grid instanceof HTMLElement)) return;
+        const query = search instanceof HTMLInputElement ? search.value.trim().toLowerCase() : '';
+        const visible = assets.filter((asset) => asset.name.toLowerCase().includes(query));
+        grid.replaceChildren(
+          ...visible.map((asset) => {
+            const card = document.createElement('article');
+            const image = document.createElement('img');
+            const name = document.createElement('strong');
+            const path = document.createElement('code');
+            const actions = document.createElement('div');
+            const copy = document.createElement('button');
+            const remove = document.createElement('button');
+            image.src = asset.url;
+            image.alt = '';
+            image.loading = 'lazy';
+            name.textContent = asset.name;
+            path.textContent = `@assets/images/content/${asset.path.split('/').at(-1)}`;
+            copy.type = 'button';
+            copy.textContent = '复制引用';
+            copy.addEventListener('click', async () => {
+              await navigator.clipboard.writeText(path.textContent);
+              copy.textContent = '已复制';
+            });
+            remove.type = 'button';
+            remove.textContent = '删除';
+            remove.className = 'danger';
+            remove.addEventListener('click', async () => {
+              if (!confirm(`确定删除素材 ${asset.name} 吗？请先确认没有内容正在引用。`)) return;
+              const response = await fetch('/api/studio/assets', {
+                method: 'DELETE',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ path: asset.path, sha: asset.sha }),
+              });
+              const result = await response.json();
+              if (!response.ok) return message('删除失败', result.error || '请重试。', 'error');
+              await load();
+            });
+            actions.append(copy, remove);
+            card.append(image, name, path, actions);
+            return card;
+          }),
+        );
+        if (empty instanceof HTMLElement) empty.hidden = visible.length > 0;
+      };
+      const load = async () => {
+        const response = await fetch('/api/studio/assets');
+        const result = await response.json();
+        if (!response.ok) return message('素材加载失败', result.error || '请刷新重试。', 'error');
+        assets = result.assets;
+        render();
+        message('素材已同步', `共 ${assets.length} 个文件。`, 'success');
+      };
+      search?.addEventListener('input', render);
+      file?.addEventListener('change', async () => {
+        if (!(file instanceof HTMLInputElement) || !file.files?.[0]) return;
+        const form = new FormData();
+        form.append('file', file.files[0]);
+        message('正在上传', '验证图片并写入内容仓库。');
+        const response = await fetch('/api/studio/assets', { method: 'POST', body: form });
+        const result = await response.json();
+        if (!response.ok) return message('上传失败', result.error || '请重试。', 'error');
+        message('上传成功', `可在正文中使用 ${result.reference}`, 'success');
+        file.value = '';
+        await load();
+      });
+      void load();
+    </script>
+  </body>
+</html>
+
+<style>
+  :global(*) {
+    box-sizing: border-box;
+  }
+  :global(body) {
+    margin: 0;
+    background: var(--paper-bg);
+    color: var(--paper-ink);
+    font-family: var(--font-ui);
+  }
+  .shell {
+    width: min(1180px, calc(100% - 32px));
+    margin: auto;
+    padding: 22px 0 90px;
+  }
+  .topbar,
+  .hero,
+  .section-title {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 24px;
+  }
+  .topbar {
+    padding-bottom: 17px;
+    border-bottom: 1px solid var(--paper-line);
+  }
+  .topbar > div,
+  .brand {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+  .brand,
+  .topbar a {
+    color: inherit;
+    text-decoration: none;
+  }
+  .brand span {
+    display: grid;
+    width: 34px;
+    height: 34px;
+    place-items: center;
+    border-radius: 10px;
+    background: var(--paper-ink);
+    color: white;
+    font-size: 0.72rem;
+  }
+  .topbar > div a {
+    padding: 7px;
+    color: var(--paper-ink-soft);
+    font-size: 0.82rem;
+  }
+  .hero {
+    padding: 58px 0 34px;
+  }
+  .hero p {
+    margin: 0;
+    color: var(--paper-accent);
+    font: 700 0.7rem var(--font-meta);
+    letter-spacing: 0.14em;
+  }
+  .hero h1 {
+    margin: 7px 0 10px;
+    font: 400 clamp(2.6rem, 7vw, 5rem)/1 var(--font-page-heading);
+  }
+  .hero span {
+    color: var(--paper-ink-soft);
+  }
+  .upload {
+    display: grid;
+    gap: 4px;
+    padding: 20px 28px;
+    border: 1px dashed var(--paper-accent);
+    border-radius: 14px;
+    background: color-mix(in srgb, var(--paper-bg) 92%, var(--paper-accent) 8%);
+    cursor: pointer;
+  }
+  .upload input {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    opacity: 0;
+  }
+  .upload small {
+    color: var(--paper-ink-faint);
+  }
+  .notice {
+    display: flex;
+    gap: 12px;
+    margin-bottom: 42px;
+    padding: 14px 16px;
+    border: 1px solid var(--paper-line);
+    border-radius: 11px;
+  }
+  .notice small {
+    color: var(--paper-ink-soft);
+  }
+  .notice.success {
+    border-color: #82b992;
+  }
+  .notice.error {
+    border-color: #d28d8d;
+  }
+  .section-title h2 {
+    font: 400 2rem var(--font-page-heading);
+  }
+  .section-title input {
+    width: 260px;
+    padding: 10px 12px;
+    border: 1px solid var(--paper-line-strong);
+    border-radius: 9px;
+    background: var(--paper-bg);
+  }
+  .asset-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(210px, 1fr));
+    gap: 14px;
+  }
+  .asset-grid article {
+    display: grid;
+    gap: 10px;
+    padding: 12px;
+    border: 1px solid var(--paper-line);
+    border-radius: 14px;
+    overflow: hidden;
+  }
+  .asset-grid img {
+    width: 100%;
+    aspect-ratio: 4/3;
+    object-fit: cover;
+    border-radius: 9px;
+    background: var(--paper-line);
+  }
+  .asset-grid code {
+    overflow: hidden;
+    color: var(--paper-ink-faint);
+    font-size: 0.7rem;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .asset-grid article > div {
+    display: flex;
+    gap: 7px;
+  }
+  .asset-grid button {
+    flex: 1;
+    padding: 8px;
+    border: 1px solid var(--paper-line-strong);
+    border-radius: 8px;
+    background: var(--paper-bg);
+    cursor: pointer;
+  }
+  .asset-grid .danger {
+    color: #a43d3d;
+  }
+  @media (max-width: 640px) {
+    .hero {
+      align-items: flex-start;
+      flex-direction: column;
+    }
+    .upload {
+      width: 100%;
+    }
+    .section-title input {
+      width: 160px;
+    }
+  }
+</style>

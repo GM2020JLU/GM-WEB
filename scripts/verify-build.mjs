@@ -38,6 +38,7 @@ function resolvePublicPath(value) {
 
   if (!decoded || !decoded.startsWith('/') || decoded.startsWith('//')) return null;
   if (decoded === '/keystatic' || decoded.startsWith('/keystatic/')) return null;
+  if (decoded.startsWith('/studio/edit/')) return null;
 
   if (decoded === '/') return join(dist, 'index.html');
   if (decoded.endsWith('/')) return join(dist, decoded, 'index.html');
@@ -56,6 +57,8 @@ const requiredFiles = [
   'vibe/index.html',
   'studio/index.html',
   'studio/import/index.html',
+  'studio/assets/index.html',
+  'studio/organize/index.html',
   'preview/about/index.html',
   'preview/blog/casdcv/index.html',
   'preview/render/blog/casdcv/index.html',
@@ -147,7 +150,7 @@ if (existsSync(join(dist, 'blog/casdcv/index.html'))) fail('草稿文章意外�
 const studio = readFileSync(join(dist, 'studio/index.html'), 'utf8');
 for (const marker of [
   '今天写点什么？',
-  '打开内容编辑器',
+  '开始写作',
   '新建内容',
   '三步发布',
   '继续编辑',
@@ -155,8 +158,8 @@ for (const marker of [
   'data-search',
   '建议完善',
   '历史<span',
-  '/keystatic/branch/main/collection/blog/create',
-  '/keystatic/branch/main/collection/media/create',
+  '/studio/edit/blog/new?new=1',
+  '/studio/edit/media/new?new=1',
 ]) {
   if (!studio.includes(marker)) fail(`内容工作台缺少：${marker}`);
 }
@@ -182,7 +185,7 @@ if (!markdownImportScripts.length) {
   const script = markdownImportScripts
     .map((source) => readFileSync(join(dist, source.replace(/^\//, '')), 'utf8'))
     .join('\n');
-  for (const marker of ['/api/studio/import', '/keystatic/branch/']) {
+  for (const marker of ['/api/studio/import', '/studio/edit/']) {
     if (!script.includes(marker)) fail(`Markdown 导入脚本缺少：${marker}`);
   }
 }
@@ -202,7 +205,7 @@ for (const marker of [
   '平板',
   '手机',
   '/preview/render/blog/casdcv',
-  '/keystatic/branch/main/collection/blog/item/casdcv',
+  '/studio/edit/blog/casdcv',
 ]) {
   if (!preview.includes(marker)) fail(`预览工作台缺少：${marker}`);
 }
@@ -235,7 +238,14 @@ for (const file of vercelRequiredFiles) {
 
 if (existsSync(join(vercelOutput, 'config.json'))) {
   const vercelConfig = readFileSync(join(vercelOutput, 'config.json'), 'utf8');
-  for (const route of ['/keystatic', '/api/keystatic', '/api/studio/import']) {
+  for (const route of [
+    '/keystatic',
+    '/api/keystatic',
+    '/api/studio/import',
+    '/api/studio/content',
+    '/api/studio/assets',
+    '/studio/edit',
+  ]) {
     if (!vercelConfig.includes(route)) fail(`Vercel 未配置后台动态路由：${route}`);
   }
 }

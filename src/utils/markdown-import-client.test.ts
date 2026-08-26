@@ -106,7 +106,7 @@ describe('Markdown 导入浏览器交互', () => {
     expect(element(window, '[data-submit]').disabled).toBe(false);
   });
 
-  test('导入成功后进入 production 分支的编辑页面', async () => {
+  test('导入成功后进入 Studio 编辑页面', async () => {
     const window = createPage();
     let destination = '';
     const client = setupMarkdownImport(browserDocument(window), {
@@ -124,7 +124,7 @@ describe('Markdown 导入浏览器交互', () => {
     element(window, '[data-import-form]').requestSubmit();
     await settle();
 
-    expect(destination).toBe('/keystatic/branch/main/collection/blog/item/hello-world');
+    expect(destination).toBe('/studio/edit/blog/hello-world');
     expect(element(window, '[data-result]').textContent).toContain('导入成功');
   });
 

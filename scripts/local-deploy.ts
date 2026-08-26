@@ -28,6 +28,11 @@ const logFile = resolve(deployments, `${targetSha}.log`);
 const lock = resolve(runtime, 'deployment.lock');
 const astroBuildCache = resolve(runtime, 'astro-build-cache');
 const bunExecutable = process.env.STUDIO_BUN_PATH || 'bun';
+const studioManagedPaths = [
+  'src/assets/images/content',
+  'src/config/site.toml',
+  'src/content',
+] as const;
 
 function ensureInsideRuntime(path: string) {
   const pathFromRuntime = relative(runtime, path);
@@ -88,6 +93,49 @@ async function run(command: string, args: string[]) {
   });
 }
 
+async function runForStatus(command: string, args: string[]) {
+  await appendLog(`\n$ ${command} ${args.join(' ')}\n`);
+  return new Promise<number>((accept, reject) => {
+    const child = spawn(command, args, {
+      cwd: root,
+      env: process.env,
+      stdio: ['ignore', 'pipe', 'pipe'],
+    });
+    child.stdout.on('data', (chunk) => void appendLog(String(chunk)));
+    child.stderr.on('data', (chunk) => void appendLog(String(chunk)));
+    child.on('error', reject);
+    child.on('exit', (code) => accept(code ?? 1));
+  });
+}
+
+async function backupToGitHub() {
+  const existingIndex = await runForStatus('git', ['diff', '--cached', '--quiet']);
+  if (existingIndex !== 0) {
+    throw new Error('Git 暂存区存在非后台操作的更改，为避免误提交已停止发布。');
+  }
+
+  await run('git', ['fetch', 'origin', 'main']);
+  const remoteIsAncestor = await runForStatus('git', [
+    'merge-base',
+    '--is-ancestor',
+    'origin/main',
+    'HEAD',
+  ]);
+  if (remoteIsAncestor !== 0) {
+    throw new Error('GitHub 已有较新更改，请先同步 Mac 再发布，以免覆盖远程内容。');
+  }
+
+  await run('git', ['add', '--all', '--', ...studioManagedPaths]);
+  const noManagedChanges = await runForStatus('git', ['diff', '--cached', '--quiet']);
+  if (noManagedChanges === 0) {
+    await appendLog('\nGitHub 备份：没有需要提交的后台内容更改。\n');
+    return;
+  }
+
+  await run('git', ['commit', '-m', `content: ${reason}`]);
+  await run('git', ['push', 'origin', 'HEAD:main']);
+}
+
 async function acquireLock() {
   for (let attempt = 0; attempt < 180; attempt++) {
     try {
@@ -146,6 +194,7 @@ try {
   await rm(resolve(astroBuildCache, 'data-store.json'), { force: true });
   await run(bunExecutable, ['run', 'build']);
   await run(bunExecutable, ['run', 'verify:build']);
+  await backupToGitHub();
   await publishRelease();
   await update('ready');
 } catch (error) {

@@ -20,6 +20,12 @@
   <dict>
     <key>PATH</key>
     <string>/Users/goumin/Services/goumin-work/repo/.venv/bin:/Users/goumin/.bun/bin:/Users/goumin/.local/bin:/usr/bin:/bin:/usr/sbin:/sbin</string>
+    <key>ALL_PROXY</key>
+    <string>http://127.0.0.1:7897</string>
+    <key>HTTP_PROXY</key>
+    <string>http://127.0.0.1:7897</string>
+    <key>HTTPS_PROXY</key>
+    <string>http://127.0.0.1:7897</string>
     <key>PUBLIC_KEYSTATIC_STORAGE_KIND</key>
     <string>local</string>
     <key>PUBLIC_STUDIO_DEPLOYMENT_MODE</key>

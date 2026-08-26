@@ -1,6 +1,8 @@
 ---
 import { getCollection } from 'astro:content';
 import BaseHead from '../components/BaseHead.astro';
+import StudioNavigation from '../components/studio/StudioNavigation.astro';
+import { getThemePalette } from '../data/site';
 import { getContentHealth, getPublicationStatus } from '../utils/content-metrics';
 import { hasContentFiles } from '../utils/content-source';
 
@@ -53,17 +55,37 @@ const items = definitions
   .sort((a, b) => new Date(b.date || 0).valueOf() - new Date(a.date || 0).valueOf());
 const statusLabels = { draft: '草稿', ready: '待发布', published: '已发布' } as const;
 const deployedSha = import.meta.env.VERCEL_GIT_COMMIT_SHA || 'local';
+const palette = await getThemePalette();
+const moduleCards = [
+  { label: '博客文章', note: '长文与技术笔记', href: '/studio/content/blog', count: blog.length },
+  {
+    label: '项目案例',
+    note: '过程、取舍与结果',
+    href: '/studio/content/projects',
+    count: projects.length,
+  },
+  { label: '随记', note: '短想法与生活片段', href: '/studio/content/vibe', count: vibe.length },
+  { label: '书影音', note: '阅读与观看记录', href: '/studio/content/media', count: media.length },
+  {
+    label: '站点页面',
+    note: '关于页与独立页面',
+    href: '/studio/content/pages',
+    count: about.length,
+  },
+  { label: '站点设置', note: '首页、身份与页面文案', href: '/studio/site', count: null },
+];
 ---
 
 <!doctype html>
-<html lang="zh-CN" data-palette="green-soft">
+<html lang="zh-CN" data-palette={palette}>
   <head
     ><BaseHead title="内容管理" description="个人站内容管理后台" /><meta
       name="robots"
       content="noindex,nofollow,noarchive"
     /></head
   >
-  <body>
+  <body class="studio-with-navigation">
+    <StudioNavigation />
     <main class="shell">
       <nav class="topbar">
         <a class="brand" href="/studio" aria-current="page"
@@ -98,6 +120,25 @@ const deployedSha = import.meta.env.VERCEL_GIT_COMMIT_SHA || 'local';
         <div class="deploy-track" hidden data-deployment-track>
           <span data-deployment-progress></span>
         </div><a data-deployment-link hidden target="_blank">打开线上页面</a>
+      </section>
+
+      <section class="modules" aria-labelledby="modules-title">
+        <div class="modules-heading">
+          <h2 id="modules-title">网站模块</h2><span>选择要管理的区域</span>
+        </div>
+        <div class="module-grid">
+          {
+            moduleCards.map((module) => (
+              <a href={module.href}>
+                <span>{module.count === null ? '设置' : `${module.count} 条`}</span>
+                <>
+                  <strong>{module.label}</strong>
+                  <small>{module.note}</small>
+                </>
+              </a>
+            ))
+          }
+        </div>
       </section>
 
       <section class="content-section">
@@ -324,8 +365,8 @@ const deployedSha = import.meta.env.VERCEL_GIT_COMMIT_SHA || 'local';
   }
   :global(body) {
     margin: 0;
-    background: #f7f9f6;
-    color: #21352a;
+    background: var(--paper-bg);
+    color: var(--paper-ink);
     font-family: var(--font-ui);
   }
   .shell {
@@ -361,7 +402,7 @@ const deployedSha = import.meta.env.VERCEL_GIT_COMMIT_SHA || 'local';
     height: 32px;
     place-items: center;
     border-radius: 9px;
-    background: #253d2e;
+    background: var(--paper-ink);
     color: white;
     font-size: 0.7rem;
   }
@@ -398,7 +439,7 @@ const deployedSha = import.meta.env.VERCEL_GIT_COMMIT_SHA || 'local';
   }
   .new-menu > summary {
     list-style: none;
-    background: #3e7e52;
+    background: var(--paper-accent);
     color: white;
     cursor: pointer;
   }
@@ -439,7 +480,7 @@ const deployedSha = import.meta.env.VERCEL_GIT_COMMIT_SHA || 'local';
     width: 8px;
     height: 8px;
     border-radius: 50%;
-    background: #4ca265;
+    background: var(--paper-accent);
   }
   .deployment[data-phase='queued'] .deploy-dot,
   .deployment[data-phase='building'] .deploy-dot,
@@ -459,15 +500,56 @@ const deployedSha = import.meta.env.VERCEL_GIT_COMMIT_SHA || 'local';
   .deploy-track span {
     display: block;
     height: 100%;
-    background: #45945d;
+    background: var(--paper-accent);
     transition: width 0.3s;
   }
   .deployment > a {
     font-size: 0.78rem;
-    color: #347149;
+    color: var(--paper-accent);
   }
   .controls {
     margin-bottom: 13px;
+  }
+  .modules {
+    margin-bottom: 34px;
+  }
+  .modules-heading {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    margin-bottom: 12px;
+  }
+  .modules-heading h2 {
+    margin: 0;
+    font: 400 1.7rem var(--font-page-heading);
+  }
+  .modules-heading span {
+    color: var(--paper-ink-faint);
+    font-size: 0.76rem;
+  }
+  .module-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 10px;
+  }
+  .module-grid a {
+    display: grid;
+    gap: 4px;
+    padding: 16px;
+    border: 1px solid var(--paper-line);
+    border-radius: 12px;
+    background: color-mix(in srgb, var(--paper-bg) 96%, var(--paper-accent) 4%);
+  }
+  .module-grid a:hover {
+    border-color: var(--paper-accent);
+  }
+  .module-grid span {
+    color: var(--paper-accent);
+    font-size: 0.68rem;
+  }
+  .module-grid small {
+    color: var(--paper-ink-soft);
+    font-size: 0.72rem;
   }
   .status-tabs {
     display: flex;
@@ -599,6 +681,9 @@ const deployedSha = import.meta.env.VERCEL_GIT_COMMIT_SHA || 'local';
     display: none;
   }
   @media (max-width: 680px) {
+    .module-grid {
+      grid-template-columns: 1fr 1fr;
+    }
     .shell {
       width: calc(100% - 18px);
     }

@@ -1,0 +1,296 @@
+---
+import { getCollection } from 'astro:content';
+import BaseHead from '../../../components/BaseHead.astro';
+import StudioNavigation from '../../../components/studio/StudioNavigation.astro';
+import { getPublicationStatus } from '../../../utils/content-metrics';
+import { hasContentFiles } from '../../../utils/content-source';
+import { getThemePalette } from '../../../data/site';
+
+export const prerender = true;
+export function getStaticPaths() {
+  return ['blog', 'projects', 'vibe', 'media', 'pages'].map((collection) => ({
+    params: { collection },
+  }));
+}
+
+const collection = Astro.params.collection ?? 'blog';
+const definitions = {
+  blog: { label: '博客文章', note: '技术文章、长期笔记和完整教程。', publicBase: '/blog' },
+  projects: { label: '项目案例', note: '项目背景、过程、取舍与结果。', publicBase: '/projects' },
+  vibe: { label: '随记', note: '短想法、照片、引用与生活片段。', publicBase: '/vibe' },
+  media: { label: '书影音', note: '书籍、影视、音乐和播客记录。', publicBase: '/media' },
+  pages: { label: '站点页面', note: '编辑关于页等独立页面。', publicBase: '/about' },
+} as const;
+const definition = definitions[collection as keyof typeof definitions];
+if (!definition) return Astro.redirect('/studio');
+
+const sourceCollection = collection === 'pages' ? 'about' : collection;
+const entries =
+  sourceCollection === 'media' && !hasContentFiles('media')
+    ? []
+    : await getCollection(sourceCollection as 'blog' | 'projects' | 'vibe' | 'media' | 'about');
+const items = entries
+  .map((entry) => {
+    const data = entry.data as Record<string, any>;
+    const status = getPublicationStatus(data);
+    const slug = sourceCollection === 'about' ? 'about' : entry.id;
+    const publicUrl =
+      status !== 'published'
+        ? undefined
+        : sourceCollection === 'blog'
+          ? `/blog/${entry.id}`
+          : sourceCollection === 'projects'
+            ? entry.id === 'index'
+              ? '/projects'
+              : `/projects/${entry.id}`
+            : sourceCollection === 'about'
+              ? '/about'
+              : definition.publicBase;
+    return {
+      slug,
+      title: data.title || '未命名内容',
+      status,
+      date: data.updatedDate ?? data.date ?? data.completedAt,
+      editorUrl: `/studio/edit/${sourceCollection}/${slug}`,
+      previewUrl:
+        sourceCollection === 'about' ? '/preview/about' : `/preview/${sourceCollection}/${slug}`,
+      publicUrl,
+    };
+  })
+  .sort((a, b) => new Date(b.date || 0).valueOf() - new Date(a.date || 0).valueOf());
+const statusLabel = { draft: '草稿', ready: '待发布', published: '已发布' } as const;
+const canCreate = collection !== 'pages';
+const palette = await getThemePalette();
+---
+
+<!doctype html>
+<html lang="zh-CN" data-palette={palette}>
+  <head>
+    <BaseHead title={`${definition.label}管理`} description={definition.note} />
+    <meta name="robots" content="noindex,nofollow,noarchive" />
+  </head>
+  <body class="studio-with-navigation">
+    <StudioNavigation />
+    <main class="module-shell">
+      <header>
+        <div><p>CONTENT MODULE</p><h1>{definition.label}</h1><span>{definition.note}</span></div>
+        <div class="actions">
+          {
+            collection !== 'pages' && (
+              <a href={`/studio/import?collection=${collection}`}>导入 MD</a>
+            )
+          }
+          {
+            canCreate && (
+              <a class="primary" href={`/studio/edit/${sourceCollection}/new?new=1`}>
+                新建
+              </a>
+            )
+          }
+        </div>
+      </header>
+      <section class="toolbar">
+        <div role="group" aria-label="状态筛选">
+          <button type="button" data-filter="all" aria-pressed="true">全部 {items.length}</button>
+          <button type="button" data-filter="draft">草稿</button>
+          <button type="button" data-filter="ready">待发布</button>
+          <button type="button" data-filter="published">已发布</button>
+        </div>
+        <input type="search" data-search placeholder={`搜索${definition.label}`} />
+      </section>
+      <section class="entries" data-entries>
+        {
+          items.map((item) => (
+            <article data-entry data-status={item.status}>
+              <div>
+                <span class:list={['status', item.status]}>{statusLabel[item.status]}</span>
+                <h2>{item.title}</h2>
+                <small>
+                  {item.date ? new Date(item.date).toLocaleDateString('zh-CN') : '暂无日期'}
+                </small>
+              </div>
+              <nav aria-label={`${item.title}操作`}>
+                <>
+                  <a class="edit" href={item.editorUrl}>
+                    编辑
+                  </a>
+                  <a href={item.previewUrl}>预览</a>
+                </>
+                {item.publicUrl && <a href={item.publicUrl}>线上</a>}
+              </nav>
+            </article>
+          ))
+        }
+        <div class="empty" data-empty hidden={items.length > 0}>
+          <strong>这个模块还是空的</strong>
+          <p>{canCreate ? '可以新建内容，或导入现有 Markdown。' : '还没有可编辑页面。'}</p>
+        </div>
+      </section>
+    </main>
+    <script>
+      const entries = [...document.querySelectorAll('[data-entry]')];
+      const filters = [...document.querySelectorAll('[data-filter]')];
+      const search = document.querySelector('[data-search]');
+      const empty = document.querySelector('[data-empty]');
+      let active = 'all';
+      const apply = () => {
+        const query = search instanceof HTMLInputElement ? search.value.trim().toLowerCase() : '';
+        let visible = 0;
+        entries.forEach((entry) => {
+          if (!(entry instanceof HTMLElement)) return;
+          const show =
+            (active === 'all' || entry.dataset.status === active) &&
+            (!query || entry.textContent?.toLowerCase().includes(query));
+          entry.hidden = !show;
+          if (show) visible++;
+        });
+        if (empty instanceof HTMLElement) empty.hidden = visible > 0;
+      };
+      filters.forEach((button) =>
+        button.addEventListener('click', () => {
+          if (!(button instanceof HTMLElement)) return;
+          active = button.dataset.filter ?? 'all';
+          filters.forEach((item) => item.setAttribute('aria-pressed', String(item === button)));
+          apply();
+        }),
+      );
+      search?.addEventListener('input', apply);
+    </script>
+  </body>
+</html>
+
+<style>
+  :global(*) {
+    box-sizing: border-box;
+  }
+  :global(body) {
+    margin: 0;
+    font-family: var(--font-ui);
+  }
+  .module-shell {
+    width: min(1040px, calc(100% - 40px));
+    padding: 44px 0 90px;
+  }
+  header,
+  .toolbar,
+  article,
+  article nav,
+  .actions,
+  .toolbar > div {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+  }
+  header {
+    align-items: flex-end;
+    padding-bottom: 34px;
+    border-bottom: 1px solid var(--paper-line);
+  }
+  header p {
+    margin: 0;
+    color: var(--paper-accent);
+    font: 700 0.68rem var(--font-meta);
+    letter-spacing: 0.14em;
+  }
+  h1 {
+    margin: 8px 0 10px;
+    font: 400 clamp(2.5rem, 7vw, 4.8rem)/1 var(--font-page-heading);
+  }
+  header span,
+  article small {
+    color: var(--paper-ink-soft);
+  }
+  a {
+    color: inherit;
+    text-decoration: none;
+  }
+  .actions a,
+  article nav a,
+  button {
+    padding: 8px 11px;
+    border: 1px solid var(--paper-line-strong);
+    border-radius: 9px;
+    background: var(--paper-bg);
+    font: inherit;
+    font-size: 0.78rem;
+  }
+  .actions .primary,
+  article nav .edit {
+    border-color: var(--paper-accent);
+    background: var(--paper-accent);
+    color: white;
+  }
+  .toolbar {
+    padding: 22px 0 12px;
+  }
+  .toolbar button {
+    border: 0;
+    color: var(--paper-ink-soft);
+    cursor: pointer;
+  }
+  .toolbar button[aria-pressed='true'] {
+    background: color-mix(in srgb, var(--paper-accent) 12%, transparent);
+    color: var(--paper-ink);
+  }
+  .toolbar input {
+    width: 230px;
+    padding: 9px 11px;
+    border: 1px solid var(--paper-line-strong);
+    border-radius: 9px;
+    background: var(--paper-bg);
+    color: inherit;
+  }
+  .entries {
+    overflow: hidden;
+    border: 1px solid var(--paper-line);
+    border-radius: 15px;
+    background: color-mix(in srgb, var(--paper-bg) 97%, white 3%);
+  }
+  article {
+    padding: 18px 20px;
+    border-bottom: 1px solid var(--paper-line);
+  }
+  article:last-of-type {
+    border-bottom: 0;
+  }
+  article h2 {
+    margin: 8px 0 5px;
+    font: 500 1.05rem/1.35 var(--font-ui);
+  }
+  .status {
+    padding: 3px 7px;
+    border-radius: 99px;
+    background: color-mix(in srgb, var(--paper-ink) 7%, transparent);
+    color: var(--paper-ink-soft);
+    font-size: 0.67rem;
+  }
+  .status.published {
+    background: color-mix(in srgb, var(--paper-accent) 14%, transparent);
+    color: var(--paper-accent);
+  }
+  .empty {
+    padding: 70px 20px;
+    text-align: center;
+  }
+  .empty[hidden] {
+    display: none;
+  }
+  .empty p {
+    color: var(--paper-ink-soft);
+  }
+  @media (max-width: 680px) {
+    header,
+    .toolbar,
+    article {
+      align-items: stretch;
+      flex-direction: column;
+    }
+    .toolbar input {
+      width: 100%;
+    }
+    article nav {
+      justify-content: flex-start;
+    }
+  }
+</style>

@@ -78,17 +78,21 @@ navigation、scaffold 和 i18n contribution 消失。
   `draft` 字段并为公开路由派生布尔值；后台保存自动写入 `updatedDate`
 - `src/content/taxonomies` 保存受控标签、分类和系列；图片统一写入
   `src/assets/images/content`
-- `/studio` 是日常内容后台入口：主页采用精简内容列表，只保留状态/类型筛选、搜索、
-  新建、导入、编辑/预览与批量操作；动态 `/studio/edit/**` 以标题、摘要和正文为主，
-  低频字段折叠到“更多设置”。网址别名由标题自动生成并在冲突时追加序号
+- `/studio` 是模块化日常后台入口：共享侧栏将 Blog、Projects、Vibe、Media、Pages、
+  站点设置、内容组织、素材和导入分区；`/studio/content/{module}` 提供模块内列表、
+  状态筛选和创建/导入入口。所有后台页面读取主站当前 palette 和 paper tokens
+- 动态 `/studio/edit/**` 以标题、摘要和正文为主，低频字段折叠到“更多设置”。网址别名
+  由标题自动生成并在冲突时追加序号；`/studio/site` 与 `/api/studio/site` 编辑站点身份、
+  主题、个人资料、首页介绍/关注方向/引语和公开模块文案
 - 线上发布会保存目标 Git commit SHA，并由 `/api/studio/deployment` 对比 GitHub main、
   GitHub Deployment 与当前 Vercel runtime SHA，向编辑页和工作台持续反馈已提交、排队、
   构建中、已上线或失败；待部署记录保存在浏览器中，换页后继续追踪
 - `/api/studio/**` 负责读取最新 GitHub 内容、编辑、草稿/待发布/发布/撤回、批量状态、
   定时发布、素材、分类和版本恢复；线上写入复用 Keystatic GitHub 登录。`/keystatic`
   保留为不出现在日常导航中的应急编辑器
-- `/studio/import` 是静态导入 UI，只向同源 `/api/studio/import` 提交经服务端重新解析的
-  Markdown，导入后直接进入 Studio 编辑器；`/preview/**` 为真实渲染预览。后台路由均
+- `/studio/import` 是静态导入 UI，支持 Blog、Projects、Vibe 和 Media 的 Markdown，
+  只向同源 `/api/studio/import` 提交经服务端重新解析的内容，导入后直接进入 Studio
+  编辑器；`/preview/**` 为真实渲染预览。后台路由均
   noindex/no-store，静态页不包含密钥
 - Keystatic 应急深链接仍由 `src/utils/keystatic-routes.ts` 统一生成；Studio 日常工作流统一
   使用 `/studio/edit/{collection}/{slug}`，不再暴露 Keystatic 的分支路由

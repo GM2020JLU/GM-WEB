@@ -1,5 +1,7 @@
 ---
 import BaseHead from '../../../../components/BaseHead.astro';
+import StudioNavigation from '../../../../components/studio/StudioNavigation.astro';
+import { getThemePalette } from '../../../../data/site';
 import { isStudioCollection, isTaxonomyCollection } from '../../../../utils/studio-content';
 
 export const prerender = false;
@@ -18,17 +20,19 @@ const labels = {
   tags: '标签',
 };
 const taxonomy = isTaxonomyCollection(collection);
+const palette = await getThemePalette();
 ---
 
 <!doctype html>
-<html lang="zh-CN" data-palette="green-soft">
+<html lang="zh-CN" data-palette={palette}>
   <head
     ><BaseHead
       title={`${isNew ? '新建' : '编辑'}${labels[collection]}`}
       description="Studio 内容编辑器"
     /><meta name="robots" content="noindex,nofollow,noarchive" /></head
   >
-  <body>
+  <body class="studio-with-navigation">
+    <StudioNavigation />
     <main
       class="shell"
       data-editor-root
@@ -204,8 +208,8 @@ const taxonomy = isTaxonomyCollection(collection);
   }
   :global(body) {
     margin: 0;
-    background: #f7f9f6;
-    color: #21352a;
+    background: var(--paper-bg);
+    color: var(--paper-ink);
     font-family: var(--font-ui);
   }
   .shell {
@@ -238,7 +242,7 @@ const taxonomy = isTaxonomyCollection(collection);
     height: 32px;
     place-items: center;
     border-radius: 9px;
-    background: #253d2e;
+    background: var(--paper-ink);
     color: white;
     font-size: 0.7rem;
   }
@@ -257,7 +261,7 @@ const taxonomy = isTaxonomyCollection(collection);
   }
   .editor-header p {
     margin: 0;
-    color: #45815a;
+    color: var(--paper-accent);
     font-size: 0.72rem;
     font-weight: 700;
   }
@@ -331,7 +335,7 @@ const taxonomy = isTaxonomyCollection(collection);
     display: block;
     height: 100%;
     border-radius: inherit;
-    background: #3f8a58;
+    background: var(--paper-accent);
     transition: width 0.35s ease;
   }
   .deployment-tracker > a {
@@ -459,8 +463,8 @@ const taxonomy = isTaxonomyCollection(collection);
   }
   .view-switch button[aria-pressed='true'],
   .primary {
-    border-color: #3e7e52;
-    background: #3e7e52;
+    border-color: var(--paper-accent);
+    background: var(--paper-accent);
     color: white;
   }
   .editor-grid {
@@ -551,7 +555,7 @@ const taxonomy = isTaxonomyCollection(collection);
     border: 1px solid #d9e1da;
     border-radius: 14px;
     background: #f9fbf8;
-    color: #21352a;
+    color: var(--paper-ink);
   }
   dialog::backdrop {
     background: #17251da8;

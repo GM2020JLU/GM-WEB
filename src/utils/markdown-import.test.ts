@@ -42,6 +42,21 @@ describe('Markdown 导入', () => {
     expect(result.content).toContain('updatedDate: 2026-08-26T08:00:00+08:00');
   });
 
+  test('项目 Markdown 导入为可编辑的 MDX 草稿', () => {
+    const result = createImportedMarkdown({
+      collection: 'projects',
+      filename: 'board.md',
+      source: '# 开发板项目\n\n项目说明。',
+      slug: 'board-project',
+      title: '开发板项目',
+      description: '项目说明',
+      creator: '',
+    });
+    expect(result.path).toBe('src/content/projects/board-project.mdx');
+    expect(result.content).toContain('publicationStatus: draft');
+    expect(result.content).toContain('highlights: []');
+  });
+
   test('拒绝非 Markdown、非法 slug 和 YAML 别名', () => {
     expect(() => parseMarkdownImport('post.mdx', '# MDX')).toThrow('目前只支持 .md');
     expect(() =>

@@ -1,0 +1,182 @@
+---
+const pathname = Astro.url.pathname;
+const groups = [
+  {
+    label: '内容',
+    items: [
+      { label: '总览', href: '/studio', match: (path: string) => path === '/studio' },
+      {
+        label: '博客文章',
+        href: '/studio/content/blog',
+        match: (path: string) => path.includes('/blog'),
+      },
+      {
+        label: '项目案例',
+        href: '/studio/content/projects',
+        match: (path: string) => path.includes('/projects'),
+      },
+      {
+        label: '随记',
+        href: '/studio/content/vibe',
+        match: (path: string) => path.includes('/vibe'),
+      },
+      {
+        label: '书影音',
+        href: '/studio/content/media',
+        match: (path: string) => path.includes('/media'),
+      },
+    ],
+  },
+  {
+    label: '站点',
+    items: [
+      {
+        label: '页面',
+        href: '/studio/content/pages',
+        match: (path: string) => path.includes('/about') || path.endsWith('/pages'),
+      },
+      { label: '站点设置', href: '/studio/site', match: (path: string) => path === '/studio/site' },
+      {
+        label: '内容组织',
+        href: '/studio/organize',
+        match: (path: string) =>
+          path === '/studio/organize' || /\/(categories|series|tags)(?:\/|$)/.test(path),
+      },
+      {
+        label: '素材库',
+        href: '/studio/assets',
+        match: (path: string) => path === '/studio/assets',
+      },
+    ],
+  },
+];
+---
+
+<aside class="studio-navigation" aria-label="创作后台模块">
+  <a class="studio-brand" href="/studio"><span>GM</span><strong>创作中心</strong></a>
+  <nav>
+    {
+      groups.map((group) => (
+        <section>
+          <p>{group.label}</p>
+          {group.items.map((item) => (
+            <a href={item.href} aria-current={item.match(pathname) ? 'page' : undefined}>
+              {item.label}
+            </a>
+          ))}
+        </section>
+      ))
+    }
+  </nav>
+  <div class="studio-nav-footer">
+    <a href="/studio/import">导入 Markdown</a><a href="/" target="_blank">查看网站 ↗</a>
+  </div>
+</aside>
+
+<style>
+  .studio-navigation {
+    position: fixed;
+    inset: 0 auto 0 0;
+    z-index: 20;
+    display: flex;
+    flex-direction: column;
+    width: 228px;
+    padding: 22px 18px;
+    border-right: 1px solid var(--paper-line);
+    background: color-mix(in srgb, var(--paper-bg) 96%, var(--paper-accent) 4%);
+    color: var(--paper-ink);
+    font-family: var(--font-ui);
+  }
+  .studio-brand {
+    display: flex;
+    gap: 10px;
+    align-items: center;
+    padding: 0 8px 22px;
+    color: inherit;
+    text-decoration: none;
+  }
+  .studio-brand span {
+    display: grid;
+    width: 34px;
+    height: 34px;
+    place-items: center;
+    border-radius: 11px;
+    background: var(--paper-ink);
+    color: var(--paper-bg);
+    font: 700 0.7rem/1 var(--font-meta);
+  }
+  nav {
+    display: grid;
+    gap: 24px;
+  }
+  section {
+    display: grid;
+    gap: 3px;
+  }
+  section p {
+    margin: 0 9px 7px;
+    color: var(--paper-ink-faint);
+    font: 700 0.67rem/1.3 var(--font-meta);
+    letter-spacing: 0.12em;
+  }
+  section a,
+  .studio-nav-footer a {
+    padding: 9px 10px;
+    border-radius: 9px;
+    color: var(--paper-ink-soft);
+    font-size: 0.82rem;
+    text-decoration: none;
+  }
+  section a:hover,
+  section a[aria-current='page'] {
+    background: color-mix(in srgb, var(--paper-accent) 12%, transparent);
+    color: var(--paper-ink);
+  }
+  section a[aria-current='page'] {
+    box-shadow: inset 3px 0 var(--paper-accent);
+    font-weight: 700;
+  }
+  .studio-nav-footer {
+    display: grid;
+    gap: 3px;
+    margin-top: auto;
+    padding-top: 18px;
+    border-top: 1px solid var(--paper-line);
+  }
+  :global(body.studio-with-navigation) {
+    padding-left: 228px;
+    background: var(--paper-bg) !important;
+    color: var(--paper-ink) !important;
+  }
+  :global(body.studio-with-navigation > main) {
+    margin-inline: auto;
+  }
+  :global(body.studio-with-navigation .topbar) {
+    display: none;
+  }
+  @media (max-width: 760px) {
+    .studio-navigation {
+      position: sticky;
+      top: 0;
+      width: 100%;
+      height: auto;
+      padding: 10px 16px;
+      border-right: 0;
+      border-bottom: 1px solid var(--paper-line);
+    }
+    .studio-brand {
+      padding: 0;
+    }
+    .studio-brand span {
+      width: 30px;
+      height: 30px;
+    }
+    nav,
+    .studio-nav-footer {
+      display: none;
+    }
+    :global(body.studio-with-navigation) {
+      padding-left: 0;
+    }
+  }
+</style>

@@ -1,16 +1,20 @@
 ---
 import BaseHead from '../../components/BaseHead.astro';
+import StudioNavigation from '../../components/studio/StudioNavigation.astro';
+import { getThemePalette } from '../../data/site';
+const palette = await getThemePalette();
 ---
 
 <!doctype html>
-<html lang="zh-CN" data-palette="green-soft">
+<html lang="zh-CN" data-palette={palette}>
   <head
     ><BaseHead title="素材库" description="上传和复用内容图片" /><meta
       name="robots"
       content="noindex,nofollow,noarchive"
     /></head
   >
-  <body>
+  <body class="studio-with-navigation">
+    <StudioNavigation />
     <main class="shell">
       <nav class="topbar">
         <a class="brand" href="/studio"><span>GM</span><strong>创作中心</strong></a><div>

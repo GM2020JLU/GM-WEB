@@ -3,7 +3,7 @@ import { fromMarkdown } from 'mdast-util-from-markdown';
 import { frontmatter } from 'micromark-extension-frontmatter';
 import { parseDocument, stringify } from 'yaml';
 
-export const markdownImportCollections = ['blog', 'vibe', 'media'] as const;
+export const markdownImportCollections = ['blog', 'projects', 'vibe', 'media'] as const;
 export type MarkdownImportCollection = (typeof markdownImportCollections)[number];
 
 export const MAX_MARKDOWN_IMPORT_BYTES = 1024 * 1024;
@@ -148,7 +148,7 @@ export function createImportedMarkdown(
   let frontmatterData: Record<string, unknown>;
   const warnings = [...parsed.warnings];
 
-  if (request.collection === 'blog') {
+  if (request.collection === 'blog' || request.collection === 'projects') {
     frontmatterData = {
       title: request.title,
       description: request.description,
@@ -162,6 +162,17 @@ export function createImportedMarkdown(
       series: stringList(original.series),
       comments: true,
       sidebar: { enable: true, toc: true, relatedPosts: true },
+      ...(request.collection === 'projects'
+        ? {
+            icon: 'github',
+            iconColor: '',
+            role: '',
+            period: '',
+            highlights: [],
+            authors: [],
+            links: [],
+          }
+        : {}),
     };
   } else if (request.collection === 'vibe') {
     frontmatterData = {
@@ -212,7 +223,7 @@ export function createImportedMarkdown(
 
   return {
     content: `---\n${stringify(frontmatterData, { lineWidth: 0 })}---\n${parsed.body ? `\n${parsed.body}\n` : ''}`,
-    path: `src/content/${request.collection}/${request.slug}.md`,
+    path: `src/content/${request.collection}/${request.slug}.${request.collection === 'projects' ? 'mdx' : 'md'}`,
     warnings,
   };
 }

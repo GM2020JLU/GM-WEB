@@ -1,0 +1,349 @@
+---
+import BaseHead from '../../components/BaseHead.astro';
+import StudioNavigation from '../../components/studio/StudioNavigation.astro';
+import { getThemePalette } from '../../data/site';
+const palette = await getThemePalette();
+---
+
+<!doctype html>
+<html lang="zh-CN" data-palette={palette}>
+  <head
+    ><BaseHead title="站点设置" description="编辑个人站身份、主题和页面文案" /><meta
+      name="robots"
+      content="noindex,nofollow,noarchive"
+    /></head
+  >
+  <body class="studio-with-navigation">
+    <StudioNavigation />
+    <main class="settings-shell">
+      <header>
+        <p>SITE MODULE</p><h1>站点设置</h1><span>编辑网站身份、主题和各模块公开文案。</span>
+      </header>
+      <div class="notice" data-notice role="status">
+        <strong>正在读取设置</strong><small>请稍候…</small>
+      </div>
+      <form data-site-form>
+        <section>
+          <div><span>01</span><h2>网站身份</h2><p>浏览器标题、搜索摘要和页脚。</p></div>
+          <div class="fields">
+            <label>站点名称<input required name="site.title" /></label>
+            <label>首页标题<input required name="site.pageTitle" /></label>
+            <label class="wide"
+              >站点说明<textarea required rows="2" name="site.description"></textarea></label
+            >
+            <label class="wide"
+              >首页搜索摘要<textarea required rows="2" name="site.pageDescription"
+              ></textarea></label
+            >
+            <label class="wide">页脚文字<input name="site.footerNote" /></label>
+          </div>
+        </section>
+        <section>
+          <div><span>02</span><h2>首页内容</h2><p>首页自我介绍、关注方向和引语。</p></div>
+          <div class="fields">
+            <label>引导词<input required name="home.introTitle" /></label>
+            <label>显示姓名<input required name="home.introName" /></label>
+            <label class="wide"
+              >自我介绍<textarea required rows="6" name="home.introBody"></textarea><small
+                >每行显示为一个段落。</small
+              ></label
+            >
+            <label class="wide"
+              >关注方向<input name="home.focus" /><small>用顿号或逗号分隔。</small></label
+            >
+            <label class="wide"
+              >首页引语<textarea required rows="3" name="home.quote"></textarea><small
+                >每行显示为一句。</small
+              ></label
+            >
+          </div>
+        </section>
+        <section>
+          <div><span>03</span><h2>个人资料</h2><p>首页名片和全站作者身份。</p></div>
+          <div class="fields">
+            <label>姓名<input required name="profile.name" /></label>
+            <label>角色<input name="profile.role" /></label>
+            <label>邮箱<input required type="email" name="profile.email" /></label>
+            <label>头像网址<input required type="url" name="profile.avatar" /></label>
+            <label
+              >主题色<select name="theme.palette"
+                ><option value="blue-soft">蓝 · 柔和</option><option value="green-soft"
+                  >绿 · 柔和</option
+                ><option value="green-vivid">绿 · 鲜明</option><option value="rose-soft"
+                  >玫瑰</option
+                ><option value="pink-soft">粉</option><option value="purple-soft">紫</option><option
+                  value="orange-soft">橙</option
+                ><option value="brown-soft">棕</option></select
+              ></label
+            >
+          </div>
+        </section>
+        {
+          [
+            ['blog', '文章页'],
+            ['projects', '项目页'],
+            ['vibe', '随记页'],
+            ['media', '书影音页'],
+          ].map(([key, label], index) => (
+            <section>
+              <div>
+                <>
+                  <span>{String(index + 4).padStart(2, '0')}</span>
+                  <h2>{label}</h2>
+                  <p>该公开模块的标题与介绍。</p>
+                </>
+              </div>
+              <div class="fields">
+                <label>
+                  标题
+                  <input required name={`pages.${key}.title`} />
+                </label>
+                <label class="wide">
+                  副标题
+                  <input name={`pages.${key}.subtitle`} />
+                </label>
+                <label class="wide">
+                  补充说明
+                  <textarea rows="2" name={`pages.${key}.note`} />
+                </label>
+              </div>
+            </section>
+          ))
+        }
+        <footer>
+          <span>保存后会触发网站重新构建</span><button type="submit">保存站点设置</button>
+        </footer>
+      </form>
+    </main>
+    <script>
+      import { STUDIO_DEPLOYMENT_STORAGE_KEY } from '../../utils/studio-deployment';
+      const form = document.querySelector('[data-site-form]');
+      const notice = document.querySelector('[data-notice]');
+      const message = (title: string, detail: string, kind = '') => {
+        if (!(notice instanceof HTMLElement)) return;
+        notice.className = `notice ${kind}`;
+        notice.innerHTML = '<strong></strong><small></small>';
+        notice.querySelector('strong')!.textContent = title;
+        notice.querySelector('small')!.textContent = detail;
+      };
+      const field = (name: string) =>
+        form?.querySelector<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>(
+          `[name="${name}"]`,
+        );
+      const load = async () => {
+        const response = await fetch('/api/studio/site');
+        const result = await response.json();
+        if (!response.ok) return message('无法读取设置', result.error || '请刷新重试。', 'error');
+        const flatten = (value: Record<string, unknown>, prefix = ''): Array<[string, unknown]> =>
+          Object.entries(value).flatMap(([key, item]) =>
+            item && typeof item === 'object'
+              ? flatten(item as Record<string, unknown>, `${prefix}${key}.`)
+              : ([[`${prefix}${key}`, item]] as Array<[string, unknown]>),
+          );
+        flatten(result.settings).forEach(([name, value]) => {
+          const input = field(String(name));
+          if (input) input.value = String(value ?? '');
+        });
+        message('设置已载入', '修改后保存，线上页面会自动重新构建。', 'success');
+      };
+      form?.addEventListener('submit', async (event) => {
+        event.preventDefault();
+        if (!(form instanceof HTMLFormElement) || !form.reportValidity()) return;
+        const button = form.querySelector('button[type="submit"]') as HTMLButtonElement;
+        button.disabled = true;
+        message('正在保存', '正在写入站点配置。');
+        const value = (name: string) => field(name)?.value.trim() ?? '';
+        const pages = Object.fromEntries(
+          ['blog', 'projects', 'vibe', 'media'].map((key) => [
+            key,
+            {
+              title: value(`pages.${key}.title`),
+              subtitle: value(`pages.${key}.subtitle`),
+              note: value(`pages.${key}.note`),
+            },
+          ]),
+        );
+        const response = await fetch('/api/studio/site', {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            site: {
+              title: value('site.title'),
+              description: value('site.description'),
+              pageTitle: value('site.pageTitle'),
+              pageDescription: value('site.pageDescription'),
+              footerNote: value('site.footerNote'),
+            },
+            theme: { palette: value('theme.palette') },
+            profile: {
+              name: value('profile.name'),
+              role: value('profile.role'),
+              email: value('profile.email'),
+              avatar: value('profile.avatar'),
+            },
+            home: {
+              introTitle: value('home.introTitle'),
+              introName: value('home.introName'),
+              introBody: value('home.introBody'),
+              focus: value('home.focus'),
+              quote: value('home.quote'),
+            },
+            pages,
+          }),
+        });
+        const result = await response.json();
+        button.disabled = false;
+        if (!response.ok) return message('保存失败', result.error || '请稍后重试。', 'error');
+        if (result.commitSha)
+          localStorage.setItem(
+            STUDIO_DEPLOYMENT_STORAGE_KEY,
+            JSON.stringify({
+              targetSha: result.commitSha,
+              title: '站点设置',
+              startedAt: new Date().toISOString(),
+              publicUrl: '/',
+            }),
+          );
+        message(
+          '保存成功',
+          result.deploymentPending ? '已提交，返回总览可查看上线进度。' : '本地配置已经更新。',
+          'success',
+        );
+      });
+      void load();
+    </script>
+  </body>
+</html>
+
+<style>
+  :global(*) {
+    box-sizing: border-box;
+  }
+  :global(body) {
+    margin: 0;
+    font-family: var(--font-ui);
+  }
+  .settings-shell {
+    width: min(1040px, calc(100% - 40px));
+    padding: 44px 0 100px;
+  }
+  header {
+    padding-bottom: 34px;
+    border-bottom: 1px solid var(--paper-line);
+  }
+  header p {
+    margin: 0;
+    color: var(--paper-accent);
+    font: 700 0.68rem var(--font-meta);
+    letter-spacing: 0.14em;
+  }
+  h1 {
+    margin: 8px 0 10px;
+    font: 400 clamp(2.5rem, 7vw, 4.8rem)/1 var(--font-page-heading);
+  }
+  header span,
+  section > div:first-child p,
+  footer span,
+  .notice small {
+    color: var(--paper-ink-soft);
+  }
+  .notice {
+    display: flex;
+    gap: 10px;
+    margin: 22px 0;
+    padding: 13px 15px;
+    border: 1px solid var(--paper-line);
+    border-radius: 11px;
+  }
+  .notice.success {
+    border-color: color-mix(in srgb, var(--paper-accent) 48%, var(--paper-line));
+  }
+  .notice.error {
+    border-color: #bf7474;
+  }
+  form {
+    display: grid;
+    gap: 14px;
+  }
+  section {
+    display: grid;
+    grid-template-columns: 230px 1fr;
+    gap: 34px;
+    padding: 25px;
+    border: 1px solid var(--paper-line);
+    border-radius: 14px;
+  }
+  section > div:first-child > span {
+    color: var(--paper-accent);
+    font: 700 0.68rem var(--font-meta);
+  }
+  h2 {
+    margin: 7px 0;
+    font: 400 1.55rem var(--font-page-heading);
+  }
+  section p {
+    margin: 0;
+    font-size: 0.78rem;
+    line-height: 1.6;
+  }
+  .fields {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 13px;
+  }
+  label {
+    display: grid;
+    gap: 6px;
+    color: var(--paper-ink-soft);
+    font-size: 0.74rem;
+  }
+  label.wide {
+    grid-column: 1 / -1;
+  }
+  input,
+  textarea,
+  select {
+    width: 100%;
+    padding: 10px 11px;
+    border: 1px solid var(--paper-line-strong);
+    border-radius: 8px;
+    background: var(--paper-bg);
+    color: var(--paper-ink);
+    font: inherit;
+  }
+  textarea {
+    resize: vertical;
+  }
+  footer {
+    position: sticky;
+    bottom: 14px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 13px 16px;
+    border: 1px solid var(--paper-line-strong);
+    border-radius: 12px;
+    background: color-mix(in srgb, var(--paper-bg) 92%, transparent);
+    backdrop-filter: blur(12px);
+  }
+  button {
+    padding: 10px 15px;
+    border: 0;
+    border-radius: 9px;
+    background: var(--paper-accent);
+    color: white;
+    font: inherit;
+    cursor: pointer;
+  }
+  @media (max-width: 720px) {
+    section {
+      grid-template-columns: 1fr;
+    }
+    .fields {
+      grid-template-columns: 1fr;
+    }
+    label.wide {
+      grid-column: auto;
+    }
+  }
+</style>

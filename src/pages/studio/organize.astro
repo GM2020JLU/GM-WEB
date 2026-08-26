@@ -2,6 +2,9 @@
 import { readdir, readFile } from 'node:fs/promises';
 import { parse } from 'yaml';
 import BaseHead from '../../components/BaseHead.astro';
+import StudioNavigation from '../../components/studio/StudioNavigation.astro';
+import { getThemePalette } from '../../data/site';
+const palette = await getThemePalette();
 
 const definitions = [
   { key: 'categories', label: '分类', note: '文章所属的主要栏目' },
@@ -34,14 +37,15 @@ const groups = await Promise.all(
 ---
 
 <!doctype html>
-<html lang="zh-CN" data-palette="green-soft">
+<html lang="zh-CN" data-palette={palette}>
   <head
     ><BaseHead title="内容组织" description="管理分类、系列和标签" /><meta
       name="robots"
       content="noindex,nofollow,noarchive"
     /></head
-  ><body
-    ><main class="shell">
+  ><body class="studio-with-navigation">
+    <StudioNavigation />
+    <main class="shell">
       <nav class="topbar">
         <a class="brand" href="/studio"><span>GM</span><strong>创作中心</strong></a><div>
           <a href="/studio">内容</a><a href="/studio/import">导入</a><a href="/studio/assets"

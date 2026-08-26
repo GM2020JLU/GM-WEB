@@ -51,7 +51,6 @@ const requiredFiles = [
   '404.html',
   'about/index.html',
   'blog/index.html',
-  'blog/rebuild-personal-site/index.html',
   'projects/index.html',
   'projects/personal-site/index.html',
   'vibe/index.html',
@@ -59,9 +58,15 @@ const requiredFiles = [
   'studio/import/index.html',
   'studio/assets/index.html',
   'studio/organize/index.html',
+  'studio/site/index.html',
+  'studio/content/blog/index.html',
+  'studio/content/projects/index.html',
+  'studio/content/vibe/index.html',
+  'studio/content/media/index.html',
+  'studio/content/pages/index.html',
   'preview/about/index.html',
-  'preview/blog/casdcv/index.html',
-  'preview/render/blog/casdcv/index.html',
+  'preview/projects/personal-site/index.html',
+  'preview/render/projects/personal-site/index.html',
   'preview/vibe/2026-08-23-new-site/index.html',
   'preview/render/vibe/2026-08-23-new-site/index.html',
   'rss.xml',
@@ -156,6 +161,10 @@ for (const marker of [
   'data-search',
   'data-content-list',
   'data-filter="published"',
+  '网站模块',
+  '/studio/content/blog',
+  '/studio/content/projects',
+  '/studio/site',
   '/studio/assets',
   '/studio/edit/blog/new?new=1',
 ]) {
@@ -170,10 +179,28 @@ for (const marker of [
   'accept=".md,text/markdown"',
   'data-import-form',
   'data-body-preview',
+  'value="projects"',
 ]) {
   if (!markdownImport.includes(marker)) fail(`Markdown 导入页缺少：${marker}`);
 }
 if (!markdownImport.includes('noindex,nofollow,noarchive')) fail('Markdown 导入页缺少 noindex');
+
+const siteSettings = readFileSync(join(dist, 'studio/site/index.html'), 'utf8');
+for (const marker of [
+  '站点设置',
+  'data-site-form',
+  'site.pageTitle',
+  'profile.avatar',
+  'theme.palette',
+]) {
+  if (!siteSettings.includes(marker)) fail(`站点设置页缺少：${marker}`);
+}
+for (const module of ['blog', 'projects', 'vibe', 'media', 'pages']) {
+  const modulePage = readFileSync(join(dist, `studio/content/${module}/index.html`), 'utf8');
+  if (!modulePage.includes('studio-navigation') || !modulePage.includes('CONTENT MODULE')) {
+    fail(`Studio ${module} 模块缺少统一导航或模块标题`);
+  }
+}
 const markdownImportScripts = [...markdownImport.matchAll(/<script type="module" src="([^"]+)"/gi)]
   .map((match) => match[1])
   .filter((source) => source.startsWith('/'));
@@ -196,14 +223,14 @@ if (!project.includes('问题与目标') || !project.includes('核心取舍')) {
   fail('项目案例缺少问题与决策过程');
 }
 
-const preview = readFileSync(join(dist, 'preview/blog/casdcv/index.html'), 'utf8');
+const preview = readFileSync(join(dist, 'preview/projects/personal-site/index.html'), 'utf8');
 for (const marker of [
   '页面预览',
   '桌面',
   '平板',
   '手机',
-  '/preview/render/blog/casdcv',
-  '/studio/edit/blog/casdcv',
+  '/preview/render/projects/personal-site',
+  '/studio/edit/projects/personal-site',
 ]) {
   if (!preview.includes(marker)) fail(`预览工作台缺少：${marker}`);
 }
@@ -216,7 +243,7 @@ const sitemapIndex = readFileSync(join(dist, 'sitemap-index.xml'), 'utf8');
 if (!sitemapIndex.includes('https://goumin.work/')) fail('Sitemap 未指向生产域名');
 
 const rss = readFileSync(join(dist, 'rss.xml'), 'utf8');
-if (!rss.includes('我为什么重新做了个人站')) fail('RSS 缺少已发布文章');
+if (!rss.includes('<rss') || !rss.includes('<channel>')) fail('RSS 产物格式不正确');
 
 const robots = readFileSync(join(dist, 'robots.txt'), 'utf8');
 for (const route of ['/keystatic/', '/api/keystatic/', '/studio', '/preview/']) {

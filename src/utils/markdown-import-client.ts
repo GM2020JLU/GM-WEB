@@ -1,5 +1,6 @@
 import { parseMarkdownImport } from './markdown-import';
 import { renderMarkdownPreview } from './markdown-preview';
+import { generateStudioSlug } from './studio-slug';
 
 type ImportResponse = {
   actionLabel?: string;
@@ -88,6 +89,12 @@ export function setupMarkdownImport(
   let selectedSource = '';
   let selectedFilename = '';
   let loadSequence = 0;
+  const requestedCollection = document.defaultView?.location.search
+    ? new URLSearchParams(document.defaultView.location.search).get('collection')
+    : null;
+  if (requestedCollection && ['blog', 'projects', 'vibe', 'media'].includes(requestedCollection)) {
+    collection.value = requestedCollection;
+  }
 
   const setResult = (heading: string, detail: string, kind = '') => {
     result.className = `result ${kind}`.trim();
@@ -108,7 +115,7 @@ export function setupMarkdownImport(
     const isMedia = collection.value === 'media';
     creatorField.hidden = !isMedia;
     creator.required = isMedia;
-    description.required = collection.value === 'blog';
+    description.required = collection.value === 'blog' || collection.value === 'projects';
   };
 
   const loadFile = async (file: File) => {
@@ -127,7 +134,7 @@ export function setupMarkdownImport(
       selectedSource = source;
       selectedFilename = file.name;
       title.value = parsed.title;
-      slug.value = parsed.slug;
+      slug.value = generateStudioSlug(parsed.title) || parsed.slug;
       description.value = parsed.description;
       creator.value = typeof parsed.data.creator === 'string' ? parsed.data.creator : '';
       parseState.textContent = '解析完成';
@@ -151,7 +158,7 @@ export function setupMarkdownImport(
       );
       warnings.hidden = parsed.warnings.length === 0;
       submit.disabled = false;
-      setResult('文件已解析，可以导入', '请确认内容类型、标题、别名和正文。', 'success');
+      setResult('文件已解析，可以导入', '请确认内容类型、标题和正文。网址会自动生成。', 'success');
     } catch (error) {
       if (sequence !== loadSequence) return;
       selectedSource = '';
@@ -185,6 +192,9 @@ export function setupMarkdownImport(
     if (file) void loadFile(file);
   });
   collection.addEventListener('change', updateTypeFields);
+  title.addEventListener('input', () => {
+    slug.value = generateStudioSlug(title.value);
+  });
   updateTypeFields();
 
   form.addEventListener('submit', async (event) => {

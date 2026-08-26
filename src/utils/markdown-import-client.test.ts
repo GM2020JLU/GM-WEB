@@ -6,7 +6,7 @@ import { renderMarkdownPreview } from './markdown-preview';
 const page = `
   <form data-import-form>
     <label data-dropzone><input type="file" data-file><strong data-file-label>选择文件</strong></label>
-    <select data-collection><option value="blog">博客</option><option value="media">媒体</option></select>
+    <select data-collection><option value="blog">博客</option><option value="projects">项目</option><option value="media">媒体</option></select>
     <input data-title required><input data-slug required pattern="[a-z0-9-]+">
     <textarea data-description></textarea>
     <label data-creator-field hidden><input data-creator></label>
@@ -126,6 +126,19 @@ describe('Markdown 导入浏览器交互', () => {
 
     expect(destination).toBe('/studio/edit/blog/hello-world');
     expect(element(window, '[data-result]').textContent).toContain('导入成功');
+  });
+
+  test('模块入口会预选项目并自动生成网址', async () => {
+    const window = new Window({ url: 'https://goumin.work/studio/import?collection=projects' });
+    window.document.body.innerHTML = page;
+    const client = setupMarkdownImport(browserDocument(window), {
+      fetch: async () => new Response(),
+    });
+    await client?.loadFile(markdown(window, 'board.md') as unknown as File);
+    expect(element(window, '[data-collection]').value).toBe('projects');
+    element(window, '[data-title]').value = '开发板 Bring-up';
+    element(window, '[data-title]').dispatchEvent(new window.Event('input'));
+    expect(element(window, '[data-slug]').value).toMatch(/^kai-fa-ban-bring-up/);
   });
 
   test('仓库权限不足时显示 GitHub App 配置入口', async () => {

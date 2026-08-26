@@ -54,5 +54,9 @@ http://:8081 {
 	@keystatic path /keystatic /keystatic/* /api/keystatic /api/keystatic/*
 	respond @keystatic 404
 
-	reverse_proxy 127.0.0.1:4321
+	reverse_proxy 127.0.0.1:4321 {
+		# Let this edge define browser caching consistently instead of inheriting
+		# Astro/Vite's development-only no-cache header.
+		header_down -Cache-Control
+	}
 }

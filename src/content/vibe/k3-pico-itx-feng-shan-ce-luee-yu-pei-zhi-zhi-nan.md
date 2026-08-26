@@ -1,16 +1,15 @@
 ---
-title: K3 Pico-ITX 风扇策略与配置指南
-date: 2026-08-26T15:22:59+08:00
-updatedDate: 2026-08-26T15:22:59+08:00
-publicationStatus: draft
-draft: true
-type: text
-mood: ""
-location: ""
 images: []
-tags: []
 align: left
 size: md
+title: K3 Pico-ITX 风扇策略与配置指南
+publicationStatus: published
+draft: false
+description: xascasca
+date: 2026-08-26T15:22:00+08:00
+type: text
+tags: []
+updatedDate: 2026-08-26T15:23:15+08:00
 ---
 
 # K3 Pico-ITX 风扇策略与配置指南

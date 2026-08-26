@@ -55,7 +55,9 @@ const groups = [
 ---
 
 <aside class="studio-navigation" aria-label="创作后台模块">
-  <a class="studio-brand" href="/studio"><span>GM</span><strong>创作中心</strong></a>
+  <a class="studio-brand" href="/studio" data-astro-reload
+    ><span>GM</span><strong>创作中心</strong></a
+  >
   <nav>
     {
       groups.map((group) => (
@@ -64,7 +66,7 @@ const groups = [
           {group.items.map((item) => (
             <a
               href={item.href}
-              data-astro-prefetch="hover"
+              data-astro-reload
               aria-current={item.match(pathname) ? 'page' : undefined}
             >
               {item.label}
@@ -75,8 +77,8 @@ const groups = [
     }
   </nav>
   <div class="studio-nav-footer">
-    <a href="/studio/import" data-astro-prefetch="hover">导入 Markdown</a>
-    <a href="/" target="_blank" data-astro-prefetch="hover">查看网站 ↗</a>
+    <a href="/studio/import" data-astro-reload>导入 Markdown</a>
+    <a href="/" target="_blank">查看网站 ↗</a>
     <button
       class="studio-nav-theme"
       type="button"

@@ -77,28 +77,30 @@ const structuredData = {
       }
     };
 
-    const installStudioPrefetch = () => {
-      if (!document.body.classList.contains('studio-with-navigation')) return;
+    const markStudioLinksForReload = () => {
+      if (!location.pathname.startsWith('/studio')) return;
 
       for (const link of document.querySelectorAll('a[href]')) {
-        if (!(link instanceof HTMLAnchorElement) || link.dataset.gouminPrefetchBound) continue;
+        if (!(link instanceof HTMLAnchorElement)) continue;
         if (link.origin !== location.origin || link.target === '_blank') continue;
-
-        link.dataset.gouminPrefetchBound = 'true';
-        link.addEventListener(
-          'mouseenter',
-          () => {
-            if (link.dataset.gouminPrefetched) return;
-            link.dataset.gouminPrefetched = 'true';
-            const preload = document.createElement('link');
-            preload.rel = 'prefetch';
-            preload.href = link.href;
-            document.head.append(preload);
-          },
-          { passive: true, once: true },
-        );
+        link.dataset.astroReload = '';
       }
     };
+
+    // Astro's client router can wait for every page script before painting the
+    // next module. Studio is a server-rendered admin surface, so native
+    // navigation is both simpler and noticeably faster on high-latency links.
+    document.addEventListener(
+      'click',
+      (event) => {
+        if (!location.pathname.startsWith('/studio')) return;
+        const target = event.target instanceof Element ? event.target.closest('a[href]') : null;
+        if (!(target instanceof HTMLAnchorElement)) return;
+        if (target.origin !== location.origin || target.target === '_blank') return;
+        target.dataset.astroReload = '';
+      },
+      true,
+    );
 
     syncThemeLabel();
 
@@ -106,7 +108,7 @@ const structuredData = {
       window.__gouminThemeI18nInitialized = true;
       window.addEventListener('navfolio:theme-change', syncThemeLabel);
       document.addEventListener('astro:page-load', syncThemeLabel);
-      document.addEventListener('astro:page-load', installStudioPrefetch);
+      document.addEventListener('astro:page-load', markStudioLinksForReload);
     }
 
     if (document.readyState === 'loading') {
@@ -114,13 +116,13 @@ const structuredData = {
         'DOMContentLoaded',
         () => {
           syncThemeLabel();
-          installStudioPrefetch();
+          markStudioLinksForReload();
         },
         { once: true },
       );
     } else {
       syncThemeLabel();
-      installStudioPrefetch();
+      markStudioLinksForReload();
     }
   })();
 </script>

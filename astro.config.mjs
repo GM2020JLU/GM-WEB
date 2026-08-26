@@ -72,7 +72,6 @@ export default defineConfig({
   base: resolvedBase,
   cacheDir: process.env.ASTRO_CACHE_DIR || `./node_modules/.astro-${contentSource}`,
   devToolbar: { enabled: false },
-  prefetch: { prefetchAll: false, defaultStrategy: 'hover' },
   output: 'static',
   adapter: vercel(),
   security: {

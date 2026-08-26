@@ -56,6 +56,22 @@ const structuredData = {
       }
     };
 
+    const markStudioLinkForReload = (link) => {
+      if (!document.body.classList.contains('studio-with-navigation')) return;
+      if (link.origin !== location.origin) return;
+      link.dataset.astroReload = '';
+    };
+
+    document.addEventListener(
+      'click',
+      (event) => {
+        const target = event.target;
+        const link = target instanceof Element ? target.closest('a') : null;
+        if (link instanceof HTMLAnchorElement) markStudioLinkForReload(link);
+      },
+      true,
+    );
+
     markStudioTransition();
 
     document.addEventListener('astro:before-swap', (event) => {
@@ -86,7 +102,16 @@ const structuredData = {
     }
 
     if (document.readyState === 'loading') {
-      document.addEventListener('DOMContentLoaded', syncThemeLabel, { once: true });
+      document.addEventListener(
+        'DOMContentLoaded',
+        () => {
+          syncThemeLabel();
+          document
+            .querySelectorAll('a[href]')
+            .forEach((link) => link instanceof HTMLAnchorElement && markStudioLinkForReload(link));
+        },
+        { once: true },
+      );
     } else {
       syncThemeLabel();
     }

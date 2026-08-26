@@ -272,7 +272,8 @@ for (const file of vercelRequiredFiles) {
 }
 
 if (existsSync(join(vercelOutput, 'config.json'))) {
-  const vercelConfig = readFileSync(join(vercelOutput, 'config.json'), 'utf8');
+  const vercelConfigPath = join(vercelOutput, 'config.json');
+  const vercelConfig = readFileSync(vercelConfigPath, 'utf8');
   for (const route of [
     '/keystatic',
     '/api/keystatic',
@@ -282,6 +283,18 @@ if (existsSync(join(vercelOutput, 'config.json'))) {
     '/studio/edit',
   ]) {
     if (!vercelConfig.includes(route)) fail(`Vercel 未配置后台动态路由：${route}`);
+  }
+
+  const parsedVercelConfig = JSON.parse(vercelConfig);
+  const privateDenyRoute = parsedVercelConfig.routes?.[0];
+  if (
+    privateDenyRoute?.status !== 404 ||
+    privateDenyRoute?.dest !== '/404.html' ||
+    !privateDenyRoute?.src?.includes('api/studio') ||
+    !privateDenyRoute?.src?.includes('api/keystatic') ||
+    !privateDenyRoute?.src?.includes('preview')
+  ) {
+    fail('Vercel 公开部署未在文件和函数路由之前封锁后台。');
   }
 }
 

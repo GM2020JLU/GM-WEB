@@ -149,17 +149,15 @@ if (existsSync(join(dist, 'blog/casdcv/index.html'))) fail('草稿文章意外�
 
 const studio = readFileSync(join(dist, 'studio/index.html'), 'utf8');
 for (const marker of [
-  '今天写点什么？',
-  '开始写作',
-  '新建内容',
-  '三步发布',
-  '继续编辑',
-  'data-deploy-label',
+  '>内容</h1>',
+  '>新建</summary>',
+  '导入 Markdown',
+  'data-deployment',
   'data-search',
-  '建议完善',
-  '历史<span',
+  'data-content-list',
+  'data-filter="published"',
+  '/studio/assets',
   '/studio/edit/blog/new?new=1',
-  '/studio/edit/media/new?new=1',
 ]) {
   if (!studio.includes(marker)) fail(`内容工作台缺少：${marker}`);
 }

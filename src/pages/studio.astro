@@ -1,12 +1,7 @@
 ---
 import { getCollection } from 'astro:content';
 import BaseHead from '../components/BaseHead.astro';
-import {
-  countWords,
-  estimateReadingMinutes,
-  getContentHealth,
-  getPublicationStatus,
-} from '../utils/content-metrics';
+import { getContentHealth, getPublicationStatus } from '../utils/content-metrics';
 import { hasContentFiles } from '../utils/content-source';
 
 const [blog, projects, vibe, media, about] = await Promise.all([
@@ -16,7 +11,6 @@ const [blog, projects, vibe, media, about] = await Promise.all([
   hasContentFiles('media') ? getCollection('media') : Promise.resolve([]),
   getCollection('about'),
 ]);
-
 const definitions = [
   ...blog.map((entry) => ({ entry, type: '博客', collection: 'blog' })),
   ...projects.map((entry) => ({ entry, type: '项目', collection: 'projects' })),
@@ -24,353 +18,186 @@ const definitions = [
   ...media.map((entry) => ({ entry, type: '书影音', collection: 'media' })),
   ...about.map((entry) => ({ entry, type: '页面', collection: 'about' })),
 ];
-
 const items = definitions
   .map(({ entry, type, collection }) => {
     const data = entry.data as Record<string, any>;
-    const source = entry.body ?? '';
     const status = getPublicationStatus(data);
-    const healthIssues = getContentHealth({ collection, id: entry.id, data, body: source });
-    const date = data.updatedDate ?? data.date ?? data.completedAt;
-    const isSingleton = collection === 'about';
-    const contentExtension = collection === 'projects' || isSingleton ? 'mdx' : 'md';
-    const contentPath = isSingleton
-      ? `src/content/about.${contentExtension}`
-      : `src/content/${collection}/${entry.id}.${contentExtension}`;
+    const isAbout = collection === 'about';
     const publicUrl =
-      status !== 'published'
-        ? undefined
-        : collection === 'blog'
+      status === 'published'
+        ? collection === 'blog'
           ? `/blog/${entry.id}`
           : collection === 'projects'
             ? entry.id === 'index'
               ? '/projects'
               : `/projects/${entry.id}`
-            : collection === 'about'
-              ? '/about'
-              : undefined;
+            : collection === 'vibe'
+              ? '/vibe'
+              : collection === 'media'
+                ? '/media'
+                : '/about'
+        : undefined;
     return {
       id: entry.id,
       title: data.title || '未命名内容',
       type,
       collection,
       status,
-      date: date ? new Date(date) : undefined,
-      words: countWords(source),
-      minutes: estimateReadingMinutes(source),
-      taxonomy: [...(data.categories ?? []), ...(data.series ?? []), ...(data.tags ?? [])],
-      healthIssues,
+      date: data.updatedDate ?? data.date ?? data.completedAt,
+      issues: getContentHealth({ collection, id: entry.id, data, body: entry.body ?? '' }),
       publicUrl,
-      historyUrl: `https://github.com/GM2020JLU/GM-WEB/commits/main/${contentPath}`,
-      editorUrl: `/studio/edit/${collection}/${isSingleton ? 'about' : entry.id}`,
-      previewUrl: isSingleton ? '/preview/about' : `/preview/${collection}/${entry.id}`,
+      editorUrl: `/studio/edit/${collection}/${isAbout ? 'about' : entry.id}`,
+      previewUrl: isAbout ? '/preview/about' : `/preview/${collection}/${entry.id}`,
     };
   })
-  .sort((a, b) => (b.date?.valueOf() ?? 0) - (a.date?.valueOf() ?? 0));
-
+  .sort((a, b) => new Date(b.date || 0).valueOf() - new Date(a.date || 0).valueOf());
 const statusLabels = { draft: '草稿', ready: '待发布', published: '已发布' } as const;
-const totals = Object.fromEntries(
-  Object.keys(statusLabels).map((status) => [
-    status,
-    items.filter((item) => item.status === status).length,
-  ]),
-);
 const deployedSha = import.meta.env.VERCEL_GIT_COMMIT_SHA || 'local';
-const builtAt = new Date().toISOString();
-const needsAttention = totals.draft + totals.ready;
-const unhealthyTotal = items.filter((item) => item.healthIssues.length > 0).length;
-const quickActions = [
-  {
-    label: '导入 Markdown',
-    note: '先检查，再安全创建草稿',
-    href: '/studio/import',
-    icon: '导',
-  },
-  {
-    label: '写博客',
-    note: '完整文章与技术笔记',
-    href: '/studio/edit/blog/new?new=1',
-    icon: '文',
-  },
-  {
-    label: '记随记',
-    note: '短想法、照片与片段',
-    href: '/studio/edit/vibe/new?new=1',
-    icon: '记',
-  },
-  {
-    label: '建项目',
-    note: '项目背景、过程与结果',
-    href: '/studio/edit/projects/new?new=1',
-    icon: '项',
-  },
-  {
-    label: '加书影音',
-    note: '阅读、电影与音乐记录',
-    href: '/studio/edit/media/new?new=1',
-    icon: '藏',
-  },
-];
 ---
 
 <!doctype html>
 <html lang="zh-CN" data-palette="green-soft">
-  <head>
-    <BaseHead title="内容工作台" description="个人站内容管理与发布状态" />
-    <meta name="robots" content="noindex,nofollow,noarchive" />
-  </head>
+  <head
+    ><BaseHead title="内容管理" description="个人站内容管理后台" /><meta
+      name="robots"
+      content="noindex,nofollow,noarchive"
+    /></head
+  >
   <body>
     <main class="shell">
-      <nav class="topbar" aria-label="后台导航">
-        <a class="brand" href="/studio" aria-current="page">
-          <span aria-hidden="true">GM</span>
-          <strong>创作中心</strong>
-        </a>
-        <div>
-          <a href="#create">新建内容</a>
-          <a href="/studio/import">导入</a>
-          <a href="#queue">内容队列</a>
-          <a href="/studio/assets">素材</a>
-          <a href="/studio/organize">分类</a>
+      <nav class="topbar">
+        <a class="brand" href="/studio" aria-current="page"
+          ><span>GM</span><strong>创作中心</strong></a
+        ><div>
+          <a href="/studio/assets">素材</a><a href="/studio/organize">分类</a><a href="/"
+            >查看网站</a
+          >
         </div>
       </nav>
 
-      <header class="hero">
-        <div>
-          <p class="eyebrow">GOU MIN · PUBLISHING DESK</p>
-          <h1>今天写点什么？</h1>
-          <p>从这里新建、编辑、预览和发布内容；完整流程都留在 Studio，不再跳转其他后台。</p>
-        </div>
-        <div class="actions">
-          <a class="primary" href="/studio/edit/blog/new?new=1">开始写作</a>
-          <a href="/">查看网站</a>
+      <header class="page-header">
+        <div><h1>内容</h1><p>写作、预览和发布。</p></div><div class="header-actions">
+          <a href="/studio/import">导入 Markdown</a><details class="new-menu">
+            <summary>新建</summary><div>
+              <a href="/studio/edit/blog/new?new=1">博客</a><a href="/studio/edit/vibe/new?new=1"
+                >随记</a
+              ><a href="/studio/edit/projects/new?new=1">项目</a><a
+                href="/studio/edit/media/new?new=1">书影音</a
+              >
+            </div>
+          </details>
         </div>
       </header>
 
-      <section class="notice" aria-label="待办提醒">
-        <span class="notice-icon" aria-hidden="true">{needsAttention > 0 ? '!' : '✓'}</span>
+      <section class="deployment" data-deployment data-runtime-sha={deployedSha} aria-live="polite">
         <div>
-          <strong
-            >{
-              needsAttention > 0 ? `${needsAttention} 条内容需要继续处理` : '内容队列已经清空'
-            }</strong
-          >
-          <p>
-            {totals.draft} 条草稿 · {totals.ready} 条待发布 · {unhealthyTotal} 条建议完善；待发布内容会接受完整门禁检查。
-          </p>
-        </div>
-        <a href="#queue">查看队列</a>
-      </section>
-
-      <section class="create-section" id="create">
-        <div class="section-heading">
-          <div><p class="eyebrow">QUICK START</p><h2>新建内容</h2></div>
-          <p>选择内容类型，编辑器会准备对应字段。</p>
-        </div>
-        <div class="quick-grid">
-          {
-            quickActions.map((action) => (
-              <a href={action.href} class="quick-card">
-                <span aria-hidden="true">{action.icon}</span>
-                <div>
-                  <>
-                    <strong>{action.label}</strong>
-                    <small>{action.note}</small>
-                  </>
-                </div>
-                <b aria-hidden="true">→</b>
-              </a>
-            ))
-          }
-        </div>
-      </section>
-
-      <section class="workflow" aria-labelledby="workflow-title">
-        <div>
-          <p class="eyebrow">PUBLISHING FLOW</p>
-          <h2 id="workflow-title">三步发布，不会误上线</h2>
-        </div>
-        <ol>
-          <li><span>1</span><div><strong>草稿</strong><small>放心记录，可以不完整</small></div></li>
-          <li>
-            <span>2</span><div><strong>待发布</strong><small>触发字段、图片与分类检查</small></div>
-          </li>
-          <li>
-            <span>3</span><div><strong>已发布</strong><small>保存后自动部署到网站</small></div>
-          </li>
-        </ol>
-      </section>
-
-      <section class="summary" aria-label="内容统计">
-        {
-          Object.entries(statusLabels).map(([status, label]) => (
-            <button type="button" data-filter={status}>
-              <>
-                <strong>{totals[status]}</strong>
-                <span>{label}</span>
-              </>
-            </button>
-          ))
-        }
-        <button type="button" data-filter="all" aria-pressed="true"
-          ><strong>{items.length}</strong><span>全部</span></button
-        >
-        <button type="button" data-filter="issues" aria-pressed="false"
-          ><strong>{unhealthyTotal}</strong><span>建议完善</span></button
-        >
-      </section>
-
-      <section class="deployment" data-deployed-sha={deployedSha}>
-        <div>
-          <span class="deploy-dot"></span><strong data-deploy-label
-            >{deployedSha === 'local' ? '本地构建' : '检查部署状态…'}</strong
+          <span class="deploy-dot"></span><strong data-deployment-title>网站运行正常</strong><small
+            data-deployment-detail>当前版本 {deployedSha.slice(0, 7)}</small
           >
         </div>
-        <p data-deploy-detail>
-          当前构建 <code>{deployedSha.slice(0, 7)}</code> · {
-            new Date(builtAt).toLocaleString('zh-CN', { timeZone: 'Asia/Shanghai' })
-          }
-        </p>
+        <div class="deploy-track" hidden data-deployment-track>
+          <span data-deployment-progress></span>
+        </div><a data-deployment-link hidden target="_blank">打开线上页面</a>
       </section>
 
-      <section class="content-section" id="queue">
-        <div class="section-heading">
-          <div><p class="eyebrow">CONTENT QUEUE</p><h2>继续编辑</h2></div>
-          <div class="table-controls">
-            <label class="search-label"
-              ><span class="sr-only">搜索内容</span><input
-                type="search"
-                placeholder="搜索标题或分类"
-                data-search
-              /></label
-            >
-            <label
-              >类型 <select data-type-filter
-                ><option value="all">全部</option>{
-                  [...new Set(items.map((item) => item.type))].map((type) => (
-                    <option value={type}>{type}</option>
-                  ))
-                }</select
-              ></label
+      <section class="content-section">
+        <div class="controls">
+          <div class="status-tabs" role="group" aria-label="内容状态">
+            <button type="button" data-filter="all" aria-pressed="true">全部</button><button
+              type="button"
+              data-filter="draft">草稿</button
+            ><button type="button" data-filter="ready">待发布</button><button
+              type="button"
+              data-filter="published">已发布</button
+            ><button type="button" data-filter="issues">需完善</button>
+          </div><div>
+            <input type="search" placeholder="搜索内容" data-search /><select
+              data-type-filter
+              aria-label="内容类型"
+              ><option value="all">全部类型</option>{
+                [...new Set(items.map((item) => item.type))].map((type) => (
+                  <option value={type}>{type}</option>
+                ))
+              }</select
             >
           </div>
         </div>
+
         <div class="bulk-bar" data-bulk-bar hidden>
-          <strong><span data-selected-count>0</span> 条已选择</strong>
-          <div>
+          <span>已选择 <strong data-selected-count>0</strong> 条</span><div>
             <button type="button" data-bulk-action="draft">转为草稿</button><button
               type="button"
-              data-bulk-action="ready">设为待发布</button
-            ><button type="button" class="primary" data-bulk-action="publish">批量发布</button>
+              data-bulk-action="ready">待发布</button
+            ><button type="button" data-bulk-action="publish">发布</button>
           </div>
         </div>
-        <div class="table-wrap">
-          <table>
-            <thead
-              ><tr
-                ><th><input type="checkbox" data-select-all aria-label="选择全部内容" /></th><th
-                  >内容</th
-                ><th>状态</th><th>健康度</th><th>更新时间</th><th>篇幅</th><th>分类</th><th
-                  ><span class="sr-only">操作</span></th
-                ></tr
-              ></thead
-            >
-            <tbody>
-              {
-                items.map((item) => (
-                  <tr
-                    data-row
-                    data-status={item.status}
-                    data-type={item.type}
-                    data-health={item.healthIssues.length > 0 ? 'issues' : 'good'}
-                  >
-                    <td>
-                      <input
-                        type="checkbox"
-                        data-select-item
-                        data-collection={item.collection}
-                        data-slug={item.id}
-                        aria-label={`选择 ${item.title}`}
-                      />
-                    </td>
-                    <td data-label="内容">
-                      <>
-                        <span class="kind">{item.type}</span>
-                        <strong>{item.title}</strong>
-                        <small>{item.id}</small>
-                      </>
-                    </td>
-                    <td data-label="状态">
+
+        <div class="content-list" data-content-list>
+          {
+            items.map((item) => (
+              <article
+                data-row
+                data-status={item.status}
+                data-type={item.type}
+                data-health={item.issues.length ? 'issues' : 'good'}
+              >
+                <input
+                  type="checkbox"
+                  data-select-item
+                  data-collection={item.collection}
+                  data-slug={item.id}
+                  aria-label={`选择 ${item.title}`}
+                />
+                <div class="content-main">
+                  <>
+                    <div>
                       <span class:list={['badge', `badge-${item.status}`]}>
                         {statusLabels[item.status]}
                       </span>
-                    </td>
-                    <td data-label="健康度">
-                      {item.healthIssues.length > 0 ? (
-                        <details class="health-details">
-                          <summary class="health health-issues">
-                            {item.healthIssues.length} 项建议
-                          </summary>
-                          <ul>
-                            {item.healthIssues.map((issue) => (
-                              <li>{issue}</li>
-                            ))}
-                          </ul>
-                        </details>
-                      ) : (
-                        <span class="health health-good">完整</span>
+                      <span class="kind">{item.type}</span>
+                      {item.issues.length > 0 && (
+                        <span class="issue">{item.issues.length} 项需完善</span>
                       )}
-                    </td>
-                    <td data-label="更新时间">
+                    </div>
+                    <strong>{item.title}</strong>
+                    <small>
                       {item.date
-                        ? item.date.toLocaleDateString('zh-CN', { timeZone: 'Asia/Shanghai' })
-                        : '—'}
-                    </td>
-                    <td data-label="篇幅">
-                      {item.words} 字 · {item.minutes} 分钟
-                    </td>
-                    <td data-label="分类">
-                      <span class="taxonomy">{item.taxonomy.slice(0, 3).join(' · ') || '—'}</span>
-                    </td>
-                    <td data-label="操作">
-                      <div class="row-actions">
-                        <>
-                          <a href={item.previewUrl}>预览</a>
-                          {item.publicUrl && <a href={item.publicUrl}>线上</a>}
-                          <a class="edit" href={item.editorUrl}>
-                            编辑
-                          </a>
-                          <a href={item.historyUrl} target="_blank" rel="noopener noreferrer">
-                            历史<span class="sr-only">（新窗口打开）</span>
-                          </a>
-                        </>
-                      </div>
-                    </td>
-                  </tr>
-                ))
-              }
-            </tbody>
-          </table>
-          <p class="empty" hidden data-empty>没有符合筛选条件的内容。</p>
+                        ? new Date(item.date).toLocaleDateString('zh-CN', {
+                            timeZone: 'Asia/Shanghai',
+                          })
+                        : '暂无日期'}
+                    </small>
+                  </>
+                </div>
+                <div class="row-actions">
+                  <a class="edit" href={item.editorUrl}>
+                    编辑
+                  </a>
+                  <a href={item.previewUrl}>预览</a>
+                  {item.publicUrl && <a href={item.publicUrl}>线上</a>}
+                </div>
+              </article>
+            ))
+          }
+          <p class="empty" hidden data-empty>没有符合条件的内容。</p>
         </div>
       </section>
     </main>
 
     <script>
+      import {
+        deploymentCopy,
+        readPendingDeployment,
+        STUDIO_DEPLOYMENT_STORAGE_KEY,
+      } from '../utils/studio-deployment';
       import { matchesContentFilters } from '../utils/content-metrics';
-
-      const filters = document.querySelectorAll('[data-filter]');
-      const typeFilter = document.querySelector('[data-type-filter]');
-      const searchInput = document.querySelector('[data-search]');
+      const filters = [...document.querySelectorAll('[data-filter]')];
       const rows = [...document.querySelectorAll('[data-row]')];
+      const search = document.querySelector('[data-search]');
+      const type = document.querySelector('[data-type-filter]');
       const empty = document.querySelector('[data-empty]');
-      let activeStatus = 'all';
-      const applyFilters = () => {
-        const activeType = typeFilter instanceof HTMLSelectElement ? typeFilter.value : 'all';
-        const query =
-          searchInput instanceof HTMLInputElement
-            ? searchInput.value.trim().toLocaleLowerCase('zh-CN')
-            : '';
+      let active = 'all';
+      const apply = () => {
         let visible = 0;
         for (const row of rows) {
           if (!(row instanceof HTMLElement)) continue;
@@ -381,84 +208,51 @@ const quickActions = [
               health: row.dataset.health,
               text: row.textContent ?? '',
             },
-            { status: activeStatus, type: activeType, query },
+            {
+              status: active,
+              type: type instanceof HTMLSelectElement ? type.value : 'all',
+              query:
+                search instanceof HTMLInputElement
+                  ? search.value.trim().toLocaleLowerCase('zh-CN')
+                  : '',
+            },
           );
           row.hidden = !show;
           if (show) visible++;
         }
         if (empty instanceof HTMLElement) empty.hidden = visible > 0;
       };
-      filters.forEach((filter) =>
-        filter.addEventListener('click', () => {
-          if (!(filter instanceof HTMLElement)) return;
-          activeStatus = filter.dataset.filter ?? 'all';
-          filters.forEach((item) => item.setAttribute('aria-pressed', String(item === filter)));
-          applyFilters();
+      filters.forEach((button) =>
+        button.addEventListener('click', () => {
+          if (!(button instanceof HTMLElement)) return;
+          active = button.dataset.filter ?? 'all';
+          filters.forEach((item) => item.setAttribute('aria-pressed', String(item === button)));
+          apply();
         }),
       );
-      typeFilter?.addEventListener('change', applyFilters);
-      searchInput?.addEventListener('input', applyFilters);
+      search?.addEventListener('input', apply);
+      type?.addEventListener('change', apply);
 
-      const deployment = document.querySelector('[data-deployed-sha]');
-      const deployedSha =
-        deployment instanceof HTMLElement ? deployment.dataset.deployedSha : 'local';
-      if (deployedSha && deployedSha !== 'local') {
-        fetch('https://api.github.com/repos/GM2020JLU/GM-WEB/commits/main', {
-          headers: { Accept: 'application/vnd.github+json' },
-        })
-          .then((response) =>
-            response.ok ? response.json() : Promise.reject(new Error(String(response.status))),
-          )
-          .then((result) => {
-            const current = result.sha === deployedSha;
-            const label = document.querySelector('[data-deploy-label]');
-            const detail = document.querySelector('[data-deploy-detail]');
-            if (label) label.textContent = current ? '最新版本已上线' : '新版本等待部署';
-            if (detail)
-              detail.textContent = current
-                ? `线上提交 ${deployedSha.slice(0, 7)}`
-                : `线上 ${deployedSha.slice(0, 7)} · 仓库 ${String(result.sha).slice(0, 7)}`;
-            deployment?.classList.add(current ? 'is-current' : 'is-pending');
-          })
-          .catch(() => {
-            const label = document.querySelector('[data-deploy-label]');
-            if (label) label.textContent = '暂时无法确认部署状态';
-          });
-      }
-
-      const selectAll = document.querySelector('[data-select-all]');
-      const selectedItems = [...document.querySelectorAll('[data-select-item]')];
-      const bulkBar = document.querySelector('[data-bulk-bar]');
-      const selectedCount = document.querySelector('[data-selected-count]');
-      const updateSelection = () => {
-        const count = selectedItems.filter(
+      const selected = [...document.querySelectorAll('[data-select-item]')];
+      const bulk = document.querySelector('[data-bulk-bar]');
+      const count = document.querySelector('[data-selected-count]');
+      const selection = () => {
+        const total = selected.filter(
           (item) => item instanceof HTMLInputElement && item.checked,
         ).length;
-        if (bulkBar instanceof HTMLElement) bulkBar.hidden = count === 0;
-        if (selectedCount) selectedCount.textContent = String(count);
-        if (selectAll instanceof HTMLInputElement) {
-          selectAll.checked = count === selectedItems.length && count > 0;
-          selectAll.indeterminate = count > 0 && count < selectedItems.length;
-        }
+        if (bulk instanceof HTMLElement) bulk.hidden = total === 0;
+        if (count) count.textContent = String(total);
       };
-      selectAll?.addEventListener('change', () => {
-        if (!(selectAll instanceof HTMLInputElement)) return;
-        selectedItems.forEach((item) => {
-          if (item instanceof HTMLInputElement && !item.closest('tr')?.hidden)
-            item.checked = selectAll.checked;
-        });
-        updateSelection();
-      });
-      selectedItems.forEach((item) => item.addEventListener('change', updateSelection));
+      selected.forEach((item) => item.addEventListener('change', selection));
       document.querySelectorAll('[data-bulk-action]').forEach((button) =>
         button.addEventListener('click', async () => {
           if (!(button instanceof HTMLButtonElement)) return;
-          const items = selectedItems.flatMap((item) =>
+          const items = selected.flatMap((item) =>
             item instanceof HTMLInputElement && item.checked
               ? [{ collection: item.dataset.collection, slug: item.dataset.slug }]
               : [],
           );
-          if (!items.length || !confirm(`确定对 ${items.length} 条内容执行此操作吗？`)) return;
+          if (!items.length || !confirm(`确定更新 ${items.length} 条内容吗？`)) return;
           button.disabled = true;
           const response = await fetch('/api/studio/bulk', {
             method: 'POST',
@@ -468,10 +262,58 @@ const quickActions = [
           const result = await response.json();
           button.disabled = false;
           if (!response.ok) return alert(result.error || '批量操作失败。');
-          alert(`已更新 ${result.updated} 条内容；线上状态会在部署完成后刷新。`);
+          if (button.dataset.bulkAction === 'publish' && result.commitSha) {
+            localStorage.setItem(
+              STUDIO_DEPLOYMENT_STORAGE_KEY,
+              JSON.stringify({
+                targetSha: result.commitSha,
+                title: `${items.length} 条内容`,
+                startedAt: new Date().toISOString(),
+              }),
+            );
+          }
           location.reload();
         }),
       );
+
+      const pending = readPendingDeployment(localStorage);
+      const deployment = document.querySelector('[data-deployment]');
+      const title = document.querySelector('[data-deployment-title]');
+      const detail = document.querySelector('[data-deployment-detail]');
+      const track = document.querySelector('[data-deployment-track]');
+      const progress = document.querySelector('[data-deployment-progress]');
+      const link = document.querySelector('[data-deployment-link]');
+      const poll = async () => {
+        if (!pending || !(deployment instanceof HTMLElement)) return;
+        deployment.dataset.phase = 'submitted';
+        if (track instanceof HTMLElement) track.hidden = false;
+        try {
+          const response = await fetch(
+            `/api/studio/deployment?sha=${encodeURIComponent(pending.targetSha)}`,
+          );
+          const result = await response.json();
+          if (!response.ok || !result.deployment) throw new Error();
+          const copy = deploymentCopy(result.deployment);
+          deployment.dataset.phase = result.deployment.phase;
+          if (title) title.textContent = copy.title;
+          if (detail) detail.textContent = copy.detail;
+          if (progress instanceof HTMLElement) progress.style.width = `${copy.progress}%`;
+          if (result.deployment.phase === 'ready') {
+            localStorage.removeItem(STUDIO_DEPLOYMENT_STORAGE_KEY);
+            if (link instanceof HTMLAnchorElement && pending.publicUrl) {
+              link.href = pending.publicUrl;
+              link.hidden = false;
+            }
+            return;
+          }
+          if (result.deployment.phase !== 'error') setTimeout(poll, 3000);
+        } catch {
+          if (title) title.textContent = '正在等待部署状态';
+          if (detail) detail.textContent = '内容已保存，将自动重试。';
+          setTimeout(poll, 6000);
+        }
+      };
+      if (pending) void poll();
     </script>
   </body>
 </html>
@@ -482,590 +324,316 @@ const quickActions = [
   }
   :global(body) {
     margin: 0;
-    background: var(--paper-bg);
-    color: var(--paper-ink);
+    background: #f7f9f6;
+    color: #21352a;
     font-family: var(--font-ui);
   }
   .shell {
-    width: min(1180px, calc(100% - 32px));
-    margin: 0 auto;
-    padding: 24px 0 96px;
+    width: min(1040px, calc(100% - 32px));
+    margin: auto;
+    padding: 18px 0 80px;
   }
-  .topbar {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    margin-bottom: 72px;
-    padding-bottom: 18px;
-    border-bottom: 1px solid var(--paper-line);
-  }
+  .topbar,
+  .page-header,
+  .controls,
+  .bulk-bar,
+  .deployment,
+  .deployment > div,
+  .brand,
   .topbar > div,
-  .brand {
-    display: flex;
-    align-items: center;
-    gap: 18px;
-  }
-  .brand {
-    gap: 10px;
-    padding: 0;
-    border: 0;
-  }
-  .brand > span {
-    display: grid;
-    width: 34px;
-    height: 34px;
-    place-items: center;
-    border-radius: 10px;
-    background: var(--paper-ink);
-    color: var(--paper-bg);
-    font: 700 0.72rem/1 var(--font-meta);
-  }
-  .topbar > div a {
-    padding: 6px 2px;
-    border: 0;
-    color: var(--paper-ink-soft);
-    font-size: 0.83rem;
-  }
-  .hero,
-  .section-heading,
-  .deployment {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 24px;
-  }
-  .hero h1 {
-    margin: 4px 0 10px;
-    font: 400 clamp(2.6rem, 7vw, 5.2rem)/1 var(--font-page-heading);
-  }
-  .hero p {
-    max-width: 56ch;
-    color: var(--paper-ink-soft);
-    line-height: 1.7;
-  }
-  .notice {
-    display: grid;
-    grid-template-columns: auto 1fr auto;
-    gap: 14px;
-    align-items: center;
-    margin-top: 42px;
-    padding: 17px 18px;
-    border: 1px solid color-mix(in srgb, var(--paper-accent) 35%, var(--paper-line));
-    border-radius: 13px;
-    background: color-mix(in srgb, var(--paper-bg) 90%, var(--paper-accent) 10%);
-  }
-  .notice-icon {
-    display: grid;
-    width: 34px;
-    height: 34px;
-    place-items: center;
-    border-radius: 50%;
-    background: var(--paper-accent);
-    color: white;
-    font-weight: 800;
-  }
-  .notice p,
-  .notice strong {
-    margin: 0;
-  }
-  .notice p {
-    margin-top: 3px;
-    color: var(--paper-ink-soft);
-    font-size: 0.83rem;
-  }
-  .notice > a {
-    padding: 7px 10px;
-    font-size: 0.8rem;
-  }
-  .eyebrow {
-    margin: 0;
-    color: var(--paper-accent);
-    font: 700 0.7rem/1.4 var(--font-meta);
-    letter-spacing: 0.14em;
-  }
-  .actions,
+  .header-actions,
   .row-actions {
     display: flex;
-    gap: 9px;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
   }
-  a,
-  button,
-  select {
-    border: 1px solid var(--paper-line-strong);
+  .topbar {
+    height: 52px;
+    border-bottom: 1px solid #dfe6df;
+  }
+  .brand {
+    justify-content: flex-start;
+  }
+  .brand span {
+    display: grid;
+    width: 32px;
+    height: 32px;
+    place-items: center;
     border-radius: 9px;
-    background: var(--paper-bg);
-    color: inherit;
-    font: inherit;
+    background: #253d2e;
+    color: white;
+    font-size: 0.7rem;
   }
-  a,
-  button {
-    padding: 10px 13px;
+  .topbar a,
+  a {
+    color: inherit;
     text-decoration: none;
+  }
+  .topbar > div a {
+    color: #66756b;
+    font-size: 0.8rem;
+  }
+  .page-header {
+    padding: 42px 0 24px;
+  }
+  .page-header h1 {
+    margin: 0;
+    font: 400 clamp(2.4rem, 7vw, 4.5rem)/1 var(--font-page-heading);
+  }
+  .page-header p {
+    margin: 8px 0 0;
+    color: #68776d;
+  }
+  .header-actions > a,
+  .new-menu > summary {
+    padding: 9px 12px;
+    border: 1px solid #cad5cc;
+    border-radius: 8px;
+    background: white;
+    font-size: 0.82rem;
+  }
+  .new-menu {
+    position: relative;
+  }
+  .new-menu > summary {
+    list-style: none;
+    background: #3e7e52;
+    color: white;
     cursor: pointer;
   }
-  .primary,
-  .edit {
-    border-color: var(--paper-accent);
-    background: var(--paper-accent);
-    color: white;
-  }
-  a:focus-visible,
-  button:focus-visible,
-  input:focus-visible,
-  select:focus-visible {
-    outline: 3px solid color-mix(in srgb, var(--paper-accent) 38%, transparent);
-    outline-offset: 2px;
-  }
-  .create-section {
-    margin-top: 64px;
-  }
-  .section-heading > p {
-    max-width: 34ch;
-    margin: 0;
-    color: var(--paper-ink-soft);
-    font-size: 0.84rem;
-    line-height: 1.6;
-    text-align: right;
-  }
-  .quick-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
-    gap: 12px;
-    margin-top: 20px;
-  }
-  .quick-card {
-    display: grid;
-    grid-template-columns: auto 1fr auto;
-    gap: 12px;
-    align-items: center;
-    padding: 18px;
-    border-color: var(--paper-line);
-    background: color-mix(in srgb, var(--paper-bg) 96%, var(--paper-accent) 4%);
-    transition:
-      border-color 160ms ease,
-      transform 160ms ease,
-      box-shadow 160ms ease;
-  }
-  .quick-card:hover {
-    border-color: var(--paper-accent);
-    box-shadow: 0 10px 28px rgba(31, 57, 38, 0.08);
-    transform: translateY(-2px);
-  }
-  .quick-card > span {
-    display: grid;
-    width: 36px;
-    height: 36px;
-    place-items: center;
-    border-radius: 10px;
-    background: color-mix(in srgb, var(--paper-accent) 13%, var(--paper-bg));
-    color: var(--paper-accent);
-    font-family: var(--font-page-heading);
-  }
-  .quick-card div {
-    display: grid;
-    gap: 3px;
-  }
-  .quick-card small {
-    color: var(--paper-ink-faint);
-    font-size: 0.72rem;
-    line-height: 1.45;
-  }
-  .quick-card b {
-    color: var(--paper-accent);
-    font-weight: 500;
-  }
-  .workflow {
-    display: grid;
-    grid-template-columns: minmax(220px, 0.8fr) 2fr;
-    gap: 42px;
-    align-items: center;
-    margin-top: 34px;
-    padding: 30px;
-    border: 1px solid var(--paper-line);
-    border-radius: 16px;
-  }
-  .workflow ol {
-    display: grid;
-    grid-template-columns: repeat(3, 1fr);
-    gap: 0;
-    margin: 0;
-    padding: 0;
-    list-style: none;
-  }
-  .workflow li {
-    position: relative;
-    display: flex;
-    gap: 10px;
-    align-items: center;
-  }
-  .workflow li:not(:last-child)::after {
+  .new-menu > div {
     position: absolute;
-    top: 17px;
-    right: 12px;
-    left: 44px;
-    z-index: 0;
-    height: 1px;
-    background: var(--paper-line-strong);
-    content: '';
-  }
-  .workflow li > span {
-    z-index: 1;
+    right: 0;
+    z-index: 3;
     display: grid;
-    flex: 0 0 auto;
-    width: 34px;
-    height: 34px;
-    place-items: center;
-    border: 1px solid var(--paper-line-strong);
-    border-radius: 50%;
-    background: var(--paper-bg);
-    color: var(--paper-accent);
-    font-weight: 700;
+    width: 140px;
+    margin-top: 7px;
+    padding: 7px;
+    border: 1px solid #d8e1d9;
+    border-radius: 10px;
+    background: white;
+    box-shadow: 0 14px 36px #273e2e24;
   }
-  .workflow li div {
-    z-index: 1;
-    display: grid;
-    gap: 3px;
-    padding-right: 10px;
-    background: var(--paper-bg);
+  .new-menu > div a {
+    padding: 8px;
+    border-radius: 6px;
   }
-  .workflow small {
-    color: var(--paper-ink-faint);
-    font-size: 0.7rem;
-    line-height: 1.4;
-  }
-  .summary {
-    display: grid;
-    grid-template-columns: repeat(5, 1fr);
-    gap: 12px;
-    margin: 34px 0 18px;
-  }
-  .summary button {
-    display: flex;
-    align-items: baseline;
-    justify-content: space-between;
-    padding: 20px;
-    text-align: left;
-  }
-  .summary strong {
-    font: 400 2rem/1 var(--font-page-heading);
-  }
-  .summary span {
-    color: var(--paper-ink-soft);
-  }
-  .summary button[aria-pressed='true'] {
-    border-color: var(--paper-accent);
-    box-shadow: inset 0 -3px var(--paper-accent);
+  .new-menu > div a:hover {
+    background: #eff5f0;
   }
   .deployment {
-    padding: 18px 20px;
-    border: 1px solid var(--paper-line);
-    border-radius: 12px;
-    background: color-mix(in srgb, var(--paper-bg) 90%, var(--paper-accent) 10%);
+    margin-bottom: 28px;
+    padding: 13px 15px;
+    border: 1px solid #d9e3db;
+    border-radius: 11px;
+    background: white;
   }
-  .deployment div {
-    display: flex;
-    gap: 10px;
-    align-items: center;
+  .deployment > div {
+    justify-content: flex-start;
   }
-  .deployment p {
-    margin: 0;
-    color: var(--paper-ink-faint);
-    font: 0.78rem/1.5 var(--font-meta);
+  .deployment small {
+    color: #6d7a71;
   }
   .deploy-dot {
-    width: 9px;
-    height: 9px;
+    width: 8px;
+    height: 8px;
     border-radius: 50%;
-    background: #8a938c;
-    box-shadow: 0 0 0 4px color-mix(in srgb, #8a938c 18%, transparent);
+    background: #4ca265;
   }
-  .is-current .deploy-dot {
-    background: #2f9950;
+  .deployment[data-phase='queued'] .deploy-dot,
+  .deployment[data-phase='building'] .deploy-dot,
+  .deployment[data-phase='submitted'] .deploy-dot {
+    background: #d29b2d;
   }
-  .is-pending .deploy-dot {
-    background: #c4941c;
+  .deployment[data-phase='error'] .deploy-dot {
+    background: #c65050;
   }
-  .content-section {
-    margin-top: 58px;
+  .deploy-track {
+    flex: 1;
+    height: 4px;
+    overflow: hidden;
+    border-radius: 99px;
+    background: #e2e9e3;
+  }
+  .deploy-track span {
+    display: block;
+    height: 100%;
+    background: #45945d;
+    transition: width 0.3s;
+  }
+  .deployment > a {
+    font-size: 0.78rem;
+    color: #347149;
+  }
+  .controls {
+    margin-bottom: 13px;
+  }
+  .status-tabs {
+    display: flex;
+    gap: 4px;
+  }
+  .status-tabs button,
+  .bulk-bar button {
+    padding: 7px 10px;
+    border: 0;
+    border-radius: 7px;
+    background: transparent;
+    color: #637168;
+    font: inherit;
+    font-size: 0.78rem;
+    cursor: pointer;
+  }
+  .status-tabs button[aria-pressed='true'] {
+    background: #e7efe9;
+    color: #2d6040;
+  }
+  .controls > div:last-child {
+    display: flex;
+    gap: 8px;
+  }
+  .controls input,
+  .controls select {
+    padding: 8px 10px;
+    border: 1px solid #d1dbd3;
+    border-radius: 8px;
+    background: white;
+    color: inherit;
   }
   .bulk-bar {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 16px;
-    margin-top: 20px;
-    padding: 12px 14px;
-    border: 1px solid var(--paper-accent);
-    border-radius: 10px;
-    background: color-mix(in srgb, var(--paper-bg) 88%, var(--paper-accent) 12%);
+    margin-bottom: 10px;
+    padding: 10px 12px;
+    border: 1px solid #9dbca7;
+    border-radius: 9px;
+    background: #f0f7f2;
+    font-size: 0.8rem;
   }
   .bulk-bar[hidden] {
     display: none;
   }
   .bulk-bar > div {
     display: flex;
-    gap: 8px;
+    gap: 5px;
   }
-  h2 {
-    margin: 4px 0 0;
-    font: 400 2rem/1.2 var(--font-page-heading);
+  .content-list {
+    overflow: hidden;
+    border: 1px solid #dce4dd;
+    border-radius: 12px;
+    background: white;
   }
-  .section-heading label {
-    color: var(--paper-ink-soft);
-    font-size: 0.85rem;
-  }
-  .table-controls {
-    display: flex;
-    gap: 10px;
+  .content-list article {
+    display: grid;
+    grid-template-columns: auto 1fr auto;
+    gap: 13px;
     align-items: center;
+    padding: 15px;
+    border-bottom: 1px solid #e4e9e4;
   }
-  .search-label input {
-    width: 210px;
-    padding: 9px 11px;
-    border: 1px solid var(--paper-line-strong);
-    border-radius: 9px;
-    background: var(--paper-bg);
-    color: inherit;
-    font: inherit;
-  }
-  select {
-    margin-left: 8px;
-    padding: 8px 28px 8px 10px;
-  }
-  .table-wrap {
-    overflow-x: auto;
-    margin-top: 20px;
-    border: 1px solid var(--paper-line);
-    border-radius: 14px;
-  }
-  table {
-    width: 100%;
-    border-collapse: collapse;
-    min-width: 920px;
-  }
-  th {
-    color: var(--paper-ink-faint);
-    font-size: 0.72rem;
-    letter-spacing: 0.08em;
-    text-align: left;
-  }
-  th,
-  td {
-    padding: 15px 16px;
-    border-bottom: 1px solid var(--paper-line);
-    vertical-align: middle;
-  }
-  tbody tr:last-child td {
+  .content-list article:last-of-type {
     border-bottom: 0;
   }
-  td:first-child {
+  .content-list article > input {
+    width: 15px;
+    height: 15px;
+  }
+  .content-main {
     display: grid;
-    grid-template-columns: auto 1fr;
-    gap: 2px 9px;
+    gap: 5px;
+    min-width: 0;
   }
-  td:first-child small {
-    grid-column: 2;
-    color: var(--paper-ink-faint);
+  .content-main > div {
+    display: flex;
+    gap: 7px;
+    align-items: center;
   }
-  .kind {
-    grid-row: 1 / 3;
-    align-self: center;
-    color: var(--paper-accent);
-    font-size: 0.72rem;
-  }
-  .badge {
-    display: inline-block;
-    padding: 4px 8px;
-    border-radius: 99px;
-    background: #e5e8e5;
-    font-size: 0.75rem;
-  }
-  .badge-ready {
-    background: #fff1bd;
-    color: #725800;
-  }
-  .badge-published {
-    background: #d7efdd;
-    color: #185b2b;
-  }
-  .health {
-    display: inline-block;
-    padding: 4px 8px;
-    border-radius: 99px;
-    font-size: 0.75rem;
-  }
-  .health-good {
-    background: #e8f3eb;
-    color: #28633a;
-  }
-  .health-issues {
-    background: #fff0dc;
-    color: #8a5314;
-    cursor: pointer;
-  }
-  .health-details {
-    position: relative;
-  }
-  .health-details summary {
-    width: max-content;
-    list-style: none;
-  }
-  .health-details summary::-webkit-details-marker {
-    display: none;
-  }
-  .health-details ul {
-    position: absolute;
-    z-index: 3;
-    top: calc(100% + 7px);
-    left: 0;
-    width: max-content;
-    max-width: 260px;
-    margin: 0;
-    padding: 10px 12px 10px 28px;
-    border: 1px solid var(--paper-line-strong);
-    border-radius: 9px;
-    background: var(--paper-bg);
-    color: var(--paper-ink-soft);
-    box-shadow: var(--paper-shadow);
-    font-size: 0.76rem;
-    line-height: 1.65;
-  }
-  .taxonomy {
-    display: block;
-    max-width: 230px;
+  .content-main > strong {
     overflow: hidden;
+    font-size: 0.96rem;
     text-overflow: ellipsis;
     white-space: nowrap;
-    color: var(--paper-ink-soft);
+  }
+  .content-main small,
+  .kind {
+    color: #78847c;
+    font-size: 0.72rem;
+  }
+  .badge,
+  .issue {
+    padding: 3px 7px;
+    border-radius: 99px;
+    background: #e9eeea;
+    color: #56645a;
+    font-size: 0.68rem;
+  }
+  .badge-published {
+    background: #dff1e4;
+    color: #27623a;
+  }
+  .badge-ready {
+    background: #fff0c7;
+    color: #745900;
+  }
+  .issue {
+    background: #fff0dc;
+    color: #82591e;
+  }
+  .row-actions {
+    justify-content: flex-end;
   }
   .row-actions a {
-    padding: 7px 10px;
-    font-size: 0.8rem;
+    padding: 7px 9px;
+    border-radius: 7px;
+    color: #657269;
+    font-size: 0.76rem;
+  }
+  .row-actions .edit {
+    background: #edf4ef;
+    color: #315e40;
   }
   .empty {
     padding: 32px;
     text-align: center;
-    color: var(--paper-ink-faint);
+    color: #77837a;
   }
-  .sr-only {
-    position: absolute;
-    width: 1px;
-    height: 1px;
-    overflow: hidden;
-    clip: rect(0, 0, 0, 0);
+  .content-list article[hidden] {
+    display: none;
   }
-  @media (max-width: 720px) {
+  @media (max-width: 680px) {
     .shell {
-      padding-top: 16px;
+      width: calc(100% - 18px);
     }
-    .topbar {
-      align-items: flex-start;
+    .page-header {
+      align-items: flex-end;
+      padding-top: 30px;
+    }
+    .page-header p {
+      display: none;
+    }
+    .controls {
+      align-items: stretch;
       flex-direction: column;
-      margin-bottom: 42px;
     }
-    .topbar > div {
-      width: 100%;
-      justify-content: space-between;
-      gap: 8px;
+    .controls > div:last-child input {
+      flex: 1;
+      min-width: 0;
     }
-    .hero,
-    .section-heading,
+    .content-list article {
+      grid-template-columns: auto 1fr;
+    }
+    .row-actions {
+      grid-column: 2;
+      justify-content: flex-start;
+    }
     .deployment {
       align-items: flex-start;
       flex-direction: column;
     }
-    .summary {
-      grid-template-columns: repeat(2, 1fr);
-    }
-    .notice {
-      grid-template-columns: auto 1fr;
-    }
-    .notice > a {
-      grid-column: 2;
-      justify-self: start;
-    }
-    .actions {
-      flex-wrap: wrap;
-    }
-    .quick-grid {
-      grid-template-columns: 1fr;
-    }
-    .workflow {
-      grid-template-columns: 1fr;
-      gap: 22px;
-      padding: 22px;
-    }
-    .workflow ol {
-      grid-template-columns: 1fr;
-      gap: 18px;
-    }
-    .workflow li:not(:last-child)::after {
-      top: 34px;
-      bottom: -18px;
-      left: 17px;
-      width: 1px;
-      height: auto;
-    }
-    .section-heading > p {
-      text-align: left;
-    }
-    .table-controls {
-      width: 100%;
-      align-items: stretch;
-      flex-direction: column;
-    }
-    .search-label input {
+    .deploy-track {
       width: 100%;
     }
-    .table-wrap {
-      overflow: visible;
-      border: 0;
-    }
-    table,
-    tbody,
-    tr,
-    td {
-      display: block;
-      width: 100%;
-      min-width: 0;
-    }
-    thead {
+    .topbar > div a:nth-child(1),
+    .topbar > div a:nth-child(2) {
       display: none;
-    }
-    tbody {
-      display: grid;
-      gap: 12px;
-    }
-    tbody tr {
-      padding: 14px;
-      border: 1px solid var(--paper-line);
-      border-radius: 13px;
-    }
-    td,
-    td:first-child {
-      display: grid;
-      grid-template-columns: 88px 1fr;
-      gap: 6px 10px;
-      padding: 9px 4px;
-      border-bottom: 1px dashed var(--paper-line);
-    }
-    td::before {
-      color: var(--paper-ink-faint);
-      font-size: 0.72rem;
-      content: attr(data-label);
-    }
-    td:first-child .kind {
-      display: none;
-    }
-    td:first-child strong,
-    td:first-child small {
-      grid-column: 2;
-    }
-    td:last-child {
-      border-bottom: 0;
-    }
-    .row-actions {
-      grid-column: 2;
     }
   }
 </style>

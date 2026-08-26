@@ -1,9 +1,20 @@
 import { renderMarkdownPreview } from './markdown-preview';
+import {
+  deploymentCopy,
+  readPendingDeployment,
+  STUDIO_DEPLOYMENT_STORAGE_KEY,
+  type PendingStudioDeployment,
+  type StudioDeploymentState,
+} from './studio-deployment';
+import { generateStudioSlug } from './studio-slug';
 
-type StudioEditorOptions = {
+export type StudioEditorOptions = {
   collection: string;
+  fetch?: typeof globalThis.fetch;
   initialSlug: string;
   isNew: boolean;
+  pollDelay?: number;
+  setTimeout?: typeof globalThis.setTimeout;
 };
 
 type DocumentPayload = {
@@ -62,6 +73,7 @@ export function setupStudioEditor(document: Document, options: StudioEditorOptio
   const form = element<HTMLFormElement>(document, '[data-editor-form]');
   const title = element<HTMLInputElement>(document, '[data-title]');
   const slug = element<HTMLInputElement>(document, '[data-slug]');
+  const slugPreview = element<HTMLElement>(document, '[data-slug-preview]');
   const description = element<HTMLTextAreaElement>(document, '[data-description]');
   const date = element<HTMLInputElement>(document, '[data-date]');
   const status = element<HTMLSelectElement>(document, '[data-publication-status]');
@@ -80,11 +92,23 @@ export function setupStudioEditor(document: Document, options: StudioEditorOptio
   const saveButtons = [...document.querySelectorAll<HTMLButtonElement>('[data-action]')];
   const historyList = element<HTMLElement>(document, '[data-history-list]');
   const historyDialog = element<HTMLDialogElement>(document, '[data-history-dialog]');
+  const deploymentTracker = element<HTMLElement>(document, '[data-deployment-tracker]');
+  const deploymentTitle = element<HTMLElement>(document, '[data-deployment-title]');
+  const deploymentDetail = element<HTMLElement>(document, '[data-deployment-detail]');
+  const deploymentProgress = element<HTMLElement>(document, '[data-deployment-progress]');
+  const deploymentLink = element<HTMLAnchorElement>(document, '[data-deployment-link]');
+  const currentStatus = element<HTMLElement>(document, '[data-current-status]');
   const knownFieldContainers = [...document.querySelectorAll<HTMLElement>('[data-for]')];
   let originalSlug = options.initialSlug;
   let initialSnapshot = '';
   let loading = false;
   const recoveryKey = `gm-studio-recovery:${options.collection}:${options.initialSlug}`;
+  const request = options.fetch ?? globalThis.fetch;
+  const defer = options.setTimeout ?? globalThis.setTimeout;
+  const pollDelay = options.pollDelay ?? 3000;
+  const browserWindow = document.defaultView;
+  if (!browserWindow) throw new Error('编辑器需要浏览器环境。');
+  const storage = browserWindow.localStorage;
 
   const apiUrl = () =>
     `/api/studio/content/${encodeURIComponent(options.collection)}/${encodeURIComponent(originalSlug)}`;
@@ -98,6 +122,45 @@ export function setupStudioEditor(document: Document, options: StudioEditorOptio
     notice.querySelector('small')!.textContent = detail;
   };
 
+  const renderDeployment = (state: StudioDeploymentState, pending: PendingStudioDeployment) => {
+    const copy = deploymentCopy(state);
+    deploymentTracker.hidden = false;
+    deploymentTracker.dataset.phase = state.phase;
+    deploymentTitle.textContent = copy.title;
+    deploymentDetail.textContent = copy.detail;
+    deploymentProgress.style.width = `${copy.progress}%`;
+    deploymentLink.hidden = state.phase !== 'ready' || !pending.publicUrl;
+    if (pending.publicUrl) deploymentLink.href = pending.publicUrl;
+  };
+
+  const trackDeployment = async (pending: PendingStudioDeployment) => {
+    if (deploymentTracker.hidden) {
+      renderDeployment({ phase: 'submitted', targetSha: pending.targetSha }, pending);
+    }
+    try {
+      const response = await request(
+        `/api/studio/deployment?sha=${encodeURIComponent(pending.targetSha)}`,
+      );
+      const result = (await response.json()) as {
+        deployment?: StudioDeploymentState;
+        error?: string;
+      };
+      if (!response.ok || !result.deployment) throw new Error(result.error || '无法读取部署状态。');
+      renderDeployment(result.deployment, pending);
+      if (result.deployment.phase === 'ready') {
+        storage.removeItem(STUDIO_DEPLOYMENT_STORAGE_KEY);
+        showNotice('发布完成', '网站已经更新，可以打开线上页面。', 'success');
+        return;
+      }
+      if (result.deployment.phase === 'error') return;
+      defer(() => void trackDeployment(pending), pollDelay);
+    } catch {
+      deploymentTitle.textContent = '仍在等待部署';
+      deploymentDetail.textContent = '暂时无法取得进度，将自动重试。内容已经安全保存。';
+      defer(() => void trackDeployment(pending), pollDelay * 2);
+    }
+  };
+
   const setBusy = (busy: boolean) => {
     loading = busy;
     form.setAttribute('aria-busy', String(busy));
@@ -109,7 +172,7 @@ export function setupStudioEditor(document: Document, options: StudioEditorOptio
       const collections = container.dataset.for?.split(',') ?? [];
       container.hidden = !collections.includes(options.collection);
     });
-    slug.readOnly = options.collection === 'about';
+    slug.readOnly = true;
     body.closest<HTMLElement>('[data-body-panel]')!.hidden = [
       'categories',
       'series',
@@ -119,11 +182,14 @@ export function setupStudioEditor(document: Document, options: StudioEditorOptio
 
   const populate = (metadata: Record<string, unknown>, source: string, loadedSlug: string) => {
     title.value = typeof metadata.title === 'string' ? metadata.title : '';
-    slug.value = loadedSlug;
+    slug.value = options.isNew ? '' : loadedSlug;
+    slugPreview.textContent = options.isNew ? '保存时自动生成' : loadedSlug;
     description.value = typeof metadata.description === 'string' ? metadata.description : '';
     date.value = typeof metadata.date === 'string' ? metadata.date.slice(0, 16) : '';
     status.value =
       typeof metadata.publicationStatus === 'string' ? metadata.publicationStatus : 'draft';
+    currentStatus.textContent =
+      status.value === 'published' ? '已发布' : status.value === 'ready' ? '待发布' : '草稿';
     scheduledAt.value =
       typeof metadata.scheduledAt === 'string' ? metadata.scheduledAt.slice(0, 16) : '';
     creator.value = typeof metadata.creator === 'string' ? metadata.creator : '';
@@ -190,7 +256,7 @@ export function setupStudioEditor(document: Document, options: StudioEditorOptio
     setBusy(true);
     showNotice('正在读取内容', '从当前内容源加载最新版本。');
     try {
-      const response = await fetch(`${apiUrl()}${options.isNew ? '?new=1' : ''}`);
+      const response = await request(`${apiUrl()}${options.isNew ? '?new=1' : ''}`);
       const result = await payload(response);
       if (!response.ok || !result.document) {
         if (result.loginUrl) {
@@ -206,11 +272,11 @@ export function setupStudioEditor(document: Document, options: StudioEditorOptio
       }
       populate(result.document.metadata, result.document.body, result.document.slug);
       const serverSnapshot = initialSnapshot;
-      const recovered = localStorage.getItem(recoveryKey);
+      const recovered = storage.getItem(recoveryKey);
       if (
         recovered &&
         recovered !== serverSnapshot &&
-        confirm('发现尚未提交的本地编辑，是否恢复？')
+        browserWindow.confirm('发现尚未提交的本地编辑，是否恢复？')
       ) {
         try {
           const draft = JSON.parse(recovered) as ReturnType<typeof collect>;
@@ -219,7 +285,7 @@ export function setupStudioEditor(document: Document, options: StudioEditorOptio
           showNotice('已恢复本地编辑', '请检查内容后保存到仓库。', 'success');
           return;
         } catch {
-          localStorage.removeItem(recoveryKey);
+          storage.removeItem(recoveryKey);
         }
       }
       showNotice(
@@ -244,7 +310,7 @@ export function setupStudioEditor(document: Document, options: StudioEditorOptio
     }
     showNotice('正在保存', action === 'publish' ? '正在提交发布版本。' : '正在提交内容变更。');
     try {
-      const response = await fetch(apiUrl(), {
+      const response = await request(apiUrl(), {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ ...collect(), action }),
@@ -252,12 +318,20 @@ export function setupStudioEditor(document: Document, options: StudioEditorOptio
       const result = await payload(response);
       if (!response.ok) throw new Error(result.error || '保存失败。');
       originalSlug = result.slug;
+      slug.value = result.slug;
+      slugPreview.textContent = result.slug;
       status.value = result.status;
+      currentStatus.textContent =
+        result.status === 'published' ? '已发布' : result.status === 'ready' ? '待发布' : '草稿';
       initialSnapshot = snapshot();
-      localStorage.removeItem(recoveryKey);
-      history.replaceState({}, '', `/studio/edit/${options.collection}/${result.slug}`);
+      storage.removeItem(recoveryKey);
+      browserWindow.history.replaceState(
+        {},
+        '',
+        `/studio/edit/${options.collection}/${result.slug}`,
+      );
       const message = result.deploymentPending
-        ? '已提交到 GitHub，Vercel 正在部署；可在工作台查看上线进度。'
+        ? '内容已保存到 GitHub，下面会持续显示网站上线进度。'
         : '已保存到本地内容目录。';
       showNotice(
         action === 'schedule'
@@ -268,6 +342,16 @@ export function setupStudioEditor(document: Document, options: StudioEditorOptio
         message,
         'success',
       );
+      if (action === 'publish' && result.commitSha) {
+        const pending: PendingStudioDeployment = {
+          targetSha: result.commitSha,
+          publicUrl: result.publicUrl,
+          title: title.value.trim(),
+          startedAt: new Date().toISOString(),
+        };
+        storage.setItem(STUDIO_DEPLOYMENT_STORAGE_KEY, JSON.stringify(pending));
+        void trackDeployment(pending);
+      }
     } catch (error) {
       showNotice('操作未完成', error instanceof Error ? error.message : '请稍后重试。', 'error');
     } finally {
@@ -283,9 +367,16 @@ export function setupStudioEditor(document: Document, options: StudioEditorOptio
     button.addEventListener('click', () => void save(button.dataset.action));
   });
   body.addEventListener('input', renderPreview);
-  window.setInterval(() => {
+  title.addEventListener('input', () => {
+    if (!options.isNew) return;
+    slug.value = ['categories', 'series', 'tags'].includes(options.collection)
+      ? title.value.trim()
+      : generateStudioSlug(title.value);
+    slugPreview.textContent = slug.value || '保存时自动生成';
+  });
+  browserWindow.setInterval(() => {
     if (initialSnapshot && snapshot() !== initialSnapshot) {
-      localStorage.setItem(recoveryKey, snapshot());
+      storage.setItem(recoveryKey, snapshot());
     }
   }, 2000);
   document.addEventListener('keydown', (event) => {
@@ -308,7 +399,7 @@ export function setupStudioEditor(document: Document, options: StudioEditorOptio
     historyDialog.showModal();
     historyList.textContent = '正在读取历史记录…';
     try {
-      const response = await fetch(historyUrl());
+      const response = await request(historyUrl());
       const result = await payload(response);
       if (!response.ok) throw new Error(result.error || '历史记录加载失败。');
       historyList.replaceChildren(
@@ -323,16 +414,20 @@ export function setupStudioEditor(document: Document, options: StudioEditorOptio
               restore.type = 'button';
               restore.textContent = '恢复此版本';
               restore.addEventListener('click', async () => {
-                if (!confirm(`确定恢复 ${entry.sha.slice(0, 7)} 吗？当前版本仍会保留在历史中。`))
+                if (
+                  !browserWindow.confirm(
+                    `确定恢复 ${entry.sha.slice(0, 7)} 吗？当前版本仍会保留在历史中。`,
+                  )
+                )
                   return;
-                const restored = await fetch(historyUrl(), {
+                const restored = await request(historyUrl(), {
                   method: 'POST',
                   headers: { 'Content-Type': 'application/json' },
                   body: JSON.stringify({ ref: entry.sha }),
                 });
                 const restoredPayload = await payload(restored);
-                if (!restored.ok) return alert(restoredPayload.error || '恢复失败。');
-                location.reload();
+                if (!restored.ok) return browserWindow.alert(restoredPayload.error || '恢复失败。');
+                browserWindow.location.reload();
               });
               item.append(heading, meta, restore);
               return item;
@@ -344,16 +439,18 @@ export function setupStudioEditor(document: Document, options: StudioEditorOptio
     }
   });
   document.querySelector('[data-delete]')?.addEventListener('click', async () => {
-    if (!confirm('确定删除这条内容吗？GitHub 历史中仍可恢复。')) return;
-    const response = await fetch(apiUrl(), { method: 'DELETE' });
+    if (!browserWindow.confirm('确定删除这条内容吗？GitHub 历史中仍可恢复。')) return;
+    const response = await request(apiUrl(), { method: 'DELETE' });
     const result = await payload(response);
     if (!response.ok) return showNotice('删除失败', result.error || '请稍后重试。', 'error');
-    location.assign('/studio');
+    browserWindow.location.assign('/studio');
   });
-  window.addEventListener('beforeunload', (event) => {
+  browserWindow.addEventListener('beforeunload', (event) => {
     if (initialSnapshot && snapshot() !== initialSnapshot) event.preventDefault();
   });
 
   applyVisibility();
+  const pendingDeployment = readPendingDeployment(storage);
+  if (pendingDeployment) void trackDeployment(pendingDeployment);
   void load();
 }

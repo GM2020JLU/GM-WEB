@@ -36,7 +36,7 @@ export const studioWriteSchema = z.object({
   body: z.string().max(2 * 1024 * 1024, '正文不能超过 2 MB。'),
   metadata: z.record(z.string(), z.unknown()),
   originalSlug: z.string().optional(),
-  slug: z.string(),
+  slug: z.string().optional().default(''),
 });
 
 export function isStudioCollection(value: string): value is StudioCollection {

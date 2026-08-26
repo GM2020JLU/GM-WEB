@@ -40,6 +40,7 @@ export const POST: APIRoute = async ({ cookies, request, url }) => {
     const payload = schema.parse(await request.json());
     const status = statusByAction[payload.action];
     const results: Array<{ collection: string; slug: string }> = [];
+    let commitSha: string | undefined;
     for (const item of payload.items) {
       if (!isStudioCollection(item.collection) || isTaxonomyCollection(item.collection)) {
         throw new Error('批量操作包含不支持的内容类型。');
@@ -54,13 +55,14 @@ export const POST: APIRoute = async ({ cookies, request, url }) => {
         document.body,
         status,
       );
-      await writeStudioFile({
+      const written = await writeStudioFile({
         token,
         path,
         sha: file.sha,
         content,
         message: `Bulk ${payload.action} ${item.collection}: ${item.slug}`,
       });
+      commitSha = written.commitSha ?? commitSha;
       results.push(item);
     }
     return studioJson({
@@ -68,6 +70,7 @@ export const POST: APIRoute = async ({ cookies, request, url }) => {
       status,
       updated: results.length,
       deploymentPending: Boolean(token),
+      commitSha,
     });
   } catch (error) {
     return studioApiError(error);

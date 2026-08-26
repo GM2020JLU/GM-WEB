@@ -1,0 +1,75 @@
+export type StudioDeploymentPhase = 'submitted' | 'queued' | 'building' | 'ready' | 'error';
+
+export interface StudioDeploymentState {
+  phase: StudioDeploymentPhase;
+  targetSha: string;
+  runtimeSha?: string;
+  repositorySha?: string;
+  deploymentSha?: string;
+  updatedAt?: string;
+  logUrl?: string;
+}
+
+export interface PendingStudioDeployment {
+  publicUrl?: string;
+  startedAt: string;
+  targetSha: string;
+  title: string;
+}
+
+export const STUDIO_DEPLOYMENT_STORAGE_KEY = 'gm-studio-pending-deployment';
+
+export function resolveStudioDeploymentPhase(input: {
+  deploymentSha?: string;
+  deploymentState?: string;
+  repositorySha?: string;
+  runtimeSha?: string;
+  targetSha: string;
+}): StudioDeploymentPhase {
+  if (input.runtimeSha === input.targetSha) return 'ready';
+  if (
+    input.deploymentSha === input.targetSha &&
+    ['error', 'failure'].includes(input.deploymentState ?? '')
+  ) {
+    return 'error';
+  }
+  if (input.deploymentSha === input.targetSha) return 'building';
+  if (input.repositorySha === input.targetSha) return 'queued';
+  return 'submitted';
+}
+
+export function deploymentCopy(state: StudioDeploymentState) {
+  if (state.phase === 'ready') {
+    return { title: '网站已上线', detail: '生产域名已经切换到这次发布。', progress: 100 };
+  }
+  if (state.phase === 'error') {
+    return { title: '部署失败', detail: '内容已保存，但构建没有成功。', progress: 100 };
+  }
+  if (state.phase === 'building') {
+    return {
+      title: '正在构建网站',
+      detail: 'Vercel 正在生成页面，通常需要约 30—90 秒。',
+      progress: 68,
+    };
+  }
+  if (state.phase === 'queued') {
+    return {
+      title: '等待开始构建',
+      detail: 'GitHub 已收到内容，正在等待 Vercel 接手。',
+      progress: 38,
+    };
+  }
+  return { title: '发布已提交', detail: '内容已经保存到 GitHub。', progress: 16 };
+}
+
+export function readPendingDeployment(storage: Pick<Storage, 'getItem'>) {
+  try {
+    const value = storage.getItem(STUDIO_DEPLOYMENT_STORAGE_KEY);
+    if (!value) return undefined;
+    const parsed = JSON.parse(value) as PendingStudioDeployment;
+    if (!/^[a-f0-9]{40}$/i.test(parsed.targetSha) || !parsed.startedAt) return undefined;
+    return parsed;
+  } catch {
+    return undefined;
+  }
+}

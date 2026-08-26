@@ -78,8 +78,13 @@ navigation、scaffold 和 i18n contribution 消失。
   `draft` 字段并为公开路由派生布尔值；后台保存自动写入 `updatedDate`
 - `src/content/taxonomies` 保存受控标签、分类和系列；图片统一写入
   `src/assets/images/content`
-- `/studio` 是日常内容后台入口：主页静态汇总部署时内容，动态 `/studio/edit/**` 与同源
-  `/api/studio/**` 负责读取最新 GitHub 内容、编辑、草稿/待发布/发布/撤回、批量状态、
+- `/studio` 是日常内容后台入口：主页采用精简内容列表，只保留状态/类型筛选、搜索、
+  新建、导入、编辑/预览与批量操作；动态 `/studio/edit/**` 以标题、摘要和正文为主，
+  低频字段折叠到“更多设置”。网址别名由标题自动生成并在冲突时追加序号
+- 线上发布会保存目标 Git commit SHA，并由 `/api/studio/deployment` 对比 GitHub main、
+  GitHub Deployment 与当前 Vercel runtime SHA，向编辑页和工作台持续反馈已提交、排队、
+  构建中、已上线或失败；待部署记录保存在浏览器中，换页后继续追踪
+- `/api/studio/**` 负责读取最新 GitHub 内容、编辑、草稿/待发布/发布/撤回、批量状态、
   定时发布、素材、分类和版本恢复；线上写入复用 Keystatic GitHub 登录。`/keystatic`
   保留为不出现在日常导航中的应急编辑器
 - `/studio/import` 是静态导入 UI，只向同源 `/api/studio/import` 提交经服务端重新解析的

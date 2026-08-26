@@ -3,6 +3,7 @@ import { ZodError } from 'zod';
 import {
   defaultStudioMetadata,
   isStudioCollection,
+  isTaxonomyCollection,
   parseStudioDocument,
   serializeStudioDocument,
   studioContentPath,
@@ -10,6 +11,7 @@ import {
   studioWriteSchema,
   type StudioPublicationStatus,
 } from '../../../../../utils/studio-content';
+import { generateStudioSlug } from '../../../../../utils/studio-slug';
 import {
   requireStudioToken,
   studioApiError,
@@ -65,7 +67,29 @@ export const PUT: APIRoute = async ({ params, cookies, request, url }) => {
     const { collection, slug: routeSlug } = routeParams(params);
     const token = requireStudioToken(cookies);
     const payload = studioWriteSchema.parse(await request.json());
-    const slug = collection === 'about' ? 'about' : payload.slug;
+    const isNew = routeSlug === 'new';
+    const generatedSlug = isTaxonomyCollection(collection)
+      ? String(payload.metadata.title || '').trim()
+      : generateStudioSlug(String(payload.metadata.title || ''));
+    let slug =
+      collection === 'about' ? 'about' : payload.slug.trim() || (isNew ? generatedSlug : routeSlug);
+    if (isNew && collection !== 'about') {
+      const baseSlug = slug;
+      for (let suffix = 1; suffix <= 99; suffix++) {
+        const candidate = suffix === 1 ? baseSlug : `${baseSlug}-${suffix}`;
+        try {
+          await readStudioFile(studioContentPath(collection, candidate), token);
+        } catch (error) {
+          const status = typeof error === 'object' && error && 'status' in error ? error.status : 0;
+          const code = typeof error === 'object' && error && 'code' in error ? error.code : '';
+          if ((!token && code === 'ENOENT') || (token && status === 404)) {
+            slug = candidate;
+            break;
+          }
+          throw error;
+        }
+      }
+    }
     const currentPath = studioContentPath(collection, routeSlug);
     const nextPath = studioContentPath(collection, slug);
     let current;
@@ -93,7 +117,7 @@ export const PUT: APIRoute = async ({ params, cookies, request, url }) => {
       status,
     );
     const verb = status === 'published' ? 'Publish' : status === 'ready' ? 'Mark ready' : 'Save';
-    await writeStudioFile({
+    const writeResult = await writeStudioFile({
       token,
       path: nextPath,
       previousPath: current && currentPath !== nextPath ? currentPath : undefined,
@@ -108,6 +132,7 @@ export const PUT: APIRoute = async ({ params, cookies, request, url }) => {
       status: status ?? 'draft',
       publicUrl: status === 'published' ? studioPublicUrl(collection, slug) : undefined,
       deploymentPending: Boolean(token),
+      commitSha: writeResult.commitSha,
     });
   } catch (error) {
     if (error instanceof ZodError) {

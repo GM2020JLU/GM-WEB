@@ -1,6 +1,7 @@
 import { Octokit } from '@octokit/core';
 import { mkdir, readFile, readdir, rename, unlink, writeFile } from 'node:fs/promises';
 import { dirname, resolve } from 'node:path';
+import { resolveStudioDeploymentPhase } from './studio-deployment';
 
 const repository = { owner: 'GM2020JLU', repo: 'GM-WEB', branch: 'main' } as const;
 
@@ -75,7 +76,7 @@ export async function writeStudioFile(args: {
       await rename(resolve(process.cwd(), args.previousPath), target);
     }
     await writeFile(target, args.content, 'utf8');
-    return { path: args.path };
+    return { path: args.path, commitSha: undefined };
   }
 
   const client = github(args.token);
@@ -100,7 +101,12 @@ export async function writeStudioFile(args: {
         headers: { 'X-GitHub-Api-Version': '2022-11-28' },
       });
     }
-    return { path: args.path, data: response.data };
+    const data = response.data as { commit?: { sha?: string }; content?: { sha?: string } };
+    return {
+      path: args.path,
+      commitSha: data.commit?.sha,
+      contentSha: data.content?.sha,
+    };
   } catch (error) {
     if (typeof error === 'object' && error && 'status' in error && error.status === 409) {
       throw new StudioConflictError();
@@ -177,7 +183,7 @@ export async function readStudioFileAtRef(path: string, ref: string, token: stri
   return decodeContent(response.data as GitHubContent);
 }
 
-export async function getStudioDeployment(token?: string) {
+export async function getStudioDeployment(token?: string, targetSha?: string, runtimeSha?: string) {
   const client = publicOrAuthenticatedGitHub(token);
   const [commit, deployments] = await Promise.all([
     client.request('GET /repos/{owner}/{repo}/commits/{ref}', {
@@ -192,7 +198,10 @@ export async function getStudioDeployment(token?: string) {
       headers: { 'X-GitHub-Api-Version': '2022-11-28' },
     }),
   ]);
-  const latest = (deployments.data as any[])[0];
+  const allDeployments = deployments.data as any[];
+  const latest = targetSha
+    ? (allDeployments.find((deployment) => deployment.sha === targetSha) ?? allDeployments[0])
+    : allDeployments[0];
   let status: any;
   if (latest) {
     const result = await client.request(
@@ -206,9 +215,24 @@ export async function getStudioDeployment(token?: string) {
     );
     status = (result.data as any[])[0];
   }
+  const repositorySha = (commit.data as any).sha as string;
+  const deploymentSha = latest?.sha as string | undefined;
+  const deploymentState = status?.state as string | undefined;
+  const phase = targetSha
+    ? resolveStudioDeploymentPhase({
+        targetSha,
+        runtimeSha,
+        repositorySha,
+        deploymentSha,
+        deploymentState,
+      })
+    : 'submitted';
   return {
-    repositorySha: (commit.data as any).sha,
-    deploymentSha: latest?.sha,
+    phase,
+    targetSha,
+    runtimeSha,
+    repositorySha,
+    deploymentSha,
     state: status?.state ?? (latest ? 'pending' : 'unknown'),
     environment: latest?.environment ?? 'Production',
     updatedAt: status?.updated_at ?? latest?.updated_at,

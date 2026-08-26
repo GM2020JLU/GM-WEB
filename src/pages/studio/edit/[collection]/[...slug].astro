@@ -3,16 +3,15 @@ import BaseHead from '../../../../components/BaseHead.astro';
 import { isStudioCollection, isTaxonomyCollection } from '../../../../utils/studio-content';
 
 export const prerender = false;
-
 const collection = Astro.params.collection ?? '';
 const slug = Astro.params.slug ?? 'new';
 if (!isStudioCollection(collection)) return Astro.redirect('/studio');
 const isNew = Astro.url.searchParams.get('new') === '1' || slug === 'new';
 const labels = {
-  blog: '博客 · 长文',
-  projects: '项目案例',
-  vibe: '随记 · 短内容',
-  media: '书影音记录',
+  blog: '博客',
+  projects: '项目',
+  vibe: '随记',
+  media: '书影音',
   about: '关于我',
   categories: '分类',
   series: '系列',
@@ -23,13 +22,12 @@ const taxonomy = isTaxonomyCollection(collection);
 
 <!doctype html>
 <html lang="zh-CN" data-palette="green-soft">
-  <head>
-    <BaseHead
+  <head
+    ><BaseHead
       title={`${isNew ? '新建' : '编辑'}${labels[collection]}`}
       description="Studio 内容编辑器"
-    />
-    <meta name="robots" content="noindex,nofollow,noarchive" />
-  </head>
+    /><meta name="robots" content="noindex,nofollow,noarchive" /></head
+  >
   <body>
     <main
       class="shell"
@@ -39,107 +37,106 @@ const taxonomy = isTaxonomyCollection(collection);
       data-is-new={String(isNew)}
     >
       <nav class="topbar">
-        <a class="brand" href="/studio"><span>GM</span><strong>创作中心</strong></a>
-        <div>
-          <a href="/studio">内容</a><a href="/studio/import">导入</a><a href="/studio/assets"
-            >素材</a
-          ><a href="/studio/organize">分类</a>
-        </div>
+        <a class="brand" href="/studio"><span>GM</span><strong>创作中心</strong></a><a
+          href="/studio">返回内容</a
+        >
       </nav>
 
       <header class="editor-header">
-        <div>
-          <p class="eyebrow">STUDIO EDITOR · {labels[collection]}</p><h1>
-            {isNew ? '新建内容' : '编辑内容'}
-          </h1>
-        </div>
-        <div class="header-actions">
-          <button type="button" data-history>版本历史</button>
-          {
-            !taxonomy && (
+        <div><p>{labels[collection]}</p><h1>{isNew ? '新建' : '编辑'}</h1></div><div
+          class="header-actions"
+        >
+          <button type="button" data-history>历史</button>{
+            !taxonomy && !isNew && (
               <a
                 href={collection === 'about' ? '/preview/about' : `/preview/${collection}/${slug}`}
                 target="_blank"
               >
-                页面预览
+                预览页面
               </a>
-            )
-          }
-          {
-            collection !== 'about' && !isNew && (
-              <button type="button" class="danger" data-delete>
-                删除
-              </button>
             )
           }
         </div>
       </header>
-
       <div class="notice" data-notice role="status" aria-live="polite">
-        <strong>正在初始化</strong><small>请稍候…</small>
+        <strong>正在读取</strong><small>请稍候…</small>
       </div>
+
+      <section class="deployment-tracker" data-deployment-tracker hidden aria-live="polite">
+        <div class="deploy-steps" aria-hidden="true">
+          <span>已提交</span><span>构建中</span><span>已上线</span>
+        </div>
+        <div class="deploy-copy">
+          <strong data-deployment-title>发布已提交</strong><small data-deployment-detail
+            >内容已经保存到 GitHub。</small
+          >
+        </div>
+        <div class="deploy-track"><span data-deployment-progress></span></div><a
+          data-deployment-link
+          hidden
+          target="_blank">打开线上页面</a
+        >
+      </section>
 
       <form data-editor-form>
         <aside class="meta-panel">
-          <h2>内容信息</h2>
-          <label><span>标题</span><input required maxlength="120" data-title /></label>
-          <label
-            ><span>{taxonomy ? '标识' : '网址别名'}</span><input
-              required
-              data-slug
-              pattern={taxonomy ? undefined : '[a-z0-9]+(?:-[a-z0-9]+)*'}
-            /></label
-          >
+          <h2>基本信息</h2>
+          <label><span>标题</span><input required maxlength="120" data-title /></label><input
+            type="hidden"
+            data-slug
+          />
           <label data-for="blog,projects,about"
             ><span>摘要</span><textarea rows="4" maxlength="320" data-description></textarea></label
           >
-          <label data-for="blog,projects,vibe,about"
-            ><span>日期</span><input type="datetime-local" data-date /></label
-          >
-          <label data-for="blog,projects,vibe,media,about"
-            ><span>发布状态</span><select data-publication-status
-              ><option value="draft">草稿</option><option value="ready">待发布</option><option
-                value="published">已发布</option
-              ></select
-            ></label
-          >
-          <label data-for="blog,projects,vibe,media,about"
-            ><span>定时发布时间</span><input type="datetime-local" data-scheduled-at /><small
-              >设置后点击“定时发布”</small
-            ></label
-          >
           <label data-for="media"><span>创作者</span><input data-creator /></label>
-          <label data-for="vibe,media"
-            ><span>内容类型</span><select data-content-type
-              ><option value="text">文字</option><option value="photo">图片</option><option
-                value="quote">引语</option
-              ><option value="code">代码</option><option value="mixed">混合</option><option
-                value="book">书籍</option
-              ><option value="film">电影</option><option value="series">剧集</option><option
-                value="album">专辑</option
-              ><option value="podcast">播客</option></select
-            ></label
+          <select data-publication-status hidden
+            ><option value="draft">草稿</option><option value="ready">待发布</option><option
+              value="published">已发布</option
+            ></select
           >
-          <label data-for="media"
-            ><span>阅读/观看进度</span><select data-progress
-              ><option value="planned">计划中</option><option value="in-progress">进行中</option
-              ><option value="completed">已完成</option><option value="abandoned">已放弃</option
-              ></select
-            ></label
-          >
-          <label data-for="blog,projects,vibe,media,about"
-            ><span>标签</span><input data-tags placeholder="用逗号分隔" /></label
-          >
-          <label data-for="blog,projects,about"
-            ><span>分类</span><input data-categories placeholder="用逗号分隔" /></label
-          >
-          <label data-for="blog,projects,about"
-            ><span>系列</span><input data-series placeholder="用逗号分隔" /></label
-          >
-          <details>
-            <summary>高级字段</summary><p>
-              JSON 格式，用于项目成果、图片、侧边栏等扩展信息。
-            </p><textarea rows="12" data-extras spellcheck="false">{}</textarea>
+          <details class="more-settings">
+            <summary>更多设置</summary>
+            <div class="auto-link">
+              <span>{taxonomy ? '内容标识' : '页面链接'}</span><code data-slug-preview
+                >保存时自动生成</code
+              >
+            </div>
+            <label data-for="blog,projects,vibe,about"
+              ><span>日期</span><input type="datetime-local" data-date /></label
+            >
+            <label data-for="vibe,media"
+              ><span>内容类型</span><select data-content-type
+                ><option value="text">文字</option><option value="photo">图片</option><option
+                  value="quote">引语</option
+                ><option value="code">代码</option><option value="mixed">混合</option><option
+                  value="book">书籍</option
+                ><option value="film">电影</option><option value="series">剧集</option><option
+                  value="album">专辑</option
+                ><option value="podcast">播客</option></select
+              ></label
+            >
+            <label data-for="media"
+              ><span>阅读/观看进度</span><select data-progress
+                ><option value="planned">计划中</option><option value="in-progress">进行中</option
+                ><option value="completed">已完成</option><option value="abandoned">已放弃</option
+                ></select
+              ></label
+            >
+            <label data-for="blog,projects,vibe,media,about"
+              ><span>标签</span><input data-tags placeholder="用逗号分隔" /></label
+            ><label data-for="blog,projects,about"
+              ><span>分类</span><input data-categories placeholder="用逗号分隔" /></label
+            ><label data-for="blog,projects,about"
+              ><span>系列</span><input data-series placeholder="用逗号分隔" /></label
+            >
+            <label data-for="blog,projects,vibe,media,about"
+              ><span>定时发布时间</span><input type="datetime-local" data-scheduled-at /></label
+            >
+            <details class="compatibility">
+              <summary>兼容字段</summary><textarea rows="10" data-extras spellcheck="false"
+                >{}</textarea
+              >
+            </details>
           </details>
         </aside>
 
@@ -152,36 +149,42 @@ const taxonomy = isTaxonomyCollection(collection);
                 aria-pressed="true">分栏</button
               ><button type="button" data-view="preview">预览</button>
             </div>
-          </header>
-          <div class="editor-grid">
+          </header><div class="editor-grid">
             <textarea data-body spellcheck="true" aria-label="Markdown 正文" placeholder="开始写作…"
             ></textarea><article class="markdown-preview" data-preview></article>
           </div>
         </section>
 
         <footer class="publish-bar">
-          <div>
-            <strong>发布操作</strong><small>保存后会创建 Git 版本；发布会触发 Vercel 部署。</small>
-          </div>
-          <div>
-            <button type="button" data-action="draft">保存草稿</button>
-            <button type="button" data-action="ready">设为待发布</button>
-            <button type="button" data-action="unpublish">撤回发布</button>
-            <button type="button" data-action="schedule">定时发布</button>
-            <button type="button" class="primary" data-action="publish">发布</button>
+          <span class="current-status" data-current-status>草稿</span><div>
+            <button type="button" data-action="draft">保存草稿</button><details
+              class="publish-more"
+            >
+              <summary>其他</summary><div>
+                <button type="button" data-action="ready">设为待发布</button><button
+                  type="button"
+                  data-action="schedule">定时发布</button
+                ><button type="button" data-action="unpublish">撤回发布</button>{
+                  collection !== 'about' && !isNew && (
+                    <button type="button" class="danger" data-delete>
+                      删除内容
+                    </button>
+                  )
+                }
+              </div>
+            </details><button type="button" class="primary" data-action="publish">发布</button>
           </div>
         </footer>
       </form>
     </main>
 
     <dialog data-history-dialog>
-      <header>
-        <div><p class="eyebrow">VERSION HISTORY</p><h2>版本历史</h2></div><form method="dialog">
-          <button>关闭</button>
-        </form>
-      </header><div class="history-list" data-history-list></div>
+      <header><h2>版本历史</h2><form method="dialog"><button>关闭</button></form></header><div
+        class="history-list"
+        data-history-list
+      >
+      </div>
     </dialog>
-
     <script>
       import { setupStudioEditor } from '../../../../utils/studio-editor-client';
       const root = document.querySelector('[data-editor-root]');
@@ -201,47 +204,43 @@ const taxonomy = isTaxonomyCollection(collection);
   }
   :global(body) {
     margin: 0;
-    background: var(--paper-bg);
-    color: var(--paper-ink);
+    background: #f7f9f6;
+    color: #21352a;
     font-family: var(--font-ui);
   }
   .shell {
-    width: min(1480px, calc(100% - 32px));
+    width: min(1400px, calc(100% - 32px));
     margin: auto;
-    padding: 22px 0 110px;
+    padding: 18px 0 96px;
   }
   .topbar,
   .editor-header,
-  .publish-bar,
   .body-panel > header,
+  .publish-bar,
   dialog > header {
     display: flex;
     align-items: center;
     justify-content: space-between;
-    gap: 20px;
+    gap: 18px;
   }
   .topbar {
-    padding-bottom: 17px;
-    border-bottom: 1px solid var(--paper-line);
+    height: 52px;
+    border-bottom: 1px solid #dfe6df;
   }
-  .topbar > div,
-  .brand,
-  .header-actions,
-  .publish-bar > div:last-child,
-  .view-switch {
+  .brand {
     display: flex;
     align-items: center;
-    gap: 10px;
+    gap: 9px;
   }
   .brand span {
     display: grid;
-    width: 34px;
-    height: 34px;
+    width: 32px;
+    height: 32px;
     place-items: center;
-    border-radius: 10px;
-    background: var(--paper-ink);
+    border-radius: 9px;
+    background: #253d2e;
     color: white;
-    font-size: 0.72rem;
+    font-size: 0.7rem;
   }
   .topbar a,
   .header-actions a,
@@ -249,82 +248,143 @@ const taxonomy = isTaxonomyCollection(collection);
     color: inherit;
     text-decoration: none;
   }
-  .topbar > div a {
-    padding: 7px 9px;
-    color: var(--paper-ink-soft);
+  .topbar > a:last-child {
     font-size: 0.82rem;
+    color: #66756b;
   }
   .editor-header {
-    padding: 42px 0 24px;
+    padding: 26px 0 16px;
+  }
+  .editor-header p {
+    margin: 0;
+    color: #45815a;
+    font-size: 0.72rem;
+    font-weight: 700;
   }
   .editor-header h1 {
-    margin: 4px 0 0;
-    font: 400 clamp(2rem, 4vw, 3.5rem)/1 var(--font-page-heading);
+    margin: 3px 0 0;
+    font: 400 2rem/1.1 var(--font-page-heading);
   }
-  .eyebrow {
-    margin: 0;
-    color: var(--paper-accent);
-    font: 700 0.68rem/1.4 var(--font-meta);
-    letter-spacing: 0.14em;
+  .header-actions {
+    display: flex;
+    gap: 8px;
   }
   .notice {
     display: flex;
-    gap: 12px;
+    gap: 10px;
     align-items: baseline;
-    margin-bottom: 16px;
-    padding: 13px 16px;
-    border: 1px solid var(--paper-line);
-    border-radius: 11px;
-    background: color-mix(in srgb, var(--paper-bg) 94%, var(--paper-accent) 6%);
+    margin-bottom: 12px;
+    padding: 10px 13px;
+    border: 1px solid #dfe6df;
+    border-radius: 9px;
+    background: white;
+    font-size: 0.82rem;
   }
   .notice small {
-    color: var(--paper-ink-soft);
+    color: #6a786e;
   }
   .notice.success {
-    border-color: #8abf97;
+    border-color: #8fbea0;
+    background: #f5fbf6;
   }
   .notice.error {
-    border-color: #d28d8d;
+    border-color: #d29494;
     background: #fff6f6;
   }
-  .notice a {
-    margin-left: auto;
+  .deployment-tracker {
+    position: relative;
+    display: grid;
+    grid-template-columns: 1fr auto;
+    gap: 8px 18px;
+    margin-bottom: 14px;
+    padding: 18px;
+    border: 1px solid #82b394;
+    border-radius: 13px;
+    background: #f3faf5;
+    box-shadow: 0 12px 30px #244b3020;
+  }
+  .deployment-tracker[hidden] {
+    display: none;
+  }
+  .deploy-steps {
+    grid-column: 1/-1;
+    display: flex;
+    justify-content: space-between;
+    color: #6f7f74;
+    font-size: 0.7rem;
+  }
+  .deploy-copy {
+    display: grid;
+    gap: 3px;
+  }
+  .deploy-copy small {
+    color: #5f7064;
+  }
+  .deploy-track {
+    grid-column: 1/-1;
+    height: 5px;
+    overflow: hidden;
+    border-radius: 99px;
+    background: #dce9df;
+  }
+  .deploy-track span {
+    display: block;
+    height: 100%;
+    border-radius: inherit;
+    background: #3f8a58;
+    transition: width 0.35s ease;
+  }
+  .deployment-tracker > a {
+    align-self: center;
+    padding: 8px 11px;
+    border: 1px solid #73a484;
+    border-radius: 8px;
+    background: white;
+    font-size: 0.8rem;
+  }
+  .deployment-tracker[data-phase='ready'] {
+    border-color: #43a364;
+    background: #edf9f0;
+  }
+  .deployment-tracker[data-phase='error'] {
+    border-color: #cb7777;
+    background: #fff4f4;
   }
   form[data-editor-form] {
     display: grid;
-    grid-template-columns: 300px minmax(0, 1fr);
-    gap: 16px;
+    grid-template-columns: 260px minmax(0, 1fr);
+    gap: 14px;
   }
   .meta-panel,
   .body-panel {
-    border: 1px solid var(--paper-line);
-    border-radius: 16px;
-    background: color-mix(in srgb, var(--paper-bg) 98%, white 2%);
+    border: 1px solid #dfe6df;
+    border-radius: 13px;
+    background: white;
   }
   .meta-panel {
-    padding: 22px;
+    padding: 18px;
   }
   .meta-panel h2,
   .body-panel h2,
   dialog h2 {
     margin: 0;
-    font: 400 1.45rem/1.2 var(--font-page-heading);
+    font: 400 1.25rem/1.2 var(--font-page-heading);
   }
   label {
     display: grid;
-    gap: 6px;
-    margin-top: 17px;
-    color: var(--paper-ink-soft);
-    font-size: 0.8rem;
+    gap: 5px;
+    margin-top: 14px;
+    color: #66756b;
+    font-size: 0.78rem;
   }
   input,
   textarea,
   select,
   button,
   .header-actions a {
-    border: 1px solid var(--paper-line-strong);
-    border-radius: 9px;
-    background: var(--paper-bg);
+    border: 1px solid #cdd8cf;
+    border-radius: 8px;
+    background: white;
     color: inherit;
     font: inherit;
   }
@@ -332,66 +392,88 @@ const taxonomy = isTaxonomyCollection(collection);
   select,
   textarea {
     width: 100%;
-    padding: 10px 11px;
+    padding: 9px 10px;
   }
   textarea {
     resize: vertical;
   }
-  details {
-    margin-top: 20px;
-    border-top: 1px solid var(--paper-line);
-    padding-top: 15px;
-  }
-  details summary {
+  button,
+  .header-actions a {
+    padding: 8px 11px;
     cursor: pointer;
+  }
+  .more-settings {
+    margin-top: 18px;
+    padding-top: 14px;
+    border-top: 1px solid #e3e9e3;
+  }
+  .more-settings > summary,
+  .compatibility > summary {
+    cursor: pointer;
+    font-size: 0.82rem;
     font-weight: 700;
   }
-  details p {
-    color: var(--paper-ink-faint);
+  .auto-link {
+    display: grid;
+    gap: 5px;
+    margin-top: 14px;
+    color: #6c796f;
     font-size: 0.75rem;
-    line-height: 1.5;
+  }
+  .auto-link code {
+    overflow: hidden;
+    padding: 7px 8px;
+    border-radius: 6px;
+    background: #f3f6f3;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .compatibility {
+    margin-top: 16px;
+  }
+  .compatibility textarea {
+    margin-top: 9px;
+    font: 12px/1.5 var(--font-code);
   }
   .body-panel {
     min-width: 0;
     overflow: hidden;
   }
   .body-panel > header {
-    padding: 16px 18px;
-    border-bottom: 1px solid var(--paper-line);
+    padding: 13px 15px;
+    border-bottom: 1px solid #e1e7e1;
   }
-  .body-panel > header > div:first-child {
+  .body-panel > header > div:first-child,
+  .view-switch,
+  .publish-bar > div {
     display: flex;
-    gap: 10px;
-    align-items: baseline;
+    align-items: center;
+    gap: 8px;
   }
   .body-panel small {
-    color: var(--paper-ink-faint);
+    color: #78847c;
   }
-  button,
-  .header-actions a {
-    padding: 9px 12px;
-    cursor: pointer;
+  .view-switch button {
+    padding: 6px 9px;
+    font-size: 0.75rem;
   }
   .view-switch button[aria-pressed='true'],
   .primary {
-    border-color: var(--paper-accent);
-    background: var(--paper-accent);
+    border-color: #3e7e52;
+    background: #3e7e52;
     color: white;
-  }
-  .danger {
-    color: #a43d3d;
   }
   .editor-grid {
     display: grid;
     grid-template-columns: 1fr 1fr;
-    min-height: 720px;
+    min-height: 680px;
   }
   .editor-grid > textarea {
-    min-height: 720px;
-    padding: 24px;
+    min-height: 680px;
+    padding: 22px;
     border: 0;
     border-radius: 0;
-    border-right: 1px solid var(--paper-line);
+    border-right: 1px solid #e0e6e0;
     font: 14px/1.75 var(--font-code);
     resize: none;
     outline: none;
@@ -399,18 +481,14 @@ const taxonomy = isTaxonomyCollection(collection);
   .markdown-preview {
     min-width: 0;
     overflow: auto;
-    padding: 28px;
+    padding: 26px;
     line-height: 1.8;
   }
-  .body-panel[data-view='edit'] .editor-grid {
-    grid-template-columns: 1fr;
-  }
-  .body-panel[data-view='edit'] .markdown-preview {
-    display: none;
-  }
+  .body-panel[data-view='edit'] .editor-grid,
   .body-panel[data-view='preview'] .editor-grid {
     grid-template-columns: 1fr;
   }
+  .body-panel[data-view='edit'] .markdown-preview,
   .body-panel[data-view='preview'] textarea {
     display: none;
   }
@@ -420,96 +498,112 @@ const taxonomy = isTaxonomyCollection(collection);
     bottom: 0;
     left: 0;
     z-index: 5;
-    padding: 14px max(20px, calc((100vw - 1480px) / 2));
-    border-top: 1px solid var(--paper-line);
-    background: color-mix(in srgb, var(--paper-bg) 90%, transparent);
+    height: 68px;
+    padding: 10px max(18px, calc((100vw - 1400px) / 2));
+    border-top: 1px solid #d8e0d9;
+    background: #f9fbf8eb;
     backdrop-filter: blur(16px);
   }
-  .publish-bar > div:first-child {
-    display: grid;
-    gap: 3px;
+  .current-status {
+    padding: 5px 9px;
+    border-radius: 99px;
+    background: #e8eee9;
+    color: #526259;
+    font-size: 0.75rem;
   }
-  .publish-bar small {
-    color: var(--paper-ink-faint);
+  .publish-more {
+    position: relative;
+  }
+  .publish-more > summary {
+    list-style: none;
+    padding: 8px 11px;
+    border: 1px solid #cdd8cf;
+    border-radius: 8px;
+    background: white;
+    cursor: pointer;
+  }
+  .publish-more > summary::-webkit-details-marker {
+    display: none;
+  }
+  .publish-more > div {
+    position: absolute;
+    right: 0;
+    bottom: 44px;
+    display: grid;
+    width: 150px;
+    padding: 7px;
+    border: 1px solid #d5ddd6;
+    border-radius: 10px;
+    background: white;
+    box-shadow: 0 14px 36px #263d2d26;
+  }
+  .publish-more button {
+    border: 0;
+    text-align: left;
+  }
+  .danger {
+    color: #a13e3e;
   }
   dialog {
-    width: min(720px, calc(100% - 32px));
+    width: min(680px, calc(100% - 28px));
     max-height: 80vh;
-    padding: 24px;
-    border: 1px solid var(--paper-line);
-    border-radius: 18px;
-    background: var(--paper-bg);
-    color: var(--paper-ink);
+    padding: 22px;
+    border: 1px solid #d9e1da;
+    border-radius: 14px;
+    background: #f9fbf8;
+    color: #21352a;
   }
   dialog::backdrop {
-    background: #17251db0;
+    background: #17251da8;
   }
   .history-list {
     display: grid;
-    gap: 10px;
-    margin-top: 20px;
+    gap: 9px;
+    margin-top: 18px;
   }
   .history-list article {
     display: grid;
     grid-template-columns: 1fr auto;
-    gap: 5px 14px;
-    padding: 14px;
-    border: 1px solid var(--paper-line);
-    border-radius: 10px;
+    gap: 5px 12px;
+    padding: 12px;
+    border: 1px solid #dfe6df;
+    border-radius: 9px;
   }
   .history-list small {
-    color: var(--paper-ink-soft);
+    color: #6b786f;
   }
   .history-list button {
     grid-row: 1/3;
     grid-column: 2;
   }
-  @media (max-width: 900px) {
+  @media (max-width: 820px) {
     form[data-editor-form] {
       grid-template-columns: 1fr;
     }
     .meta-panel {
       display: grid;
       grid-template-columns: 1fr 1fr;
-      gap: 0 14px;
+      gap: 0 12px;
     }
     .meta-panel h2,
-    .meta-panel details {
+    .more-settings {
       grid-column: 1/-1;
     }
     .editor-grid {
       grid-template-columns: 1fr;
     }
     .editor-grid > textarea {
-      min-height: 480px;
+      min-height: 460px;
       border-right: 0;
-      border-bottom: 1px solid var(--paper-line);
-    }
-    .publish-bar {
-      align-items: flex-start;
-    }
-    .publish-bar > div:first-child {
-      display: none;
-    }
-    .publish-bar > div:last-child {
-      flex-wrap: wrap;
-      justify-content: flex-end;
+      border-bottom: 1px solid #e0e6e0;
     }
   }
-  @media (max-width: 620px) {
+  @media (max-width: 560px) {
     .shell {
-      width: min(100% - 20px, 1480px);
-    }
-    .topbar > div a:nth-child(3),
-    .topbar > div a:nth-child(4) {
-      display: none;
+      width: calc(100% - 18px);
     }
     .editor-header {
-      align-items: flex-start;
-    }
-    .header-actions {
-      flex-wrap: wrap;
-      justify-content: flex-end;
+      padding-top: 18px;
     }
     .meta-panel {
       display: block;
@@ -517,17 +611,17 @@ const taxonomy = isTaxonomyCollection(collection);
     .body-panel[data-view='split'] .editor-grid {
       display: block;
     }
-    .body-panel[data-view='split'] .editor-grid > textarea {
-      min-height: 420px;
+    .body-panel[data-view='split'] textarea {
+      min-height: 400px;
     }
     .publish-bar {
-      overflow-x: auto;
+      height: 62px;
     }
-    .publish-bar > div:last-child {
-      flex-wrap: nowrap;
+    .deployment-tracker {
+      grid-template-columns: 1fr;
     }
-    .publish-bar button {
-      white-space: nowrap;
+    .deployment-tracker > a {
+      justify-self: start;
     }
   }
 </style>

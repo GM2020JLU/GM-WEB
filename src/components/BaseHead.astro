@@ -50,6 +50,26 @@ const structuredData = {
 
 <script is:inline>
   (() => {
+    const disableStudioClientRouter = () => {
+      if (!location.pathname.startsWith('/studio')) return;
+
+      // Studio links use native navigation. Removing the unused transition
+      // runtime avoids a second document listener, route prefetch bootstrap,
+      // and several deferred module requests on every admin page.
+      for (const script of document.querySelectorAll(
+        'script[src*="ClientRouter.astro"], meta[name^="astro-view-transitions-"]',
+      )) {
+        script.remove();
+      }
+    };
+
+    disableStudioClientRouter();
+    if (location.pathname.startsWith('/studio')) {
+      const observer = new MutationObserver(disableStudioClientRouter);
+      observer.observe(document.documentElement, { childList: true, subtree: true });
+      window.setTimeout(() => observer.disconnect(), 1000);
+    }
+
     const markStudioTransition = (documentElement = document.documentElement) => {
       if (location.pathname.startsWith('/studio')) {
         documentElement.dataset.studioTransition = 'none';

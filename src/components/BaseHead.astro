@@ -77,18 +77,50 @@ const structuredData = {
       }
     };
 
+    const installStudioPrefetch = () => {
+      if (!document.body.classList.contains('studio-with-navigation')) return;
+
+      for (const link of document.querySelectorAll('a[href]')) {
+        if (!(link instanceof HTMLAnchorElement) || link.dataset.gouminPrefetchBound) continue;
+        if (link.origin !== location.origin || link.target === '_blank') continue;
+
+        link.dataset.gouminPrefetchBound = 'true';
+        link.addEventListener(
+          'mouseenter',
+          () => {
+            if (link.dataset.gouminPrefetched) return;
+            link.dataset.gouminPrefetched = 'true';
+            const preload = document.createElement('link');
+            preload.rel = 'prefetch';
+            preload.href = link.href;
+            document.head.append(preload);
+          },
+          { passive: true, once: true },
+        );
+      }
+    };
+
     syncThemeLabel();
 
     if (!window.__gouminThemeI18nInitialized) {
       window.__gouminThemeI18nInitialized = true;
       window.addEventListener('navfolio:theme-change', syncThemeLabel);
       document.addEventListener('astro:page-load', syncThemeLabel);
+      document.addEventListener('astro:page-load', installStudioPrefetch);
     }
 
     if (document.readyState === 'loading') {
-      document.addEventListener('DOMContentLoaded', syncThemeLabel, { once: true });
+      document.addEventListener(
+        'DOMContentLoaded',
+        () => {
+          syncThemeLabel();
+          installStudioPrefetch();
+        },
+        { once: true },
+      );
     } else {
       syncThemeLabel();
+      installStudioPrefetch();
     }
   })();
 </script>

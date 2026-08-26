@@ -38,7 +38,13 @@ http://:8080 {
 http://:8081 {
 	bind 127.0.0.1
 	encode zstd gzip
-	header Cache-Control "private, no-store"
+
+	# Astro fingerprints these assets, so both the browser and Cloudflare may reuse them safely.
+	@immutable path /_astro/*
+	header @immutable Cache-Control "public, max-age=31536000, immutable"
+
+	@private not path /_astro/*
+	header @private Cache-Control "private, no-store"
 
 	@keystatic path /keystatic /keystatic/* /api/keystatic /api/keystatic/*
 	respond @keystatic 404

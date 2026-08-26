@@ -22,6 +22,17 @@ describe('Studio 请求来源校验', () => {
         internalUrl,
       ),
     ).toBe(true);
+    expect(
+      verifyStudioOrigin(
+        new Request(internalUrl, {
+          headers: {
+            Host: 'goumin-mac.tailfc8e48.ts.net',
+            Origin: 'https://goumin-mac.tailfc8e48.ts.net',
+          },
+        }),
+        internalUrl,
+      ),
+    ).toBe(true);
   });
 
   test('拒绝与代理转发地址不一致的来源', () => {

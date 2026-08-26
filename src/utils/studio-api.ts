@@ -1,6 +1,7 @@
 import type { AstroCookies } from 'astro';
 import { startStudioLocalDeployment } from './studio-local-deployment';
 
+const studioProxyHosts = new Set(['goumin-mac.tailfc8e48.ts.net', 'studio.goumin.work']);
 const requestedStorage = import.meta.env.PUBLIC_KEYSTATIC_STORAGE_KIND;
 export const studioUsesGitHub =
   requestedStorage === 'github' || (requestedStorage !== 'local' && import.meta.env.PROD);
@@ -44,10 +45,17 @@ export function verifyStudioOrigin(request: Request, url: URL) {
 
   const forwardedHost = request.headers.get('x-forwarded-host')?.split(',')[0]?.trim();
   const forwardedProto = request.headers.get('x-forwarded-proto')?.split(',')[0]?.trim();
-  return Boolean(
+  if (
     forwardedHost &&
     (forwardedProto === 'http' || forwardedProto === 'https') &&
-    origin === `${forwardedProto}://${forwardedHost}`,
+    origin === `${forwardedProto}://${forwardedHost}`
+  ) {
+    return true;
+  }
+
+  const requestHost = request.headers.get('host')?.toLowerCase();
+  return Boolean(
+    requestHost && studioProxyHosts.has(requestHost) && origin === `https://${requestHost}`,
   );
 }
 

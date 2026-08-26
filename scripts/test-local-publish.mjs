@@ -37,8 +37,21 @@ async function request(path, init = {}) {
     signal: AbortSignal.timeout(20_000),
   });
   const body = await response.json();
-  if (!response.ok) throw new Error(`${path} (${response.status}): ${body.error ?? 'unknown'}`);
+  if (!response.ok) throw new Error(`${path} (${response.status}): ${body?.error ?? 'unknown'}`);
   return body;
+}
+
+async function waitForStudio() {
+  for (let attempt = 0; attempt < 60; attempt++) {
+    try {
+      const response = await fetch(new URL('/studio', studioOrigin), {
+        signal: AbortSignal.timeout(10_000),
+      });
+      if (response.ok) return;
+    } catch {}
+    await new Promise((resolve) => setTimeout(resolve, 500));
+  }
+  throw new Error('远程 Studio 在 30 秒内未就绪。');
 }
 
 async function waitForDeployment(targetSha) {
@@ -71,6 +84,7 @@ async function waitForPublic(publicUrl, title, visible) {
 }
 
 try {
+  await waitForStudio();
   for (const definition of definitions) {
     const slug = `local-publish-${definition.collection}-${suffix}`;
     const imported = await request('/api/studio/import', {

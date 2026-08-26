@@ -70,6 +70,11 @@
 - 已固化 macOS 的 Caddy、Cloudflare Tunnel 与 Studio launchd 配置，并复用 Mac 已运行的
   防休眠服务；公开站入口明确封锁后台、API、Keystatic 和未发布预览路径。Tailscale
   作为后台备用入口，Cloudflare Access 完成邮箱保护后再启用日常后台域名。
+- Mac worker、主站与 docs 使用隔离的 Astro cache，并在构建前重建内容索引；产物门禁会
+  拒绝 docs 示例混入主站。Media 公共模块已与后台能力对齐启用，空集合也生成 `/media`。
+- `test:local-publish` 已通过真实 Tailscale Studio 与 Cloudflare 预览入口，对 Blog、Projects、
+  Vibe、Media 完成导入、编辑、发布、等待构建、公网上线、删除、再次构建和公网下线；测试
+  内容均已清理，Mac 仓库保持干净。
 
 ## 过渡中
 

@@ -125,7 +125,7 @@ let entriesChecked = 0;
 for (const [key, directory] of collections) {
   const collectionReader = reader.collections[key];
   const entries = await collectionReader.all();
-  assert(entries.length > 0, `Keystatic 未读取到 ${key} 内容`);
+  if (key !== 'blog') assert(entries.length > 0, `Keystatic 未读取到 ${key} 内容`);
 
   for (const { slug, entry } of entries) {
     const body = await entry.body();

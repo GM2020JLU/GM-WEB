@@ -1,9 +1,9 @@
 ---
 title: K3 Pico-ITX 风扇策略与配置指南
 description: K3 Pico-ITX 默认由 Linux 根据 CPU 温度自动调节风扇，控制链如下：
-date: 2026-08-26T11:39:46+08:00
-updatedDate: 2026-08-26T11:39:46+08:00
-publicationStatus: draft
+date: '2026-08-26T11:40:00+08:00'
+updatedDate: '2026-08-26T11:40:14+08:00'
+publicationStatus: published
 draft: true
 showHeroImage: false
 tags: []
@@ -15,7 +15,6 @@ sidebar:
   toc: true
   relatedPosts: true
 ---
-
 # K3 Pico-ITX 风扇策略与配置指南
 
 ## 📌 工作原理与重要提示
@@ -47,29 +46,29 @@ thermal_cluster0 (step_wise)
 `cooling-levels` 中的一个 PWM 值。
 
 | cooling state | PWM 值 | 约占满量程 |
-| ---: | ---: | ---: |
-| 0 | 0 | 0% |
-| 1 | 30 | 12% |
-| 2 | 60 | 24% |
-| 3 | 90 | 35% |
-| 4 | 120 | 47% |
-| 5 | 149 | 58% |
-| 6 | 170 | 67% |
-| 7 | 191 | 75% |
-| 8 | 213 | 84% |
+| ------------- | ----- | ----- |
+| 0             | 0     | 0%    |
+| 1             | 30    | 12%   |
+| 2             | 60    | 24%   |
+| 3             | 90    | 35%   |
+| 4             | 120   | 47%   |
+| 5             | 149   | 58%   |
+| 6             | 170   | 67%   |
+| 7             | 191   | 75%   |
+| 8             | 213   | 84%   |
 
 ### 温度触发点（Trips）
 
-| 温度 | 类型 | 该温度点允许的 state |
-| ---: | --- | --- |
-| 45°C | active | 0..1 |
-| 55°C | passive | 2..3 |
-| 65°C | passive | 3..4 |
-| 75°C | passive | 4 |
-| 78°C | passive | 5 |
-| 82°C | passive | 6 |
-| 85°C | passive | 7 |
-| 88°C | passive | 8 |
+| 温度   | 类型      | 该温度点允许的 state |
+| ---- | ------- | ------------- |
+| 45°C | active  | 0..1          |
+| 55°C | passive | 2..3          |
+| 65°C | passive | 3..4          |
+| 75°C | passive | 4             |
+| 78°C | passive | 5             |
+| 82°C | passive | 6             |
+| 85°C | passive | 7             |
+| 88°C | passive | 8             |
 
 所有温度点的滞回（hysteresis）均为 2°C。`step_wise` governor 会根据当前
 温度、温度变化趋势以及 cooling map 允许的范围逐级升降档，并不保证越过
@@ -117,10 +116,10 @@ echo "EC_HWMON=$EC_HWMON"
 
 变量含义：
 
-- `TZ`：CPU thermal zone，用于读取温度以及启停 Linux 自动温控。
-- `CDEV`：`pwm-fan` cooling device，用于读取和设置 cooling state。
-- `PWM_HWMON`：`pwm-fan` hwmon 节点，用于直接读写 0..255 的 PWM 值。
-- `EC_HWMON`：EC hwmon 节点，用于读取实际 RPM 和故障状态；某些系统可能
+* `TZ`：CPU thermal zone，用于读取温度以及启停 Linux 自动温控。
+* `CDEV`：`pwm-fan` cooling device，用于读取和设置 cooling state。
+* `PWM_HWMON`：`pwm-fan` hwmon 节点，用于直接读写 0..255 的 PWM 值。
+* `EC_HWMON`：EC hwmon 节点，用于读取实际 RPM 和故障状态；某些系统可能
   不提供该节点。
 
 ### 2. 状态只读检查
@@ -232,16 +231,16 @@ echo disabled > "$TZ/mode"
 这两条命令分别保存当前档位和停止 Linux 自动调速，避免 Linux 与 `ectool`
 争抢风扇控制权。
 
-| 命令 | 功能 | 注意事项 |
-| --- | --- | --- |
-| `ectool version` | 查看 EC 固件版本和当前运行镜像 | 只读，可用于确认 `ectool` 与 EC 通信正常 |
-| `ectool pwmgetnumfans` | 查询 EC 识别到的风扇数量 | 只读，用于确认风扇通道是否存在 |
-| `ectool pwmgetfanrpm all` | 读取所有风扇的实际 RPM | 只读，设置后应使用该命令确认实际转速 |
-| `ectool pwmsetfanrpm 2000` | 请求 EC 将风扇稳定在 2000 RPM | 属于目标转速闭环控制，实际 RPM 仍需读取确认 |
-| `ectool fanduty 50` | 将风扇固定为 50% 占空比 | 属于开环控制，50% 占空比不等于 50% 转速 |
-| `ectool pwmsetduty 0 32768` | 将 generic PWM channel 0 设置为约 50% | 参数为 16 位值，范围是 0..65535 |
-| `ectool pwmgetduty 0` | 读取 generic PWM channel 0 的 16 位设置 | 读取的是设置值，不是实际 RPM |
-| `ectool autofanctrl` | 恢复 EC 自身的自动风扇控制 | 这不是恢复 Linux DTS 自动温控策略 |
+| 命令                          | 功能                                | 注意事项                        |
+| --------------------------- | --------------------------------- | --------------------------- |
+| `ectool version`            | 查看 EC 固件版本和当前运行镜像                 | 只读，可用于确认 `ectool` 与 EC 通信正常 |
+| `ectool pwmgetnumfans`      | 查询 EC 识别到的风扇数量                    | 只读，用于确认风扇通道是否存在             |
+| `ectool pwmgetfanrpm all`   | 读取所有风扇的实际 RPM                     | 只读，设置后应使用该命令确认实际转速          |
+| `ectool pwmsetfanrpm 2000`  | 请求 EC 将风扇稳定在 2000 RPM             | 属于目标转速闭环控制，实际 RPM 仍需读取确认    |
+| `ectool fanduty 50`         | 将风扇固定为 50% 占空比                    | 属于开环控制，50% 占空比不等于 50% 转速    |
+| `ectool pwmsetduty 0 32768` | 将 generic PWM channel 0 设置为约 50%  | 参数为 16 位值，范围是 0..65535      |
+| `ectool pwmgetduty 0`       | 读取 generic PWM channel 0 的 16 位设置 | 读取的是设置值，不是实际 RPM            |
+| `ectool autofanctrl`        | 恢复 EC 自身的自动风扇控制                   | 这不是恢复 Linux DTS 自动温控策略      |
 
 每次只测试一种写入方式。设置后使用 `ectool pwmgetfanrpm all` 读取实际 RPM，
 并通过 sysfs 的 `fan1_fault` 检查故障状态。
@@ -297,18 +296,18 @@ thermal_cluster0 {
 
 ### DTS 属性修改的含义
 
-| 属性 | 修改效果 | 注意事项 |
-| --- | --- | --- |
-| `pwms = <&cros_ec_pwm 0>` | 选择 EC PWM 控制器的 channel 0 | 改错 channel 可能无法控制风扇，或误控其他 PWM 设备 |
-| `cooling-levels` | 定义 cooling state 到 0..255 PWM 值的映射 | 提高某项会增加该档风量、噪声和功耗；降低则相反 |
-| `#cooling-cells = <2>` | 允许 cooling map 传入最低和最高 state | `pwm-fan` 需要保持为 2 |
-| `temperature` | 设置 trip 的触发温度，单位为毫摄氏度 | 调低会更早加强散热；调高会延后散热并增加温度风险 |
-| `hysteresis` | 设置温度下降到触发点以下多少才退出该 trip，单位为毫摄氏度 | 增大可减少频繁升降档，但风扇也会更晚降档 |
-| `type = "active"` | 表示该 trip 主要通过风扇等主动散热设备处理 | 通常用于较低温度的风扇启动阶段 |
-| `type = "passive"` | 进入 passive thermal 控制阶段 | 会使用 `polling-delay-passive` 指定的轮询周期 |
-| `cooling-device = <&fan0 L U>` | 将该 trip 可使用的风扇档位限制在 state `L..U` | 修改上下界会改变该温度点允许的最低和最高档位 |
-| `polling-delay` | 设置普通状态下的温度检查间隔，单位为毫秒 | 越短响应越快，但轮询更频繁 |
-| `polling-delay-passive` | 设置 passive 状态下的温度检查间隔，单位为毫秒 | 影响高温阶段的响应速度 |
+| 属性                             | 修改效果                               | 注意事项                                |
+| ------------------------------ | ---------------------------------- | ----------------------------------- |
+| `pwms = <&cros_ec_pwm 0>`      | 选择 EC PWM 控制器的 channel 0           | 改错 channel 可能无法控制风扇，或误控其他 PWM 设备    |
+| `cooling-levels`               | 定义 cooling state 到 0..255 PWM 值的映射 | 提高某项会增加该档风量、噪声和功耗；降低则相反             |
+| `#cooling-cells = <2>`         | 允许 cooling map 传入最低和最高 state       | `pwm-fan` 需要保持为 2                   |
+| `temperature`                  | 设置 trip 的触发温度，单位为毫摄氏度              | 调低会更早加强散热；调高会延后散热并增加温度风险            |
+| `hysteresis`                   | 设置温度下降到触发点以下多少才退出该 trip，单位为毫摄氏度    | 增大可减少频繁升降档，但风扇也会更晚降档                |
+| `type = "active"`              | 表示该 trip 主要通过风扇等主动散热设备处理           | 通常用于较低温度的风扇启动阶段                     |
+| `type = "passive"`             | 进入 passive thermal 控制阶段            | 会使用 `polling-delay-passive` 指定的轮询周期 |
+| `cooling-device = <&fan0 L U>` | 将该 trip 可使用的风扇档位限制在 state `L..U`   | 修改上下界会改变该温度点允许的最低和最高档位              |
+| `polling-delay`                | 设置普通状态下的温度检查间隔，单位为毫秒               | 越短响应越快，但轮询更频繁                       |
+| `polling-delay-passive`        | 设置 passive 状态下的温度检查间隔，单位为毫秒        | 影响高温阶段的响应速度                         |
 
 修改 `cooling-levels` 会改变每个档位的实际输出，修改 trip 温度会改变升降档
 时机，修改 cooling map 则会改变各温度区间允许使用的档位。这三部分应一起
@@ -330,15 +329,15 @@ fan-stop-to-start-us = <3000000>; /* 保持 3 秒 */
 
 ## 🛡️ 安全检查清单
 
-- [ ] 手动控制期间持续观察温度、RPM 和 `fan1_fault`，不要长时间无人值守。
-- [ ] sysfs 和 `ectool` 操作的是同一个物理风扇，不要同时发出控制命令。
-- [ ] 修改 DTS 后验证冷启动、热启动、反复升降档、温度滞回、系统挂起/恢复
-      以及关机。
-- [ ] 不使用长时间停止风扇或写 PWM 0 的方式进行常规压力测试。
+* \[ ] 手动控制期间持续观察温度、RPM 和 `fan1_fault`，不要长时间无人值守。
+* \[ ] sysfs 和 `ectool` 操作的是同一个物理风扇，不要同时发出控制命令。
+* \[ ] 修改 DTS 后验证冷启动、热启动、反复升降档、温度滞回、系统挂起/恢复
+  以及关机。
+* \[ ] 不使用长时间停止风扇或写 PWM 0 的方式进行常规压力测试。
 
 ## 源码位置参考
 
-- `arch/riscv/boot/dts/spacemit/k3-pico.dtsi`：风扇档位、trip 和 cooling map。
-- `drivers/hwmon/pwm-fan.c`：处理 cooling state、sysfs、启动 boost 和电源管理。
-- `drivers/pwm/pwm-cros-ec.c`：负责 Linux PWM 到 EC PWM 协议的转换。
-- `drivers/thermal/gov_step_wise.c`：`step_wise` 调档核心逻辑。
+* `arch/riscv/boot/dts/spacemit/k3-pico.dtsi`：风扇档位、trip 和 cooling map。
+* `drivers/hwmon/pwm-fan.c`：处理 cooling state、sysfs、启动 boost 和电源管理。
+* `drivers/pwm/pwm-cros-ec.c`：负责 Linux PWM 到 EC PWM 协议的转换。
+* `drivers/thermal/gov_step_wise.c`：`step_wise` 调档核心逻辑。

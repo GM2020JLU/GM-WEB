@@ -180,7 +180,7 @@ const palette = await getThemePalette();
     place-items: center;
     border-radius: 10px;
     background: var(--paper-ink);
-    color: white;
+    color: var(--paper-bg);
     font-size: 0.72rem;
   }
   .topbar > div a {
@@ -234,10 +234,10 @@ const palette = await getThemePalette();
     color: var(--paper-ink-soft);
   }
   .notice.success {
-    border-color: #82b992;
+    border-color: color-mix(in srgb, var(--paper-accent) 45%, var(--paper-line) 55%);
   }
   .notice.error {
-    border-color: #d28d8d;
+    border-color: color-mix(in srgb, #cb6464 48%, var(--paper-line) 52%);
   }
   .section-title h2 {
     font: 400 2rem var(--font-page-heading);

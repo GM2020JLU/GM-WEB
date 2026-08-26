@@ -1,0 +1,212 @@
+body.studio-with-navigation {
+  --studio-shell-max-width: min(1180px, calc(100% - 32px));
+}
+
+body.studio-with-navigation .studio-topbar-theme {
+  margin-left: auto;
+  margin-right: 12px;
+  padding: 7px 12px;
+  border: 1px solid var(--paper-line-strong);
+  border-radius: 999px;
+  background: var(--paper-bg);
+  color: var(--paper-ink);
+  font: 500 0.74rem/1 var(--font-ui);
+  cursor: pointer;
+}
+
+body.studio-with-navigation .studio-topbar-theme:hover {
+  border-color: color-mix(in srgb, var(--paper-accent) 45%, var(--paper-line-strong) 55%);
+}
+
+body.studio-with-navigation .studio-nav-theme {
+  display: inline-flex;
+  padding: 8px 10px;
+  justify-content: center;
+}
+
+body.studio-with-navigation .topbar,
+body.studio-with-navigation .studio-navigation {
+  background: color-mix(in srgb, var(--paper-bg) 98%, var(--paper-line-strong) 2%);
+}
+
+body.studio-with-navigation .topbar {
+  border-bottom-color: var(--paper-line) !important;
+}
+
+body.studio-with-navigation .topbar > div a,
+body.studio-with-navigation .brand,
+body.studio-with-navigation .topbar .brand strong {
+  color: var(--paper-ink) !important;
+}
+
+body.studio-with-navigation .topbar > div a {
+  color: var(--paper-ink-soft) !important;
+}
+
+body.studio-with-navigation .topbar .brand span {
+  background: var(--paper-ink) !important;
+  color: var(--paper-bg) !important;
+}
+
+body.studio-with-navigation .notice,
+body.studio-with-navigation .deployment,
+body.studio-with-navigation .content-list,
+body.studio-with-navigation .deployment-tracker,
+body.studio-with-navigation .meta-panel,
+body.studio-with-navigation .body-panel,
+body.studio-with-navigation .shell,
+body.studio-with-navigation .module-shell,
+body.studio-with-navigation .settings-shell,
+body.studio-with-navigation .content-shell,
+body.studio-with-navigation .panel {
+  color: var(--paper-ink);
+}
+
+body.studio-with-navigation .notice.success,
+body.studio-with-navigation .status-badge.status-success {
+  background: color-mix(in srgb, var(--paper-accent) 16%, transparent);
+  border-color: color-mix(in srgb, var(--paper-accent) 55%, var(--paper-line-strong) 45%);
+}
+
+body.studio-with-navigation .notice.error,
+body.studio-with-navigation .status-badge.status-error {
+  background: color-mix(in srgb, #b74f4f 14%, transparent);
+  border-color: color-mix(in srgb, #b74f4f 55%, var(--paper-line-strong) 45%);
+}
+
+body.studio-with-navigation .current-status,
+body.studio-with-navigation .row-actions .edit,
+body.studio-with-navigation .primary,
+body.studio-with-navigation .new-menu > summary,
+body.studio-with-navigation .btn,
+body.studio-with-navigation .publish-more > summary {
+  color: var(--paper-bg);
+}
+
+body.studio-with-navigation .publish-bar {
+  backdrop-filter: blur(16px);
+  background: color-mix(in srgb, var(--paper-bg) 86%, transparent);
+  border-top: 1px solid var(--paper-line);
+}
+
+body.studio-with-navigation .deploy-copy small,
+body.studio-with-navigation .history-list small,
+body.studio-with-navigation .auto-link code,
+body.studio-with-navigation .markdown-preview code,
+body.studio-with-navigation .markdown-preview pre,
+body.studio-with-navigation code,
+body.studio-with-navigation pre,
+body.studio-with-navigation dl dt,
+body.studio-with-navigation dl dd {
+  color: var(--paper-ink);
+}
+
+body.studio-with-navigation .markdown-preview code,
+body.studio-with-navigation .markdown-preview pre,
+body.studio-with-navigation code {
+  background: color-mix(in srgb, var(--paper-line) 20%, transparent);
+}
+
+body.studio-with-navigation .deploy-track,
+body.studio-with-navigation .current-status {
+  background: color-mix(in srgb, var(--paper-line-strong) 55%, transparent);
+}
+
+body.studio-with-navigation .deployment-tracker {
+  box-shadow: 0 12px 30px color-mix(in srgb, var(--paper-bg) 72%, transparent);
+}
+
+body.studio-with-navigation .editor-grid > textarea {
+  background: var(--paper-bg) !important;
+  color: var(--paper-ink);
+}
+
+body.studio-with-navigation dialog {
+  border-color: var(--paper-line-strong);
+  background: color-mix(in srgb, var(--paper-bg) 95%, transparent);
+  color: var(--paper-ink);
+  backdrop-filter: blur(6px);
+}
+
+body.studio-with-navigation .editor-header p,
+body.studio-with-navigation .editor-header h1 {
+  color: var(--paper-ink);
+}
+
+body.studio-with-navigation .notice.success {
+  background: color-mix(in srgb, var(--paper-accent) 14%, transparent);
+  border-color: color-mix(in srgb, var(--paper-accent) 60%, var(--paper-line) 40%);
+}
+
+body.studio-with-navigation .notice.error {
+  background: color-mix(in srgb, #cf5c5c 16%, transparent);
+  border-color: color-mix(in srgb, #cf5c5c 58%, var(--paper-line) 42%);
+}
+
+body.studio-with-navigation .notice small,
+body.studio-with-navigation .deployment-tracker small {
+  color: var(--paper-ink-soft);
+}
+
+body.studio-with-navigation .deployment-tracker {
+  border-color: color-mix(in srgb, var(--paper-accent) 30%, var(--paper-line) 70%);
+  background: color-mix(in srgb, var(--paper-bg) 95%, var(--paper-accent) 5%);
+}
+
+body.studio-with-navigation .deployment-tracker[data-phase='ready'] {
+  border-color: color-mix(in srgb, var(--paper-accent) 68%, var(--paper-line) 32%);
+  background: color-mix(in srgb, var(--paper-accent) 12%, transparent);
+}
+
+body.studio-with-navigation .deployment-tracker[data-phase='error'] {
+  border-color: color-mix(in srgb, #d24d4d 63%, var(--paper-line) 37%);
+  background: color-mix(in srgb, #d24d4d 10%, transparent);
+}
+
+body.studio-with-navigation .deploy-steps,
+body.studio-with-navigation .deploy-copy small,
+body.studio-with-navigation .auto-link,
+body.studio-with-navigation .history-list small,
+body.studio-with-navigation label,
+body.studio-with-navigation .content-main small,
+body.studio-with-navigation .content-meta,
+body.studio-with-navigation .meta-note,
+body.studio-with-navigation .meta-help {
+  color: var(--paper-ink-soft);
+}
+
+body.studio-with-navigation .deploy-track,
+body.studio-with-navigation .body-panel > header,
+body.studio-with-navigation .editor-grid > textarea {
+  border-color: var(--paper-line);
+}
+
+body.studio-with-navigation .body-panel,
+body.studio-with-navigation .meta-panel {
+  border-color: var(--paper-line);
+}
+
+body.studio-with-navigation .auto-link code,
+body.studio-with-navigation .markdown-preview pre,
+body.studio-with-navigation .markdown-preview code {
+  background: color-mix(in srgb, var(--paper-line) 16%, transparent);
+}
+
+body.studio-with-navigation .publish-bar,
+body.studio-with-navigation .publish-more > div,
+body.studio-with-navigation .history-list article {
+  border-color: var(--paper-line);
+}
+
+body.studio-with-navigation .current-status {
+  background: color-mix(in srgb, var(--paper-line) 30%, transparent);
+  color: var(--paper-ink-faint);
+}
+
+body.studio-with-navigation .danger {
+  color: color-mix(in srgb, #d24d4d 72%, var(--paper-ink) 28%);
+}
+
+body.studio-with-navigation dialog::backdrop {
+  background: color-mix(in srgb, #0a0e0d 74%, transparent);
+}

@@ -243,7 +243,7 @@ const palette = await getThemePalette();
     place-items: center;
     border-radius: 9px;
     background: var(--paper-ink);
-    color: white;
+    color: var(--paper-bg);
     font-size: 0.7rem;
   }
   .topbar a,
@@ -281,7 +281,7 @@ const palette = await getThemePalette();
     padding: 10px 13px;
     border: 1px solid #dfe6df;
     border-radius: 9px;
-    background: white;
+    background: var(--paper-bg);
     font-size: 0.82rem;
   }
   .notice small {
@@ -293,7 +293,7 @@ const palette = await getThemePalette();
   }
   .notice.error {
     border-color: #d29494;
-    background: #fff6f6;
+    background: color-mix(in srgb, #d24d4d 10%, transparent);
   }
   .deployment-tracker {
     position: relative;
@@ -343,7 +343,7 @@ const palette = await getThemePalette();
     padding: 8px 11px;
     border: 1px solid #73a484;
     border-radius: 8px;
-    background: white;
+    background: var(--paper-bg);
     font-size: 0.8rem;
   }
   .deployment-tracker[data-phase='ready'] {
@@ -352,7 +352,7 @@ const palette = await getThemePalette();
   }
   .deployment-tracker[data-phase='error'] {
     border-color: #cb7777;
-    background: #fff4f4;
+    background: color-mix(in srgb, #d24d4d 10%, transparent);
   }
   form[data-editor-form] {
     display: grid;
@@ -363,7 +363,7 @@ const palette = await getThemePalette();
   .body-panel {
     border: 1px solid #dfe6df;
     border-radius: 13px;
-    background: white;
+    background: var(--paper-bg);
   }
   .meta-panel {
     padding: 18px;
@@ -388,7 +388,7 @@ const palette = await getThemePalette();
   .header-actions a {
     border: 1px solid #cdd8cf;
     border-radius: 8px;
-    background: white;
+    background: var(--paper-bg);
     color: inherit;
     font: inherit;
   }
@@ -465,7 +465,7 @@ const palette = await getThemePalette();
   .primary {
     border-color: var(--paper-accent);
     background: var(--paper-accent);
-    color: white;
+    color: var(--paper-bg);
   }
   .editor-grid {
     display: grid;
@@ -523,7 +523,7 @@ const palette = await getThemePalette();
     padding: 8px 11px;
     border: 1px solid #cdd8cf;
     border-radius: 8px;
-    background: white;
+    background: var(--paper-bg);
     cursor: pointer;
   }
   .publish-more > summary::-webkit-details-marker {
@@ -538,7 +538,7 @@ const palette = await getThemePalette();
     padding: 7px;
     border: 1px solid #d5ddd6;
     border-radius: 10px;
-    background: white;
+    background: var(--paper-bg);
     box-shadow: 0 14px 36px #263d2d26;
   }
   .publish-more button {

@@ -181,7 +181,7 @@ const palette = await getThemePalette();
     place-items: center;
     border-radius: 10px;
     background: var(--paper-ink);
-    color: white;
+    color: var(--paper-bg);
     font-size: 0.7rem;
   }
   .hero {
@@ -292,7 +292,7 @@ const palette = await getThemePalette();
     padding: 30px 20px;
     border: 1px dashed var(--paper-line-strong);
     border-radius: 14px;
-    background: #fbfdfb;
+    background: color-mix(in srgb, var(--paper-bg) 98%, var(--paper-accent) 2%);
     text-align: center;
     cursor: pointer;
   }
@@ -320,7 +320,7 @@ const palette = await getThemePalette();
     place-items: center;
     border: 1px solid var(--paper-line-strong);
     border-radius: 9px;
-    background: white;
+    background: var(--paper-bg);
     color: var(--paper-accent);
     font:
       800 0.7rem/1 ui-monospace,
@@ -345,7 +345,7 @@ const palette = await getThemePalette();
     padding: 11px 12px;
     border: 1px solid var(--paper-line-strong);
     border-radius: 9px;
-    background: white;
+    background: var(--paper-bg);
     color: var(--paper-ink);
     font: inherit;
     resize: vertical;
@@ -383,7 +383,7 @@ const palette = await getThemePalette();
   dl div {
     padding: 12px;
     border-radius: 10px;
-    background: #f3f7f4;
+    background: color-mix(in srgb, var(--paper-bg) 96%, var(--paper-accent) 4%);
   }
   dt {
     color: var(--paper-ink-faint);
@@ -400,10 +400,10 @@ const palette = await getThemePalette();
   .warnings {
     margin-bottom: 16px;
     padding: 14px 16px;
-    border: 1px solid #ead8ad;
+    border: 1px solid color-mix(in srgb, #ead8ad 70%, var(--paper-line) 30%);
     border-radius: 11px;
-    background: #fff8e6;
-    color: #8c611b;
+    background: color-mix(in srgb, #fff8e6 80%, var(--paper-bg) 20%);
+    color: var(--paper-ink-soft);
     font-size: 0.78rem;
   }
   .warnings ul {
@@ -421,7 +421,7 @@ const palette = await getThemePalette();
     justify-content: space-between;
     padding: 12px 14px;
     border-bottom: 1px solid var(--paper-line);
-    background: #f6f9f7;
+    background: color-mix(in srgb, var(--paper-bg) 96%, var(--paper-accent) 4%);
     font-size: 0.78rem;
   }
   article header small {
@@ -433,7 +433,7 @@ const palette = await getThemePalette();
     min-height: 300px;
     margin: 0;
     padding: 18px;
-    color: #33493a;
+    color: var(--paper-ink);
     font-size: 0.88rem;
     line-height: 1.8;
   }
@@ -479,14 +479,14 @@ const palette = await getThemePalette();
   :global(.markdown-preview code) {
     padding: 0.12em 0.35em;
     border-radius: 4px;
-    background: #edf3ee;
+    background: color-mix(in srgb, var(--paper-bg) 93%, var(--paper-accent) 7%);
     font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
   }
   :global(.markdown-preview pre) {
     overflow: auto;
     padding: 14px;
     border-radius: 9px;
-    background: #edf3ee;
+    background: color-mix(in srgb, var(--paper-bg) 93%, var(--paper-accent) 7%);
   }
   :global(.markdown-preview pre code) {
     padding: 0;
@@ -526,7 +526,7 @@ const palette = await getThemePalette();
     color: var(--paper-ink-soft);
   }
   .result.error strong {
-    color: #a23c36;
+    color: #d24d4d;
   }
   .result.success strong {
     color: var(--paper-accent);
@@ -549,7 +549,7 @@ const palette = await getThemePalette();
   }
   button.primary {
     background: var(--paper-accent);
-    color: white;
+    color: var(--paper-bg);
   }
   button:disabled {
     cursor: not-allowed;

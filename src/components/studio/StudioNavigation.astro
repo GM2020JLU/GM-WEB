@@ -69,7 +69,9 @@ const groups = [
     }
   </nav>
   <div class="studio-nav-footer">
-    <a href="/studio/import">导入 Markdown</a><a href="/" target="_blank">查看网站 ↗</a>
+    <a href="/studio/import">导入 Markdown</a>
+    <a href="/" target="_blank">查看网站 ↗</a>
+    <button class="studio-nav-theme" type="button" data-theme-toggle> 切换主题 </button>
   </div>
 </aside>
 
@@ -142,6 +144,22 @@ const groups = [
     margin-top: auto;
     padding-top: 18px;
     border-top: 1px solid var(--paper-line);
+  }
+
+  .studio-nav-footer button {
+    border: 1px solid var(--paper-line-strong);
+    border-radius: 8px;
+    background: var(--paper-bg);
+    color: var(--paper-ink-soft);
+    font: inherit;
+    font-size: 0.72rem;
+    text-align: left;
+    cursor: pointer;
+  }
+
+  .studio-nav-footer button[data-theme-toggle] {
+    border-color: var(--paper-accent);
+    color: var(--paper-accent);
   }
   :global(body.studio-with-navigation) {
     padding-left: 228px;

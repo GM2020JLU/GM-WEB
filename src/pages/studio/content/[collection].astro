@@ -219,7 +219,7 @@ const palette = await getThemePalette();
   article nav .edit {
     border-color: var(--paper-accent);
     background: var(--paper-accent);
-    color: white;
+    color: var(--paper-bg);
   }
   .toolbar {
     padding: 22px 0 12px;
@@ -245,7 +245,7 @@ const palette = await getThemePalette();
     overflow: hidden;
     border: 1px solid var(--paper-line);
     border-radius: 15px;
-    background: color-mix(in srgb, var(--paper-bg) 97%, white 3%);
+    background: color-mix(in srgb, var(--paper-bg) 97%, transparent 3%);
   }
   article {
     padding: 18px 20px;

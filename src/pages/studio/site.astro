@@ -259,7 +259,7 @@ const palette = await getThemePalette();
     border-color: color-mix(in srgb, var(--paper-accent) 48%, var(--paper-line));
   }
   .notice.error {
-    border-color: #bf7474;
+    border-color: color-mix(in srgb, #bf7474 55%, var(--paper-line) 45%);
   }
   form {
     display: grid;
@@ -331,7 +331,7 @@ const palette = await getThemePalette();
     border: 0;
     border-radius: 9px;
     background: var(--paper-accent);
-    color: white;
+    color: var(--paper-bg);
     font: inherit;
     cursor: pointer;
   }

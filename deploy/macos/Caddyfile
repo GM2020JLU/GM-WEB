@@ -17,6 +17,17 @@ http://:8080 {
 	@document not path /_astro/*
 	header @document Cache-Control "public, max-age=0, must-revalidate"
 
-	try_files {path} {path}/ /404.html
-	file_server
+	handle @private {
+		respond 404
+	}
+
+	handle {
+		try_files {path} {path}/ =404
+		file_server
+	}
+
+	handle_errors {
+		rewrite * /404.html
+		file_server
+	}
 }

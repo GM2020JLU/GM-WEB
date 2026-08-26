@@ -210,8 +210,15 @@ const groups = [
       height: 30px;
     }
     nav,
-    .studio-nav-footer {
+    .studio-nav-footer a {
       display: none;
+    }
+    .studio-nav-footer {
+      display: flex;
+      justify-content: flex-end;
+      margin-top: 0;
+      padding-top: 0;
+      border-top: 0;
     }
     :global(body.studio-with-navigation) {
       padding-left: 0;

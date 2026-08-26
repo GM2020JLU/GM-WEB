@@ -1,7 +1,11 @@
 import type { AstroCookies } from 'astro';
 import { startStudioLocalDeployment } from './studio-local-deployment';
 
-const studioProxyHosts = new Set(['goumin-mac.tailfc8e48.ts.net', 'studio.goumin.work']);
+const studioProxyHosts = new Set([
+  'goumin-mac.tailfc8e48.ts.net',
+  'mac-preview.goumin.work',
+  'studio.goumin.work',
+]);
 const requestedStorage = import.meta.env.PUBLIC_KEYSTATIC_STORAGE_KIND;
 export const studioUsesGitHub =
   requestedStorage === 'github' || (requestedStorage !== 'local' && import.meta.env.PROD);

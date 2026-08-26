@@ -33,6 +33,17 @@ describe('Studio 请求来源校验', () => {
         internalUrl,
       ),
     ).toBe(true);
+    expect(
+      verifyStudioOrigin(
+        new Request(internalUrl, {
+          headers: {
+            Host: 'mac-preview.goumin.work',
+            Origin: 'https://mac-preview.goumin.work',
+          },
+        }),
+        internalUrl,
+      ),
+    ).toBe(true);
   });
 
   test('拒绝与代理转发地址不一致的来源', () => {

@@ -85,7 +85,11 @@ export default defineConfig({
   vite: {
     plugins: [tailwindcss()],
     server: {
-      allowedHosts: ['goumin-mac.tailfc8e48.ts.net', 'studio.goumin.work'],
+      allowedHosts: [
+        'goumin-mac.tailfc8e48.ts.net',
+        'mac-preview.goumin.work',
+        'studio.goumin.work',
+      ],
     },
     resolve: {
       alias: {

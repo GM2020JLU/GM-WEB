@@ -3,13 +3,14 @@ interface Intro {
   title: string;
   name: string;
   body: string[];
+  focus?: string[];
 }
 
 interface Quote {
   text: string[];
 }
 
-const { intro, quote } = Astro.props as { intro: Intro; quote?: Quote };
+const { intro, quote, email } = Astro.props as { intro: Intro; quote?: Quote; email: string };
 ---
 
 <article class="glass-card intro-card">
@@ -34,6 +35,19 @@ const { intro, quote } = Astro.props as { intro: Intro; quote?: Quote };
       )
     }
     {intro.body.map((paragraph) => <p>{paragraph}</p>)}
+    {
+      intro.focus && intro.focus.length > 0 && (
+        <ul class="focus-list" aria-label="关注领域">
+          {intro.focus.map((item) => (
+            <li>{item}</li>
+          ))}
+        </ul>
+      )
+    }
+    <nav class="intro-actions" aria-label="进一步了解">
+      <a class="primary" href="/projects">查看项目案例</a>
+      <a href={`mailto:${email}`}>邮件交流</a>
+    </nav>
   </div>
 </article>
 
@@ -121,6 +135,52 @@ const { intro, quote } = Astro.props as { intro: Intro; quote?: Quote };
 
   p:last-child {
     margin-bottom: 0;
+  }
+
+  .focus-list {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin: 18px 0 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  .focus-list li {
+    padding: 5px 9px;
+    border: 1px solid var(--paper-line);
+    border-radius: 999px;
+    color: var(--paper-ink-soft);
+    font-size: 0.76rem;
+  }
+
+  .intro-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    margin-top: 24px;
+  }
+
+  .intro-actions a {
+    padding: 9px 13px;
+    border: 1px solid var(--paper-line-strong);
+    border-radius: 9px;
+    color: var(--paper-ink);
+    font-size: 0.82rem;
+    text-decoration: none;
+  }
+
+  .intro-actions .primary {
+    border-color: var(--paper-accent);
+    background: var(--paper-accent);
+    color: white;
+  }
+
+  .intro-actions a:hover,
+  .intro-actions a:focus-visible {
+    border-color: var(--paper-accent);
+    outline: none;
+    box-shadow: 0 0 0 3px color-mix(in srgb, var(--paper-accent) 18%, transparent);
   }
 
   @media (max-width: 640px) {

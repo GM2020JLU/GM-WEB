@@ -1,0 +1,172 @@
+---
+interface ProjectLink {
+  label: string;
+  href: string;
+  kind?: string;
+}
+
+interface Props {
+  role?: string;
+  period?: string;
+  highlights?: string[];
+  links?: ProjectLink[];
+  technologies?: string[];
+}
+
+const { role, period, highlights = [], links = [], technologies = [] } = Astro.props;
+const hasOverview = role || period || highlights.length > 0 || links.length > 0;
+---
+
+{
+  hasOverview && (
+    <aside class="project-evidence" aria-labelledby="project-evidence-title">
+      <div class="evidence-heading">
+        <p>CASE OVERVIEW</p>
+        <h2 id="project-evidence-title">项目概览</h2>
+      </div>
+      <dl>
+        {role && (
+          <div>
+            <dt>我的角色</dt>
+            <dd>{role}</dd>
+          </div>
+        )}
+        {period && (
+          <div>
+            <dt>项目周期</dt>
+            <dd>{period}</dd>
+          </div>
+        )}
+        {technologies.length > 0 && (
+          <div>
+            <dt>技术与主题</dt>
+            <dd class="tags">
+              {technologies.map((item) => (
+                <span>{item}</span>
+              ))}
+            </dd>
+          </div>
+        )}
+      </dl>
+      {highlights.length > 0 && (
+        <div class="outcomes">
+          <h3>关键成果</h3>
+          <ul>
+            {highlights.map((item) => (
+              <li>{item}</li>
+            ))}
+          </ul>
+        </div>
+      )}
+      {links.length > 0 && (
+        <nav aria-label="项目链接">
+          {links.map((link) => (
+            <a href={link.href} target="_blank" rel="noopener noreferrer">
+              {link.label}
+              <span aria-hidden="true">↗</span>
+            </a>
+          ))}
+        </nav>
+      )}
+    </aside>
+  )
+}
+
+<style>
+  .project-evidence {
+    display: grid;
+    gap: 24px;
+    margin: 0 0 42px;
+    padding: 24px;
+    border: 1px solid var(--paper-line);
+    border-radius: 14px;
+    background: color-mix(in srgb, var(--paper-bg) 94%, var(--paper-accent) 6%);
+  }
+  .evidence-heading p {
+    margin: 0 0 5px;
+    color: var(--paper-accent);
+    font: 700 0.68rem/1.4 var(--font-meta);
+    letter-spacing: 0.14em;
+  }
+  .evidence-heading h2,
+  .outcomes h3 {
+    margin: 0;
+  }
+  .evidence-heading h2 {
+    font-size: 1.35rem;
+  }
+  dl {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 18px;
+    margin: 0;
+  }
+  dl div {
+    display: grid;
+    gap: 6px;
+  }
+  dt {
+    color: var(--paper-ink-faint);
+    font-size: 0.72rem;
+  }
+  dd {
+    margin: 0;
+    color: var(--paper-ink);
+    font-size: 0.88rem;
+    line-height: 1.55;
+  }
+  .tags {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 5px;
+  }
+  .tags span {
+    padding: 2px 7px;
+    border-radius: 99px;
+    background: var(--paper-bg);
+    color: var(--paper-accent);
+    font-size: 0.72rem;
+  }
+  .outcomes h3 {
+    font-size: 0.82rem;
+  }
+  .outcomes ul {
+    display: grid;
+    gap: 8px;
+    margin: 10px 0 0;
+    padding-left: 1.2rem;
+  }
+  .outcomes li {
+    color: var(--paper-ink-soft);
+    line-height: 1.65;
+  }
+  nav {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 9px;
+  }
+  nav a {
+    display: inline-flex;
+    gap: 6px;
+    align-items: center;
+    padding: 7px 10px;
+    border: 1px solid var(--paper-line-strong);
+    border-radius: 8px;
+    color: var(--paper-ink);
+    font-size: 0.78rem;
+    text-decoration: none;
+  }
+  nav a:hover,
+  nav a:focus-visible {
+    border-color: var(--paper-accent);
+    color: var(--paper-accent);
+  }
+  @media (max-width: 640px) {
+    .project-evidence {
+      padding: 18px;
+    }
+    dl {
+      grid-template-columns: 1fr;
+    }
+  }
+</style>

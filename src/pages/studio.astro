@@ -1,8 +1,20 @@
 ---
 import { getCollection } from 'astro:content';
 import BaseHead from '../components/BaseHead.astro';
-import { countWords, estimateReadingMinutes, getPublicationStatus } from '../utils/content-metrics';
+import {
+  countWords,
+  estimateReadingMinutes,
+  getContentHealth,
+  getPublicationStatus,
+} from '../utils/content-metrics';
 import { hasContentFiles } from '../utils/content-source';
+import {
+  getKeystaticCreateUrl,
+  getKeystaticEntryUrl,
+  getKeystaticSingletonUrl,
+} from '../utils/keystatic-routes';
+
+const keystaticContext = import.meta.env.PROD ? { branch: 'main' } : {};
 
 const [blog, projects, vibe, media, about] = await Promise.all([
   getCollection('blog'),
@@ -25,8 +37,25 @@ const items = definitions
     const data = entry.data as Record<string, any>;
     const source = entry.body ?? '';
     const status = getPublicationStatus(data);
+    const healthIssues = getContentHealth({ collection, id: entry.id, data, body: source });
     const date = data.updatedDate ?? data.date ?? data.completedAt;
     const isSingleton = collection === 'about';
+    const contentExtension = collection === 'projects' || isSingleton ? 'mdx' : 'md';
+    const contentPath = isSingleton
+      ? `src/content/about.${contentExtension}`
+      : `src/content/${collection}/${entry.id}.${contentExtension}`;
+    const publicUrl =
+      status !== 'published'
+        ? undefined
+        : collection === 'blog'
+          ? `/blog/${entry.id}`
+          : collection === 'projects'
+            ? entry.id === 'index'
+              ? '/projects'
+              : `/projects/${entry.id}`
+            : collection === 'about'
+              ? '/about'
+              : undefined;
     return {
       id: entry.id,
       title: data.title || '未命名内容',
@@ -37,9 +66,12 @@ const items = definitions
       words: countWords(source),
       minutes: estimateReadingMinutes(source),
       taxonomy: [...(data.categories ?? []), ...(data.series ?? []), ...(data.tags ?? [])],
+      healthIssues,
+      publicUrl,
+      historyUrl: `https://github.com/GM2020JLU/GM-WEB/commits/main/${contentPath}`,
       editorUrl: isSingleton
-        ? '/keystatic/singleton/about'
-        : `/keystatic/collection/${collection}/item/${entry.id}`,
+        ? getKeystaticSingletonUrl('about', keystaticContext)
+        : getKeystaticEntryUrl(collection, entry.id, keystaticContext),
       previewUrl: isSingleton ? '/preview/about' : `/preview/${collection}/${entry.id}`,
     };
   })
@@ -55,29 +87,30 @@ const totals = Object.fromEntries(
 const deployedSha = import.meta.env.VERCEL_GIT_COMMIT_SHA || 'local';
 const builtAt = new Date().toISOString();
 const needsAttention = totals.draft + totals.ready;
+const unhealthyTotal = items.filter((item) => item.healthIssues.length > 0).length;
 const quickActions = [
   {
     label: '写博客',
     note: '完整文章与技术笔记',
-    href: '/keystatic/collection/blog/create',
+    href: getKeystaticCreateUrl('blog', keystaticContext),
     icon: '文',
   },
   {
     label: '记随记',
     note: '短想法、照片与片段',
-    href: '/keystatic/collection/vibe/create',
+    href: getKeystaticCreateUrl('vibe', keystaticContext),
     icon: '记',
   },
   {
     label: '建项目',
     note: '项目背景、过程与结果',
-    href: '/keystatic/collection/projects/create',
+    href: getKeystaticCreateUrl('projects', keystaticContext),
     icon: '项',
   },
   {
     label: '加书影音',
     note: '阅读、电影与音乐记录',
-    href: '/keystatic/collection/media/create',
+    href: getKeystaticCreateUrl('media', keystaticContext),
     icon: '藏',
   },
 ];
@@ -123,7 +156,9 @@ const quickActions = [
               needsAttention > 0 ? `${needsAttention} 条内容需要继续处理` : '内容队列已经清空'
             }</strong
           >
-          <p>{totals.draft} 条草稿 · {totals.ready} 条待发布；待发布内容会接受完整门禁检查。</p>
+          <p>
+            {totals.draft} 条草稿 · {totals.ready} 条待发布 · {unhealthyTotal} 条建议完善；待发布内容会接受完整门禁检查。
+          </p>
         </div>
         <a href="#queue">查看队列</a>
       </section>
@@ -181,6 +216,9 @@ const quickActions = [
         <button type="button" data-filter="all" aria-pressed="true"
           ><strong>{items.length}</strong><span>全部</span></button
         >
+        <button type="button" data-filter="issues" aria-pressed="false"
+          ><strong>{unhealthyTotal}</strong><span>建议完善</span></button
+        >
       </section>
 
       <section class="deployment" data-deployed-sha={deployedSha}>
@@ -222,15 +260,19 @@ const quickActions = [
           <table>
             <thead
               ><tr
-                ><th>内容</th><th>状态</th><th>更新时间</th><th>篇幅</th><th>分类</th><th
-                  ><span class="sr-only">操作</span></th
-                ></tr
+                ><th>内容</th><th>状态</th><th>健康度</th><th>更新时间</th><th>篇幅</th><th>分类</th
+                ><th><span class="sr-only">操作</span></th></tr
               ></thead
             >
             <tbody>
               {
                 items.map((item) => (
-                  <tr data-row data-status={item.status} data-type={item.type}>
+                  <tr
+                    data-row
+                    data-status={item.status}
+                    data-type={item.type}
+                    data-health={item.healthIssues.length > 0 ? 'issues' : 'good'}
+                  >
                     <td data-label="内容">
                       <>
                         <span class="kind">{item.type}</span>
@@ -242,6 +284,22 @@ const quickActions = [
                       <span class:list={['badge', `badge-${item.status}`]}>
                         {statusLabels[item.status]}
                       </span>
+                    </td>
+                    <td data-label="健康度">
+                      {item.healthIssues.length > 0 ? (
+                        <details class="health-details">
+                          <summary class="health health-issues">
+                            {item.healthIssues.length} 项建议
+                          </summary>
+                          <ul>
+                            {item.healthIssues.map((issue) => (
+                              <li>{issue}</li>
+                            ))}
+                          </ul>
+                        </details>
+                      ) : (
+                        <span class="health health-good">完整</span>
+                      )}
                     </td>
                     <td data-label="更新时间">
                       {item.date
@@ -258,8 +316,12 @@ const quickActions = [
                       <div class="row-actions">
                         <>
                           <a href={item.previewUrl}>预览</a>
+                          {item.publicUrl && <a href={item.publicUrl}>线上</a>}
                           <a class="edit" href={item.editorUrl}>
                             编辑
+                          </a>
+                          <a href={item.historyUrl} target="_blank" rel="noopener noreferrer">
+                            历史<span class="sr-only">（新窗口打开）</span>
                           </a>
                         </>
                       </div>
@@ -293,7 +355,12 @@ const quickActions = [
         for (const row of rows) {
           if (!(row instanceof HTMLElement)) continue;
           const show = matchesContentFilters(
-            { status: row.dataset.status, type: row.dataset.type, text: row.textContent ?? '' },
+            {
+              status: row.dataset.status,
+              type: row.dataset.type,
+              health: row.dataset.health,
+              text: row.textContent ?? '',
+            },
             { status: activeStatus, type: activeType, query },
           );
           row.hidden = !show;
@@ -601,7 +668,7 @@ const quickActions = [
   }
   .summary {
     display: grid;
-    grid-template-columns: repeat(4, 1fr);
+    grid-template-columns: repeat(5, 1fr);
     gap: 12px;
     margin: 34px 0 18px;
   }
@@ -735,6 +802,48 @@ const quickActions = [
   .badge-published {
     background: #d7efdd;
     color: #185b2b;
+  }
+  .health {
+    display: inline-block;
+    padding: 4px 8px;
+    border-radius: 99px;
+    font-size: 0.75rem;
+  }
+  .health-good {
+    background: #e8f3eb;
+    color: #28633a;
+  }
+  .health-issues {
+    background: #fff0dc;
+    color: #8a5314;
+    cursor: pointer;
+  }
+  .health-details {
+    position: relative;
+  }
+  .health-details summary {
+    width: max-content;
+    list-style: none;
+  }
+  .health-details summary::-webkit-details-marker {
+    display: none;
+  }
+  .health-details ul {
+    position: absolute;
+    z-index: 3;
+    top: calc(100% + 7px);
+    left: 0;
+    width: max-content;
+    max-width: 260px;
+    margin: 0;
+    padding: 10px 12px 10px 28px;
+    border: 1px solid var(--paper-line-strong);
+    border-radius: 9px;
+    background: var(--paper-bg);
+    color: var(--paper-ink-soft);
+    box-shadow: var(--paper-shadow);
+    font-size: 0.76rem;
+    line-height: 1.65;
   }
   .taxonomy {
     display: block;

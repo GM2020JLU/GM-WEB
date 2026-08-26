@@ -255,6 +255,19 @@ const projects = collection({
       label: '图标颜色',
       description: '支持颜色名、#RRGGBB 或 var(--css-variable)。',
     }),
+    role: fields.text({
+      label: '我的角色',
+      description: '说明你在项目中具体负责什么，例如“独立设计与开发”。',
+    }),
+    period: fields.text({
+      label: '项目周期',
+      description: '例如“2026.08—至今”或“3 周”。',
+    }),
+    highlights: fields.array(fields.text({ label: '成果' }), {
+      label: '关键成果',
+      description: '用可验证的结果说明项目价值，建议填写 2—4 项。',
+      itemLabel: ({ value }) => value || '项目成果',
+    }),
     authors: fields.array(
       fields.object(
         {

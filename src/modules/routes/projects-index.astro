@@ -110,6 +110,12 @@ function withBase(href: string) {
                 </h2>
               </div>
               <p>{project.data.description}</p>
+              {project.data.highlights[0] && (
+                <p class="project-highlight">
+                  <strong>成果</strong>
+                  <span>{project.data.highlights[0]}</span>
+                </p>
+              )}
               <footer class="project-card-footer">
                 <span class="project-meta">
                   <FormattedDate date={project.data.date} />
@@ -247,6 +253,22 @@ function withBase(href: string) {
     overflow: hidden;
     -webkit-box-orient: vertical;
     -webkit-line-clamp: 3;
+  }
+
+  .project-card .project-highlight {
+    display: grid;
+    grid-template-columns: auto 1fr;
+    gap: 8px;
+    align-items: start;
+    margin-top: 4px;
+    padding-top: 11px;
+    border-top: 1px dashed var(--paper-line);
+    font-size: 0.78rem;
+  }
+
+  .project-highlight strong {
+    color: var(--paper-accent);
+    font-size: 0.7rem;
   }
 
   .project-card-footer,

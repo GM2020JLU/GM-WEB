@@ -1,6 +1,7 @@
 ---
 import { getCollection, render } from 'astro:content';
 import BlogArticle from '../../layouts/BlogArticle.astro';
+import ProjectEvidence from '../../components/projects/ProjectEvidence.astro';
 
 export async function getStaticPaths() {
   const projects = await getCollection('projects', ({ id, data }) => id !== 'index' && !data.draft);
@@ -20,5 +21,12 @@ const { Content, headings } = await render(project);
   headings={headings}
   sidebar={{ enable: false, ...project.data.sidebar }}
 >
+  <ProjectEvidence
+    role={project.data.role}
+    period={project.data.period}
+    highlights={project.data.highlights}
+    links={project.data.links}
+    technologies={project.data.tags}
+  />
   <Content />
 </BlogArticle>

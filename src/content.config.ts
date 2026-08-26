@@ -434,6 +434,7 @@ const siteConfig = defineCollection({
         title: z.string(),
         name: z.string(),
         body: z.array(z.string()).min(1),
+        focus: z.array(z.string()).optional().default([]),
       }),
       latest: z
         .object({
@@ -529,6 +530,9 @@ const projects = defineCollection({
           )
           .optional()
           .default([]),
+        role: z.string().optional().default(''),
+        period: z.string().optional().default(''),
+        highlights: z.array(z.string()).optional().default([]),
       })
       .transform(normalizePublicationState),
 });

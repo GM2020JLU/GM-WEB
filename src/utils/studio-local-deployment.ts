@@ -33,7 +33,7 @@ export async function startStudioLocalDeployment(reason: string) {
   });
 
   const worker = resolve(process.cwd(), 'scripts/local-deploy.ts');
-  const child = spawn(process.execPath, [worker, targetSha, reason], {
+  const child = spawn(process.env.STUDIO_BUN_PATH || 'bun', [worker, targetSha, reason], {
     cwd: process.cwd(),
     detached: true,
     env: process.env,

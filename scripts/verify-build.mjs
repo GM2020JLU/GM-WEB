@@ -53,6 +53,7 @@ const requiredFiles = [
   'blog/index.html',
   'projects/index.html',
   'projects/personal-site/index.html',
+  'media/index.html',
   'vibe/index.html',
   'studio/index.html',
   'studio/import/index.html',
@@ -151,6 +152,15 @@ if (home.includes('keystatic-page') || home.includes('react-dom')) {
   fail('公开首页意外加载了 Keystatic/React 后台资源');
 }
 if (existsSync(join(dist, 'blog/casdcv/index.html'))) fail('草稿文章意外出现在公开路由');
+if (process.env.NAVFOLIO_CONTENT_SOURCE !== 'docs') {
+  for (const demoRoute of [
+    'media/books/to-live/index.html',
+    'media/films/the-truman-show/index.html',
+    'media/music/the-dark-side-of-the-moon/index.html',
+  ]) {
+    if (existsSync(join(dist, demoRoute))) fail(`主站混入了 docs 示例内容：${demoRoute}`);
+  }
+}
 
 const studio = readFileSync(join(dist, 'studio/index.html'), 'utf8');
 for (const marker of [

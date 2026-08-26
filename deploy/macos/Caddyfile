@@ -15,7 +15,10 @@ http://:8080 {
 	header @immutable Cache-Control "public, max-age=31536000, immutable"
 
 	@document not path /_astro/*
-	header @document Cache-Control "public, max-age=0, must-revalidate"
+	header @document {
+		Cache-Control "public, max-age=0, must-revalidate"
+		CDN-Cache-Control "no-store"
+	}
 
 	handle @private {
 		respond 404
@@ -30,4 +33,15 @@ http://:8080 {
 		rewrite * /404.html
 		file_server
 	}
+}
+
+http://:8081 {
+	bind 127.0.0.1
+	encode zstd gzip
+	header Cache-Control "private, no-store"
+
+	@keystatic path /keystatic /keystatic/* /api/keystatic /api/keystatic/*
+	respond @keystatic 404
+
+	reverse_proxy 127.0.0.1:4321
 }

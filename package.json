@@ -9,7 +9,7 @@
   "scripts": {
     "dev": "astro dev",
     "fonts:ui": "bun scripts/fonts/subset-ui-font.ts",
-    "build": "bun run verify:content && bun run verify:keystatic && bun run fonts:ui && astro build && bun run localize:dist && bun run prune:dist && bun scripts/build-search.mjs && bun scripts/sync-vercel-output.mjs",
+    "build": "node scripts/reset-astro-content-cache.mjs && bun run verify:content && bun run verify:keystatic && bun run fonts:ui && astro build && bun run localize:dist && bun run prune:dist && bun scripts/build-search.mjs && bun scripts/sync-vercel-output.mjs",
     "localize:dist": "node scripts/localize-build.mjs",
     "prune:dist": "node scripts/prune-build-assets.mjs",
     "verify:build": "node scripts/verify-build.mjs",

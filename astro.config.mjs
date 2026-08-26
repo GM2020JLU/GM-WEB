@@ -44,6 +44,7 @@ const normalizeSiteUrl = (value) => {
 const isGitHubActions = process.env.GITHUB_ACTIONS === 'true';
 const customSite = process.env.SITE_URL;
 const customBase = process.env.SITE_BASE;
+const contentSource = process.env.NAVFOLIO_CONTENT_SOURCE === 'docs' ? 'docs' : 'site';
 const repositoryOwner = process.env.GITHUB_REPOSITORY_OWNER;
 const repositoryName = process.env.GITHUB_REPOSITORY?.split('/')[1];
 const isProjectPage =
@@ -69,8 +70,12 @@ const resolvedBase =
 export default defineConfig({
   site: resolvedSite,
   base: resolvedBase,
+  cacheDir: process.env.ASTRO_CACHE_DIR || `./node_modules/.astro-${contentSource}`,
   output: 'static',
   adapter: vercel(),
+  security: {
+    checkOrigin: process.env.PUBLIC_KEYSTATIC_STORAGE_KIND !== 'local',
+  },
   markdown: {
     remarkPlugins: astroPluginConfig.remarkPlugins,
     rehypePlugins: astroPluginConfig.rehypePlugins,

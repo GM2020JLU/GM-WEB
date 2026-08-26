@@ -1,6 +1,6 @@
 import type { APIRoute } from 'astro';
-import { writeFile } from 'node:fs/promises';
-import { resolve } from 'node:path';
+import { mkdir, writeFile } from 'node:fs/promises';
+import { dirname, resolve } from 'node:path';
 import { ZodError } from 'zod';
 import {
   diagnoseGitHubMarkdownAccess,
@@ -13,6 +13,7 @@ import {
 } from '../../../utils/markdown-import-github';
 import { createImportedMarkdown } from '../../../utils/markdown-import';
 import { markdownImportRequestSchema } from '../../../utils/markdown-import-schema';
+import { verifyStudioOrigin } from '../../../utils/studio-api';
 
 export const prerender = false;
 
@@ -36,9 +37,7 @@ function githubStatus(error: unknown) {
 }
 
 export const POST: APIRoute = async ({ request, cookies, url }) => {
-  const origin = request.headers.get('origin');
-  if (origin && origin !== url.origin) return json({ error: '请求来源不合法。' }, 403);
-  if (import.meta.env.PROD && !origin) return json({ error: '请求缺少来源信息。' }, 403);
+  if (!verifyStudioOrigin(request, url)) return json({ error: '请求来源不合法。' }, 403);
 
   const contentLength = Number(request.headers.get('content-length') || 0);
   if (contentLength > 2_200_000) return json({ error: '导入请求过大。' }, 413);
@@ -63,6 +62,7 @@ export const POST: APIRoute = async ({ request, cookies, url }) => {
       await createGitHubMarkdownFile({ token, path: imported.path, content: imported.content });
     } else {
       const target = resolve(process.cwd(), imported.path);
+      await mkdir(dirname(target), { recursive: true });
       await writeFile(target, imported.content, { encoding: 'utf8', flag: 'wx' });
     }
 

@@ -28,6 +28,8 @@
     <string>https://goumin.work</string>
     <key>STUDIO_RUNTIME_DIR</key>
     <string>/Users/goumin/Services/goumin-work/runtime</string>
+    <key>STUDIO_BUN_PATH</key>
+    <string>/Users/goumin/.bun/bin/bun</string>
   </dict>
   <key>RunAtLoad</key>
   <true/>

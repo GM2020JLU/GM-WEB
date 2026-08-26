@@ -26,6 +26,8 @@ const releases = resolve(runtime, 'releases');
 const stateFile = resolve(deployments, `${targetSha}.json`);
 const logFile = resolve(deployments, `${targetSha}.log`);
 const lock = resolve(runtime, 'deployment.lock');
+const astroBuildCache = resolve(runtime, 'astro-build-cache');
+const bunExecutable = process.env.STUDIO_BUN_PATH || 'bun';
 
 function ensureInsideRuntime(path: string) {
   const pathFromRuntime = relative(runtime, path);
@@ -69,6 +71,7 @@ async function run(command: string, args: string[]) {
       env: {
         ...process.env,
         PATH: `${resolve(root, '.venv/bin')}:${process.env.PATH || ''}`,
+        ASTRO_CACHE_DIR: astroBuildCache,
         PUBLIC_KEYSTATIC_STORAGE_KIND: 'local',
         PUBLIC_STUDIO_DEPLOYMENT_MODE: 'local',
         SITE_URL: 'https://goumin.work',
@@ -139,8 +142,10 @@ try {
   ownsLock = await acquireLock();
   await update('building');
   await appendLog(`本地发布：${reason}\n`);
-  await run(process.execPath, ['run', 'build']);
-  await run(process.execPath, ['run', 'verify:build']);
+  ensureInsideRuntime(astroBuildCache);
+  await rm(resolve(astroBuildCache, 'data-store.json'), { force: true });
+  await run(bunExecutable, ['run', 'build']);
+  await run(bunExecutable, ['run', 'verify:build']);
   await publishRelease();
   await update('ready');
 } catch (error) {

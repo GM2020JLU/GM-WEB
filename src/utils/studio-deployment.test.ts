@@ -28,7 +28,7 @@ describe('Studio 发布进度', () => {
     ).toContain('Mac');
     expect(
       deploymentCopy({ phase: 'building', provider: 'local', targetSha: 'a'.repeat(40) }).detail,
-    ).toContain('10—30 秒');
+    ).toContain('45—90 秒');
   });
 
   test('只恢复具有合法提交 SHA 的待部署记录', () => {

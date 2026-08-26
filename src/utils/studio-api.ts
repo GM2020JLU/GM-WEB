@@ -92,7 +92,10 @@ export function studioApiError(error: unknown) {
     typeof error === 'object' && error && 'status' in error && typeof error.status === 'number'
       ? error.status
       : 500;
-  if (status === 404) return studioJson({ error: '内容不存在或尚未完成部署。' }, 404);
+  const code = typeof error === 'object' && error && 'code' in error ? error.code : undefined;
+  if (status === 404 || code === 'ENOENT') {
+    return studioJson({ error: '内容不存在或尚未完成部署。' }, 404);
+  }
   if (status === 400) {
     return studioJson({ error: error instanceof Error ? error.message : '请求参数不合法。' }, 400);
   }

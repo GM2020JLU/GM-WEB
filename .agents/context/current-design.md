@@ -114,12 +114,16 @@ navigation、scaffold 和 i18n contribution 消失。
 - 公开页仍静态预渲染；Vercel adapter 为回退部署中的 Keystatic 和 Studio 动态编辑/API
   路由打包 Node.js function。构建后处理会同步到 `.vercel/output/static`。
 - Mac 主部署由 `scripts/local-deploy.ts` 运行完整生产构建与产物验证，成功后创建不可变 release
-  并原子切换 `runtime/current`；失败时继续提供上一版本。Caddy 只在 loopback 提供公开静态
-  产物并拒绝 Studio/API/Keystatic/preview，Cloudflare Tunnel 是唯一公网源站入口。
-- Studio 在 Mac 上使用 Keystatic local storage 和 Astro 本地服务，通过受限的 Tailscale
-  备用入口访问；面向日常使用的 `studio.goumin.work` 只有在 Cloudflare Access 完成邮箱
-  身份保护后才接入 Tunnel。launchd 守护 Caddy、Tunnel 和 Studio，并复用 Mac 已运行的
-  系统防休眠服务。Vercel 保留为回退源站。
+  并原子切换 `runtime/current`；失败时继续提供上一版本。主站、docs 和 Mac worker 使用隔离
+  的 Astro build cache，每次构建重建内容索引但保留图片优化缓存，避免删除残留和内容源串库。
+  Caddy 只在 loopback 提供公开静态产物并拒绝 Studio/API/Keystatic/preview，Cloudflare Tunnel
+  是唯一公网源站入口。
+- Studio 在 Mac 上使用 Keystatic local storage 和 Astro 本地服务。Tailscale 备用入口与
+  未来的 Cloudflare Access 日常入口都先经过 Caddy 私有网关；网关封锁 Keystatic 应急路由，
+  只把 Studio 工作流交给 Astro。Mac local 模式由所有 `/api/studio` 写接口执行代理感知的
+  来源校验，Vercel/GitHub 模式仍使用 Astro 默认 CSRF。`studio.goumin.work` 只有在
+  Cloudflare Access 完成邮箱身份保护后才接入 Tunnel。launchd 守护 Caddy、Tunnel 和
+  Studio，并复用 Mac 已运行的系统防休眠服务。Vercel 保留为回退源站。
 
 ## 约束
 

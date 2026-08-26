@@ -9,7 +9,7 @@ if (!studioOrigin || !publicOrigin) {
 }
 
 const suffix = Date.now().toString(36);
-const definitions = [
+const allDefinitions = [
   {
     collection: 'blog',
     title: `本地发布回归博客${suffix}`,
@@ -28,6 +28,17 @@ const definitions = [
     creator: '本地发布测试',
   },
 ];
+const requestedCollections = new Set(
+  (
+    process.env.STUDIO_TEST_COLLECTIONS ||
+    allDefinitions.map(({ collection }) => collection).join(',')
+  )
+    .split(',')
+    .map((value) => value.trim())
+    .filter(Boolean),
+);
+const definitions = allDefinitions.filter(({ collection }) => requestedCollections.has(collection));
+if (definitions.length === 0) throw new Error('没有可执行的 Studio 测试模块。');
 const created = [];
 
 async function request(path, init = {}) {
@@ -36,7 +47,13 @@ async function request(path, init = {}) {
     headers: { Origin: studioOrigin, ...init.headers },
     signal: AbortSignal.timeout(20_000),
   });
-  const body = await response.json();
+  const text = await response.text();
+  let body;
+  try {
+    body = JSON.parse(text);
+  } catch {
+    throw new Error(`${path} (${response.status}): 响应不是 JSON。`);
+  }
   if (!response.ok) throw new Error(`${path} (${response.status}): ${body?.error ?? 'unknown'}`);
   return body;
 }
@@ -69,9 +86,11 @@ async function waitForDeployment(targetSha) {
 async function waitForPublic(publicUrl, title, visible) {
   const target = new URL(publicUrl, publicOrigin);
   target.hash = '';
-  for (let attempt = 0; attempt < 30; attempt++) {
+  for (let attempt = 0; attempt < 60; attempt++) {
+    target.searchParams.set('_studio_test', `${Date.now()}-${attempt}`);
     const response = await fetch(target, {
       cache: 'no-store',
+      headers: { 'Cache-Control': 'no-cache' },
       signal: AbortSignal.timeout(20_000),
     });
     const body = await response.text();
@@ -121,9 +140,9 @@ try {
 
     const removed = await request(endpoint, { method: 'DELETE' });
     assert.equal(removed.deploymentPending, true);
+    created.pop();
     await waitForDeployment(removed.commitSha);
     await waitForPublic(published.publicUrl, definition.title, false);
-    created.pop();
     console.log(`${definition.collection}: 导入、编辑、发布、上线、删除、下线均通过。`);
   }
 } finally {

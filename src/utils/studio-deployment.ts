@@ -57,7 +57,7 @@ export function deploymentCopy(state: StudioDeploymentState) {
     return {
       title: '正在构建网站',
       detail: isLocal
-        ? 'Mac 正在检查内容并生成页面，通常需要约 10—30 秒。'
+        ? 'Mac 正在检查内容并生成页面，通常需要约 45—90 秒。'
         : 'Vercel 正在生成页面，通常需要约 30—90 秒。',
       progress: 68,
     };

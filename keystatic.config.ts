@@ -105,6 +105,20 @@ function chinaDateTime(label: string, description?: string): BasicFormField<stri
   };
 }
 
+function optionalChinaDateTime(label: string, description?: string): BasicFormField<string> {
+  const field = fields.datetime({ label, description });
+  const parse = (value: FormFieldStoredValue) =>
+    typeof value === 'string' ? value.slice(0, 16) : '';
+  return {
+    ...field,
+    defaultValue: () => '',
+    parse,
+    serialize: (value) => ({ value: value ? `${value}:00+08:00` : undefined }),
+    validate: (value) => value ?? '',
+    reader: { parse: (value) => (typeof value === 'string' ? value : '') },
+  };
+}
+
 function stableSlug(title: string) {
   return slugify(
     pinyin(title, {
@@ -188,6 +202,7 @@ const commonArticleFields = (extension: 'md' | 'mdx') => ({
   date: chinaDateTime('发布时间', '用于公开页面排序和展示，保存时自动写入东八区。'),
   updatedDate: autoUpdatedDate(),
   publicationStatus,
+  scheduledAt: optionalChinaDateTime('定时发布时间', '仅待发布内容使用。'),
   draft: fields.ignored(),
   sticky: fields.ignored(),
   heroImage: fields.image({
@@ -347,6 +362,7 @@ export default config({
         date: chinaDateTime('发布时间', '保存时自动写入东八区。'),
         updatedDate: autoUpdatedDate(),
         publicationStatus,
+        scheduledAt: optionalChinaDateTime('定时发布时间', '仅待发布内容使用。'),
         draft: fields.ignored(),
         type: fields.select({
           label: '类型',
@@ -406,6 +422,7 @@ export default config({
         title: slugTitle(),
         creator: fields.text({ label: '创作者', validation: { isRequired: true } }),
         publicationStatus,
+        scheduledAt: optionalChinaDateTime('定时发布时间', '仅待发布内容使用。'),
         draft: fields.ignored(),
         updatedDate: autoUpdatedDate(),
         type: fields.select({

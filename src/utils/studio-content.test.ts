@@ -7,9 +7,22 @@ import {
   studioPublicUrl,
   isScheduledPublicationDue,
   validateStudioDocument,
+  validateStudioTaxonomyReferences,
 } from './studio-content';
 
 describe('Studio 内容模型', () => {
+  test('发布前拒绝未登记的分类、系列和标签', () => {
+    expect(() =>
+      validateStudioTaxonomyReferences(
+        { categories: ['未登记'], tags: ['Astro'] },
+        {
+          categories: new Set(['站点日志']),
+          series: new Set(['个人站重建']),
+          tags: new Set(['Astro']),
+        },
+      ),
+    ).toThrow('categories：未登记');
+  });
   test('为每种内容生成受限路径', () => {
     expect(studioContentPath('blog', 'linux-notes')).toBe('src/content/blog/linux-notes.md');
     expect(studioContentPath('projects', 'board-bringup')).toBe(
@@ -21,7 +34,7 @@ describe('Studio 内容模型', () => {
   });
 
   test('解析与序列化 Markdown frontmatter 并同步发布状态', () => {
-    const source = `---\ntitle: 测试文章\ndescription: 完整摘要\ndate: '2026-08-26T10:00:00+08:00'\npublicationStatus: draft\ndraft: true\n---\n\n# 正文\n`;
+    const source = `---\ntitle: 测试文章\ndescription: 完整摘要\ndate: '2026-08-26T10:00:00+08:00'\nscheduledAt: '2026-08-27T10:00:00+08:00'\npublicationStatus: draft\ndraft: true\n---\n\n# 正文\n`;
     const parsed = parseStudioDocument('blog', 'test-post', source, 'abc');
     expect(parsed.metadata.title).toBe('测试文章');
     expect(parsed.body.trim()).toBe('# 正文');
@@ -37,6 +50,7 @@ describe('Studio 内容模型', () => {
     expect(published).toContain('publicationStatus: published');
     expect(published).toContain('draft: false');
     expect(published).toContain('# 正文');
+    expect(published).not.toContain('scheduledAt');
   });
 
   test('发布前校验摘要和日期，草稿允许逐步补充', () => {

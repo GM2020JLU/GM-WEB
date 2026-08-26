@@ -93,6 +93,8 @@ navigation、scaffold 和 i18n contribution 消失。
 - Keystatic 应急深链接仍由 `src/utils/keystatic-routes.ts` 统一生成；Studio 日常工作流统一
   使用 `/studio/edit/{collection}/{slug}`，不再暴露 Keystatic 的分支路由
 - 发布审计先于 Astro 构建，待发布与已发布内容的结构、分类和资产错误会阻止部署
+- Studio 将分类、系列和标签引用校验前移到单条/批量发布 API；未登记项在写入 GitHub
+  前返回可操作错误。`scheduledAt` 只保留在待发布内容中，正式发布时自动清除
 - 定时发布由 `publish-scheduled.yml` 每 15 分钟检查 `ready + scheduledAt` 内容，到期后
   改为 `published` 并提交，继而触发正常部署和质量门禁
 - docs/demo 内容：`src/docs` submodule，由

@@ -9,6 +9,8 @@ import {
   studioContentPath,
   studioPublicUrl,
   studioWriteSchema,
+  StudioValidationError,
+  validateStudioTaxonomyReferences,
   type StudioPublicationStatus,
 } from '../../../../../utils/studio-content';
 import { generateStudioSlug } from '../../../../../utils/studio-slug';
@@ -20,6 +22,7 @@ import {
 } from '../../../../../utils/studio-api';
 import {
   deleteStudioFile,
+  getStudioTaxonomies,
   readStudioFile,
   writeStudioFile,
 } from '../../../../../utils/studio-storage';
@@ -109,6 +112,9 @@ export const PUT: APIRoute = async ({ params, cookies, request, url }) => {
     const status = payload.action
       ? actionStatus[payload.action]
       : (payload.metadata.publicationStatus as StudioPublicationStatus | undefined);
+    if (status && status !== 'draft' && !isTaxonomyCollection(collection)) {
+      validateStudioTaxonomyReferences(payload.metadata, await getStudioTaxonomies(token));
+    }
     const content = serializeStudioDocument(
       collection,
       slug,
@@ -137,6 +143,9 @@ export const PUT: APIRoute = async ({ params, cookies, request, url }) => {
   } catch (error) {
     if (error instanceof ZodError) {
       return studioJson({ error: error.issues[0]?.message ?? '内容字段校验失败。' }, 400);
+    }
+    if (error instanceof StudioValidationError) {
+      return studioJson({ error: error.message }, 400);
     }
     return studioApiError(error);
   }

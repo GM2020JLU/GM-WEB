@@ -225,7 +225,9 @@ export function setupStudioEditor(document: Document, options: StudioEditorOptio
     };
     if (description.value.trim()) metadata.description = description.value.trim();
     if (date.value) metadata.date = `${date.value}:00+08:00`;
-    if (creator.value.trim()) metadata.creator = creator.value.trim();
+    if (!creator.closest<HTMLElement>('[data-for]')?.hidden && creator.value.trim()) {
+      metadata.creator = creator.value.trim();
+    }
     if (scheduledAt.value) metadata.scheduledAt = `${scheduledAt.value}:00+08:00`;
     if (!contentType.closest<HTMLElement>('[data-for]')?.hidden) metadata.type = contentType.value;
     if (!progress.closest<HTMLElement>('[data-for]')?.hidden) metadata.status = progress.value;

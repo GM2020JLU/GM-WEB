@@ -24,6 +24,13 @@ export interface StudioDocument {
   slug: string;
 }
 
+export class StudioValidationError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = 'StudioValidationError';
+  }
+}
+
 const slugSchema = z
   .string()
   .trim()
@@ -142,7 +149,22 @@ export function validateStudioDocument(
   ) {
     errors.push('待发布或已发布内容必须填写有效日期。');
   }
-  if (errors.length) throw new Error(errors.join(' '));
+  if (errors.length) throw new StudioValidationError(errors.join(' '));
+}
+
+export function validateStudioTaxonomyReferences(
+  metadata: Record<string, unknown>,
+  taxonomies: Record<'categories' | 'series' | 'tags', Set<string>>,
+) {
+  const errors: string[] = [];
+  for (const field of ['categories', 'series', 'tags'] as const) {
+    for (const value of Array.isArray(metadata[field]) ? metadata[field] : []) {
+      if (!taxonomies[field].has(String(value))) errors.push(`${field}：${value}`);
+    }
+  }
+  if (errors.length) {
+    throw new StudioValidationError(`请先在“分类”中登记这些内容组织项：${errors.join('、')}。`);
+  }
 }
 
 export function serializeStudioDocument(
@@ -165,6 +187,7 @@ export function serializeStudioDocument(
       : 'draft');
   const next = cleanMetadata({
     ...metadata,
+    scheduledAt: publicationStatus === 'published' ? undefined : metadata.scheduledAt,
     updatedDate: chinaIsoDateTime(),
     publicationStatus,
     draft: publicationStatus !== 'published',

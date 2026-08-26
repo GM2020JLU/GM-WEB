@@ -5,7 +5,13 @@ import { resolveStudioDeploymentPhase } from './studio-deployment';
 
 const repository = { owner: 'GM2020JLU', repo: 'GM-WEB', branch: 'main' } as const;
 
-type GitHubContent = { content?: string; encoding?: string; sha?: string; type?: string };
+type GitHubContent = {
+  content?: string;
+  encoding?: string;
+  name?: string;
+  sha?: string;
+  type?: string;
+};
 
 export interface StudioStoredFile {
   content: string;
@@ -59,6 +65,35 @@ export async function readStudioFile(path: string, token?: string): Promise<Stud
   });
   const data = response.data as GitHubContent;
   return { path, content: decodeContent(data), sha: data.sha };
+}
+
+export async function getStudioTaxonomies(token?: string) {
+  const collections = ['categories', 'series', 'tags'] as const;
+  const values = await Promise.all(
+    collections.map(async (collection) => {
+      const path = `src/content/taxonomies/${collection}`;
+      if (!token) {
+        const files = await readdir(resolve(process.cwd(), path));
+        return new Set(
+          files.filter((file) => file.endsWith('.yaml')).map((file) => file.slice(0, -5)),
+        );
+      }
+      const response = await github(token).request('GET /repos/{owner}/{repo}/contents/{path}', {
+        ...repository,
+        path,
+        ref: repository.branch,
+        headers: { 'X-GitHub-Api-Version': '2022-11-28' },
+      });
+      return new Set(
+        (response.data as GitHubContent[])
+          .filter((entry) => entry.type === 'file' && entry.name?.endsWith('.yaml'))
+          .map((entry) => entry.name!.slice(0, -5)),
+      );
+    }),
+  );
+  return Object.fromEntries(
+    collections.map((collection, index) => [collection, values[index]]),
+  ) as Record<(typeof collections)[number], Set<string>>;
 }
 
 export async function writeStudioFile(args: {

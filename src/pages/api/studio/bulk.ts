@@ -1,11 +1,13 @@
 import type { APIRoute } from 'astro';
-import { z } from 'zod';
+import { z, ZodError } from 'zod';
 import {
   isStudioCollection,
   isTaxonomyCollection,
   parseStudioDocument,
   serializeStudioDocument,
   studioContentPath,
+  StudioValidationError,
+  validateStudioTaxonomyReferences,
   type StudioPublicationStatus,
 } from '../../../utils/studio-content';
 import {
@@ -14,7 +16,11 @@ import {
   studioJson,
   verifyStudioOrigin,
 } from '../../../utils/studio-api';
-import { readStudioFile, writeStudioFile } from '../../../utils/studio-storage';
+import {
+  getStudioTaxonomies,
+  readStudioFile,
+  writeStudioFile,
+} from '../../../utils/studio-storage';
 
 export const prerender = false;
 
@@ -41,6 +47,7 @@ export const POST: APIRoute = async ({ cookies, request, url }) => {
     const status = statusByAction[payload.action];
     const results: Array<{ collection: string; slug: string }> = [];
     let commitSha: string | undefined;
+    const taxonomies = status === 'draft' ? undefined : await getStudioTaxonomies(token);
     for (const item of payload.items) {
       if (!isStudioCollection(item.collection) || isTaxonomyCollection(item.collection)) {
         throw new Error('批量操作包含不支持的内容类型。');
@@ -48,6 +55,7 @@ export const POST: APIRoute = async ({ cookies, request, url }) => {
       const path = studioContentPath(item.collection, item.slug);
       const file = await readStudioFile(path, token);
       const document = parseStudioDocument(item.collection, item.slug, file.content, file.sha);
+      if (taxonomies) validateStudioTaxonomyReferences(document.metadata, taxonomies);
       const content = serializeStudioDocument(
         item.collection,
         item.slug,
@@ -73,6 +81,12 @@ export const POST: APIRoute = async ({ cookies, request, url }) => {
       commitSha,
     });
   } catch (error) {
+    if (error instanceof ZodError) {
+      return studioJson({ error: error.issues[0]?.message ?? '批量操作字段校验失败。' }, 400);
+    }
+    if (error instanceof StudioValidationError) {
+      return studioJson({ error: error.message }, 400);
+    }
     return studioApiError(error);
   }
 };

@@ -10,12 +10,8 @@ publicationStatus: published
 draft: false
 description: K3 Pico-ITX 默认由 Linux 根据 CPU 温度自动调节风扇，控制链如下：
 date: 2026-08-26T11:40:00+08:00
-creator: csd
-scheduledAt: 2026-08-26T13:44:00+08:00
-tags:
-  - cds
-categories:
-  - csd
+tags: []
+categories: []
 series: []
 updatedDate: 2026-08-26T13:45:16+08:00
 ---

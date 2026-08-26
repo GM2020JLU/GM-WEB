@@ -70,8 +70,11 @@ frontmatter 与正文、校对类型/标题/slug，再创建草稿并进入 Keys
   `publicationStatus`、`draft` 和 `updatedDate` 会被安全的草稿值替换。
 - 线上写入复用 Keystatic 的 GitHub OAuth cookie，并通过 Octokit 调用 GitHub
   Contents API；同名 slug 在预检查或并发写入时都会被拒绝，不会覆盖。
-- 单文件最大 1 MB，只接受 `.md`；预览使用纯文本显示，不执行导入内容中的
-  HTML 或脚本。
+- 单文件最大 1 MB，只接受 `.md`；渲染预览复用 unified、remark-gfm 和
+  rehype-sanitize，危险 URL、HTML 与脚本不会进入预览 DOM。
+- 如果 GitHub 返回 403，导入页会提供 GitHub App 配置入口。确认
+  `gm2020jlu-keystatic` 已安装到账号并选择 `GM-WEB` 仓库；App 本身和当前登录用户都必须
+  具备 Contents 写权限。
 
 线上编辑地址会自动带上 GitHub 分支，例如
 `/keystatic/branch/main/collection/blog/item/example`；本地编辑地址不带分支。不要手工拼接

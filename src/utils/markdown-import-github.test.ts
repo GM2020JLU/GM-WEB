@@ -1,5 +1,9 @@
 import { describe, expect, test } from 'bun:test';
-import { createGitHubMarkdownFile, MarkdownImportConflictError } from './markdown-import-github';
+import {
+  createGitHubMarkdownFile,
+  MarkdownImportConflictError,
+  MarkdownImportPermissionError,
+} from './markdown-import-github';
 
 describe('Markdown GitHub 写入', () => {
   test('只在目标不存在时创建文件', async () => {
@@ -52,6 +56,30 @@ describe('Markdown GitHub 写入', () => {
       throw new Error('预期导入冲突');
     } catch (error) {
       expect(error).toBeInstanceOf(MarkdownImportConflictError);
+    }
+  });
+
+  test('GitHub App 未获仓库权限时返回可操作错误', async () => {
+    const request = async (route: string) => {
+      if (route.startsWith('GET')) throw Object.assign(new Error('Not found'), { status: 404 });
+      throw Object.assign(new Error('Forbidden'), {
+        status: 403,
+        response: { data: { message: 'Resource not accessible by integration' } },
+      });
+    };
+
+    try {
+      await createGitHubMarkdownFile(
+        { token: 'test', path: 'src/content/blog/permission.md', content: '内容' },
+        request,
+      );
+      throw new Error('预期权限错误');
+    } catch (error) {
+      expect(error).toBeInstanceOf(MarkdownImportPermissionError);
+      expect((error as MarkdownImportPermissionError).message).toContain('尚未安装到 GM-WEB');
+      expect((error as MarkdownImportPermissionError).actionUrl).toContain(
+        '/gm2020jlu-keystatic/installations/new',
+      );
     }
   });
 });

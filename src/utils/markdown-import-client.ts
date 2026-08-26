@@ -1,7 +1,10 @@
 import { getKeystaticEntryUrl } from './keystatic-routes';
 import { parseMarkdownImport } from './markdown-import';
+import { renderMarkdownPreview } from './markdown-preview';
 
 type ImportResponse = {
+  actionLabel?: string;
+  actionUrl?: string;
   collection?: string;
   error?: string;
   loginUrl?: string;
@@ -134,7 +137,13 @@ export function setupMarkdownImport(
       previewContent.hidden = false;
       previewFile.textContent = file.name;
       previewSize.textContent = `${parsed.body.length.toLocaleString('zh-CN')} 字符`;
-      bodyPreview.textContent = parsed.body.slice(0, 12000) || '（空正文）';
+      bodyPreview.innerHTML = parsed.body
+        ? renderMarkdownPreview(parsed.body.slice(0, 12000))
+        : '<p>（空正文）</p>';
+      for (const link of bodyPreview.querySelectorAll('a')) {
+        link.target = '_blank';
+        link.rel = 'noopener noreferrer nofollow';
+      }
       warningList.replaceChildren(
         ...parsed.warnings.map((message) => {
           const item = document.createElement('li');
@@ -224,6 +233,14 @@ export function setupMarkdownImport(
           result.append(link);
         } else {
           setResult('导入未完成', payload.error || '请检查字段后重试。', 'error');
+          if (payload.actionUrl) {
+            const link = document.createElement('a');
+            link.href = payload.actionUrl;
+            link.target = '_blank';
+            link.rel = 'noopener';
+            link.textContent = payload.actionLabel || '前往处理';
+            result.append(link);
+          }
         }
         return;
       }

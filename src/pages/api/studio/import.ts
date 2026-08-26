@@ -5,6 +5,7 @@ import { ZodError } from 'zod';
 import {
   createGitHubMarkdownFile,
   MarkdownImportConflictError,
+  MarkdownImportPermissionError,
 } from '../../../utils/markdown-import-github';
 import { createImportedMarkdown } from '../../../utils/markdown-import';
 import { markdownImportRequestSchema } from '../../../utils/markdown-import-schema';
@@ -76,9 +77,28 @@ export const POST: APIRoute = async ({ request, cookies, url }) => {
     ) {
       return json({ error: '同名内容已存在，请更换网址别名。' }, 409);
     }
+    if (error instanceof MarkdownImportPermissionError) {
+      return json(
+        {
+          error: error.message,
+          actionLabel: error.actionLabel,
+          actionUrl: error.actionUrl,
+        },
+        403,
+      );
+    }
     const status = githubStatus(error);
     if (status === 401) return json({ error: 'GitHub 登录已过期，请重新登录。' }, 401);
-    if (status === 403) return json({ error: '当前 GitHub 账号没有仓库写入权限。' }, 403);
+    if (status === 403) {
+      return json(
+        {
+          error: '当前 GitHub 账号没有仓库写入权限。',
+          actionLabel: '配置 GitHub App 仓库权限',
+          actionUrl: 'https://github.com/apps/gm2020jlu-keystatic/installations/new',
+        },
+        403,
+      );
+    }
     console.error('Markdown import failed', error);
     return json({ error: error instanceof Error ? error.message : 'Markdown 导入失败。' }, 500);
   }

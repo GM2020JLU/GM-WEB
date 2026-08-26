@@ -1,6 +1,7 @@
 import { describe, expect, test } from 'bun:test';
 import { Window } from 'happy-dom';
 import { readMarkdownFile, setupMarkdownImport } from './markdown-import-client';
+import { renderMarkdownPreview } from './markdown-preview';
 
 const page = `
   <form data-import-form>
@@ -25,7 +26,9 @@ function createPage() {
 
 function markdown(window: Window, name = 'hello-world.md') {
   return new window.File(
-    ['---\ntitle: DOM 测试\ndescription: DOM 摘要\n---\n\n# 正文\n\n内容'],
+    [
+      '---\ntitle: DOM 测试\ndescription: DOM 摘要\n---\n\n# 正文\n\n**加粗内容**与[链接](https://example.com)。',
+    ],
     name,
     { type: 'text/markdown' },
   );
@@ -57,6 +60,8 @@ describe('Markdown 导入浏览器交互', () => {
     expect(element(window, '[data-title]').value).toBe('DOM 测试');
     expect(element(window, '[data-parse-state]').textContent).toBe('解析完成');
     expect(element(window, '[data-preview-content]').hasAttribute('hidden')).toBe(false);
+    expect(element(window, '[data-body-preview]').innerHTML).toContain('<h1>正文</h1>');
+    expect(element(window, '[data-body-preview]').innerHTML).toContain('<strong>加粗内容</strong>');
     expect(element(window, '[data-submit]').disabled).toBe(false);
   });
 
@@ -123,11 +128,43 @@ describe('Markdown 导入浏览器交互', () => {
     expect(element(window, '[data-result]').textContent).toContain('导入成功');
   });
 
+  test('仓库权限不足时显示 GitHub App 配置入口', async () => {
+    const window = createPage();
+    const client = setupMarkdownImport(browserDocument(window), {
+      fetch: async () =>
+        Response.json(
+          {
+            error: 'Keystatic GitHub App 尚未安装到 GM-WEB。',
+            actionLabel: '配置 GitHub App 仓库权限',
+            actionUrl: 'https://github.com/apps/gm2020jlu-keystatic/installations/new',
+          },
+          { status: 403 },
+        ),
+    });
+    await client?.loadFile(markdown(window) as unknown as File);
+    element(window, '[data-import-form]').requestSubmit();
+    await settle();
+
+    expect(element(window, '[data-result]').textContent).toContain('尚未安装到 GM-WEB');
+    expect(element(window, '[data-result] a').href).toContain(
+      '/gm2020jlu-keystatic/installations/new',
+    );
+  });
+
   test('File.text 失败时使用 FileReader 兼容读取', async () => {
     const window = createPage();
     const file = markdown(window);
     Object.defineProperty(file, 'text', { value: async () => Promise.reject(new Error('fail')) });
     const content = await readMarkdownFile(file as unknown as File, browserDocument(window));
     expect(content).toContain('DOM 测试');
+  });
+
+  test('渲染 Markdown 并清理危险链接和标签', () => {
+    const html = renderMarkdownPreview(
+      '# 标题\n\n[危险链接](javascript:alert(1))\n\n<script>alert(1)</script>',
+    );
+    expect(html).toContain('<h1>标题</h1>');
+    expect(html).not.toContain('javascript:');
+    expect(html).not.toContain('<script>');
   });
 });

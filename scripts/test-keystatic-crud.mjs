@@ -54,6 +54,13 @@ date: '2026-08-26T08:30:00+08:00'
 updatedDate: '2026-08-26T08:31:00+08:00'
 publicationStatus: draft
 showHeroImage: false
+role: 独立测试
+period: '2026.08'
+highlights: [完成 CRUD 回归]
+links:
+  - label: 测试链接
+    href: https://example.com
+    kind: website
 tags: [质量验证]
 categories: []
 series: []
@@ -162,7 +169,10 @@ try {
   assert.equal(blog.heroImage, `@assets/images/content/${slug}/heroImage.png`);
   assert((await blog.body()).includes('第一次保存'));
 
-  assert.equal((await reader.collections.projects.readOrThrow(slug)).title, '全流程测试项目');
+  const project = await reader.collections.projects.readOrThrow(slug);
+  assert.equal(project.title, '全流程测试项目');
+  assert.equal(project.role, '独立测试');
+  assert.deepEqual(project.highlights, ['完成 CRUD 回归']);
   assert.equal((await reader.collections.vibe.readOrThrow(slug)).mood, '专注');
   assert.equal((await reader.collections.media.readOrThrow(slug)).creator, '测试作者');
   assert.equal((await reader.collections.tags.readOrThrow('质量验证')).title, '质量验证');

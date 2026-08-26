@@ -81,6 +81,8 @@ navigation、scaffold 和 i18n contribution 消失。
 - `/studio` 是只读静态运营工作台，提供快捷创建、发布指引、状态汇总和组合筛选；
   `/preview/**` 是同源 iframe 预览壳与真实渲染页；两者均 noindex/no-store，不包含密钥
   或写接口
+- Keystatic 深链接由 `src/utils/keystatic-routes.ts` 统一生成：本地模式直接进入集合，
+  GitHub 模式显式进入 `main` 分支，避免工作台和预览页各自拼接导致客户端 Not Found
 - 发布审计先于 Astro 构建，待发布与已发布内容的结构、分类和资产错误会阻止部署
 - docs/demo 内容：`src/docs` submodule，由
   `NAVFOLIO_CONTENT_SOURCE=docs` 选择

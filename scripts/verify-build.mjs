@@ -119,7 +119,16 @@ for (const file of htmlFiles) {
 }
 
 const home = readFileSync(join(dist, 'index.html'), 'utf8');
-for (const marker of ['Gou Min', '嵌入式系统工程师', '文章', '项目', '随记']) {
+for (const marker of [
+  'Gou Min',
+  '嵌入式系统工程师',
+  '文章',
+  '项目',
+  '随记',
+  'Bootloader',
+  '查看项目案例',
+  '邮件交流',
+]) {
   if (!home.includes(marker)) fail(`首页缺少关键内容：${marker}`);
 }
 if (home.includes('data-navfolio-full-font-warmup')) fail('首页仍在预取完整中文字体');
@@ -143,15 +152,32 @@ for (const marker of [
   '继续编辑',
   'data-deploy-label',
   'data-search',
-  '/keystatic/collection/blog/create',
-  '/keystatic/collection/media/create',
+  '建议完善',
+  '历史<span',
+  '/keystatic/branch/main/collection/blog/create',
+  '/keystatic/branch/main/collection/media/create',
 ]) {
   if (!studio.includes(marker)) fail(`内容工作台缺少：${marker}`);
 }
 if (!studio.includes('noindex,nofollow,noarchive')) fail('内容工作台缺少 noindex');
 
+const project = readFileSync(join(dist, 'projects/personal-site/index.html'), 'utf8');
+for (const marker of ['项目概览', '我的角色', '项目周期', '关键成果', '独立产品设计']) {
+  if (!project.includes(marker)) fail(`项目案例缺少证据内容：${marker}`);
+}
+if (!project.includes('问题与目标') || !project.includes('核心取舍')) {
+  fail('项目案例缺少问题与决策过程');
+}
+
 const preview = readFileSync(join(dist, 'preview/blog/casdcv/index.html'), 'utf8');
-for (const marker of ['页面预览', '桌面', '平板', '手机', '/preview/render/blog/casdcv']) {
+for (const marker of [
+  '页面预览',
+  '桌面',
+  '平板',
+  '手机',
+  '/preview/render/blog/casdcv',
+  '/keystatic/branch/main/collection/blog/item/casdcv',
+]) {
   if (!preview.includes(marker)) fail(`预览工作台缺少：${marker}`);
 }
 

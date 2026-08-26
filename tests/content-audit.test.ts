@@ -3,6 +3,7 @@ import { auditDocuments, parseDocument, publicationStatus } from '../scripts/lib
 import {
   countWords,
   estimateReadingMinutes,
+  getContentHealth,
   getPublicationStatus,
   matchesContentFilters,
 } from '../src/utils/content-metrics';
@@ -59,7 +60,12 @@ describe('篇幅估算', () => {
 });
 
 describe('后台内容筛选', () => {
-  const article = { status: 'draft', type: '博客', text: '个人站 Astro 站点日志' };
+  const article = {
+    status: 'draft',
+    type: '博客',
+    text: '个人站 Astro 站点日志',
+    health: 'issues',
+  };
 
   test('组合状态、类型和中文搜索', () => {
     expect(matchesContentFilters(article, { status: 'draft', type: '博客', query: 'astro' })).toBe(
@@ -72,5 +78,44 @@ describe('后台内容筛选', () => {
     expect(matchesContentFilters(article, { status: 'all', type: 'all', query: '站点日志' })).toBe(
       true,
     );
+    expect(matchesContentFilters(article, { status: 'issues', type: 'all', query: '' })).toBe(true);
+  });
+});
+
+describe('内容健康度', () => {
+  test('项目案例给出可执行的完善建议', () => {
+    expect(
+      getContentHealth({
+        collection: 'projects',
+        id: 'demo',
+        body: '项目正文',
+        data: {
+          title: '示例项目',
+          description: '说明',
+          date: '2026-08-26',
+          updatedDate: '2026-08-26',
+          publicationStatus: 'ready',
+          links: [],
+        },
+      }),
+    ).toEqual(expect.arrayContaining(['补充项目链接', '补充项目成果', '说明你的角色']));
+  });
+
+  test('完整文章健康度通过', () => {
+    expect(
+      getContentHealth({
+        collection: 'blog',
+        id: 'complete',
+        body: '完整正文',
+        data: {
+          title: '完整文章',
+          description: '摘要',
+          date: '2026-08-26',
+          updatedDate: '2026-08-26',
+          publicationStatus: 'published',
+          tags: ['Astro'],
+        },
+      }),
+    ).toEqual([]);
   });
 });

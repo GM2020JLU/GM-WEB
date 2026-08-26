@@ -43,6 +43,10 @@ assert.deepEqual(keystaticConfig.ui.navigation['创作与发布'], [
 ]);
 
 const blogSchema = keystaticConfig.collections.blog.schema;
+const projectSchema = keystaticConfig.collections.projects.schema;
+for (const field of ['role', 'period', 'highlights', 'links']) {
+  assert(projectSchema[field], `项目案例缺少证据字段：${field}`);
+}
 assert.equal(blogSchema.heroImage.formKind, 'asset', '博客封面未使用媒体选择字段');
 assert.equal(blogSchema.heroImage.directory, 'src/assets/images/content');
 const serializedImage = blogSchema.heroImage.serialize(

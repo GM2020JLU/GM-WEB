@@ -39,7 +39,16 @@ export function studioJson(body: Record<string, unknown>, status = 200) {
 
 export function verifyStudioOrigin(request: Request, url: URL) {
   const origin = request.headers.get('origin');
-  return (!origin && !import.meta.env.PROD) || origin === url.origin;
+  if (!origin && !import.meta.env.PROD) return true;
+  if (origin === url.origin) return true;
+
+  const forwardedHost = request.headers.get('x-forwarded-host')?.split(',')[0]?.trim();
+  const forwardedProto = request.headers.get('x-forwarded-proto')?.split(',')[0]?.trim();
+  return Boolean(
+    forwardedHost &&
+    (forwardedProto === 'http' || forwardedProto === 'https') &&
+    origin === `${forwardedProto}://${forwardedHost}`,
+  );
 }
 
 export function studioToken(cookies: AstroCookies) {

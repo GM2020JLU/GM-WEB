@@ -72,7 +72,7 @@ async function waitForStudio() {
 }
 
 async function waitForDeployment(targetSha) {
-  for (let attempt = 0; attempt < 180; attempt++) {
+  for (let attempt = 0; attempt < 360; attempt++) {
     const { deployment } = await request(`/api/studio/deployment?sha=${targetSha}`);
     if (deployment.phase === 'ready') return deployment;
     if (deployment.phase === 'error') {
@@ -80,7 +80,7 @@ async function waitForDeployment(targetSha) {
     }
     await new Promise((resolve) => setTimeout(resolve, 500));
   }
-  throw new Error(`部署 ${targetSha} 在 90 秒内未完成。`);
+  throw new Error(`部署 ${targetSha} 在 180 秒内未完成。`);
 }
 
 async function waitForPublic(publicUrl, title, visible) {

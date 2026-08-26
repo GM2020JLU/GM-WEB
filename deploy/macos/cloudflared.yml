@@ -1,5 +1,6 @@
 tunnel: f714836f-59c5-4592-9172-7669a7cadfea
 credentials-file: /Users/goumin/.cloudflared/f714836f-59c5-4592-9172-7669a7cadfea.json
+protocol: http2
 
 ingress:
   - hostname: studio.goumin.work

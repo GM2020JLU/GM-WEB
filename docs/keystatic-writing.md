@@ -1,7 +1,8 @@
-# Keystatic 中文写作后台
+# Studio 中文内容后台
 
-本站不自建 CMS。写作后台复用 Keystatic 的开源编辑器、官方 Astro 集成和
-GitHub 存储模式；公开页面仍由 Astro 预渲染为静态 HTML。
+本站的日常后台位于 `/studio`，复用 unified、YAML、Zod、Octokit、Sharp 和
+Keystatic GitHub OAuth 等开源能力；公开页面仍由 Astro 预渲染为静态 HTML。
+`/keystatic` 不再出现在正常工作流中，只作为字段兼容和故障恢复的应急入口。
 
 ## 本地写作
 
@@ -9,7 +10,7 @@ GitHub 存储模式；公开页面仍由 Astro 预渲染为静态 HTML。
 bun run dev
 ```
 
-打开 `http://127.0.0.1:4321/keystatic`。本地模式直接写入 `src/content`，不需要
+打开 `http://127.0.0.1:4321/studio`。本地模式直接写入 `src/content`，不需要
 GitHub 登录。
 
 ## 线上写作
@@ -34,9 +35,8 @@ Git：
 - `KEYSTATIC_SECRET`
 - `PUBLIC_KEYSTATIC_GITHUB_APP_SLUG`
 
-配置完成后，先打开 `https://goumin.work/studio`。工作台首页提供四类内容的“新建”和 Markdown 导入
-快捷入口、草稿/待发布提醒、发布流程、搜索和筛选；需要管理全部内容或分类时，再进入
-`https://goumin.work/keystatic`。只有对
+配置完成后，打开 `https://goumin.work/studio`。工作台提供内容新建、Markdown 导入、
+编辑、真实预览、素材、分类、批量操作、版本历史与发布状态。只有对
 `GM2020JLU/GM-WEB` 有写权限的 GitHub 用户才能登录和保存。保存会更新 GitHub
 中的 Markdown/MDX 文件；Vercel 连接该仓库后会自动重新部署。
 
@@ -53,15 +53,19 @@ Git：
 内容类型的组合筛选，并显示更新时间、字数、预计阅读时间和分类。它还会比较当前
 Vercel 构建提交与 GitHub `main` 最新提交；两者一致时显示“最新版本已上线”。
 
-Keystatic 内部按“创作与发布 / 站点页面 / 内容组织”分组。新内容先进入草稿；正文完成
-后切换为待发布并打开预览，检查无误再切换为已发布。工作台和编辑器都使用中文名称，
-但仓库里的文件格式与目录保持不变。
+Studio 编辑器提供源码、分栏和渲染预览视图，支持 `Ctrl/Cmd+S` 保存草稿，并每两秒把
+未提交修改保存到浏览器恢复区。新内容先进入草稿；正文完成后可以设为待发布、直接发布、
+撤回发布，或填写时间后定时发布。仓库里的 Markdown/MDX 格式与目录保持不变。
+
+批量选择可以统一调整多条内容的状态。GitHub 模式下每次保存都会形成版本记录，历史面板
+可以查看最近 30 次修改并非破坏性恢复旧版本。定时任务每 15 分钟检查一次
+`ready + scheduledAt` 内容，到期后自动发布并触发 Vercel。
 
 ## Markdown 导入
 
 `/studio/import` 可导入单个 `.md` 文件，当前支持 Blog、Vibe 和 Media。项目与
 关于页使用 `.mdx`，不在第一版导入范围内。流程为：选择文件、解析 YAML
-frontmatter 与正文、校对类型/标题/slug，再创建草稿并进入 Keystatic 编辑器。
+frontmatter 与正文、校对类型/标题/slug，再创建草稿并进入 Studio 编辑器。
 
 - 语法识别复用 unified 生态的 `mdast-util-from-markdown` 和
   `mdast-util-frontmatter`；YAML 使用 `yaml` 并禁止别名，不使用正则手写 frontmatter
@@ -76,9 +80,8 @@ frontmatter 与正文、校对类型/标题/slug，再创建草稿并进入 Keys
   `gm2020jlu-keystatic` 已安装到账号并选择 `GM-WEB` 仓库；App 本身和当前登录用户都必须
   具备 Contents 写权限。
 
-线上编辑地址会自动带上 GitHub 分支，例如
-`/keystatic/branch/main/collection/blog/item/example`；本地编辑地址不带分支。不要手工拼接
-编辑链接，工作台、新建入口和预览页的“返回编辑”会根据运行环境生成正确地址。
+Studio 编辑地址统一为 `/studio/edit/{collection}/{slug}`，不再区分本地和 GitHub 分支。
+工作台、新建入口、Markdown 导入和预览页的“返回编辑”都使用该地址。
 
 工作台的“建议完善”会检查标题、摘要、正文、更新时间、分类、图片替代文本，以及项目
 案例的角色、成果和外部链接。点击健康度标签可看到具体下一步；这些建议帮助草稿逐步
@@ -86,10 +89,10 @@ frontmatter 与正文、校对类型/标题/slug，再创建草稿并进入 Keys
 
 ## 图片与分类
 
-- 封面、随记图片和书影音封面都使用后台图片选择器，文件统一保存到
-  `src/assets/images/content`。
+- 素材库支持 JPG、PNG、WebP、GIF 和 AVIF 的上传、检索、引用复制和删除，文件统一保存到
+  `src/assets/images/content`；服务端使用 Sharp 校验真实图片格式，单文件最大 5 MB。
 - 封面包含有效信息时填写“封面图替代文本”；发布检查也会检查 Markdown 图片的 alt。
-- 标签、分类和系列先在“分类管理”中建立，再在文章中选择，避免同义词和错别字形成
+- 标签、分类和系列先在“内容组织”中建立，再在文章中填写，避免同义词和错别字形成
   重复入口。
 - 每次后台保存会自动刷新 `updatedDate`；发布时间使用可视化日期时间控件，并统一保存
   为 `+08:00`。
@@ -98,8 +101,8 @@ frontmatter 与正文、校对类型/标题/slug，再创建草稿并进入 Keys
 
 - 博客和随记继续使用 `.md`，项目和关于页继续使用 `.mdx`，没有切换解析器。
 - 保留 UTF-8、完整 ISO 8601 时区、远程图片 URL 和 Astro 本地资源路径。
-- 富文本保存时可能统一 Markdown 源码风格（例如把列表符号 `-` 改成 `*`），
-  但回归测试会阻止标题、段落、列表、链接或代码块结构发生变化。
+- Studio 采用源码优先编辑，渲染预览复用 unified 和 rehype-sanitize，不会在保存时改写
+  正文 Markdown 风格。
 - Keystatic MDX 不支持文章内的 `import`/`export` 和原始 HTML/JSX 标签。构建前兼容
   测试会在遇到这些语法时立即报错，避免不可逆改写。
 - Navfolio 的 `sticky` 同时支持布尔值和排序数字，Keystatic 没有同构字段。后台会

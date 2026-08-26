@@ -78,13 +78,18 @@ navigation、scaffold 和 i18n contribution 消失。
   `draft` 字段并为公开路由派生布尔值；后台保存自动写入 `updatedDate`
 - `src/content/taxonomies` 保存受控标签、分类和系列；图片统一写入
   `src/assets/images/content`
-- `/studio` 主页是静态运营工作台，提供快捷创建、发布指引、状态汇总和组合筛选；
-  `/studio/import` 是静态导入 UI，只向同源 `/api/studio/import` 提交经服务端重新解析的
-  Markdown，线上写入复用 Keystatic GitHub 登录；`/preview/**` 为真实渲染预览。后台路由均
+- `/studio` 是日常内容后台入口：主页静态汇总部署时内容，动态 `/studio/edit/**` 与同源
+  `/api/studio/**` 负责读取最新 GitHub 内容、编辑、草稿/待发布/发布/撤回、批量状态、
+  定时发布、素材、分类和版本恢复；线上写入复用 Keystatic GitHub 登录。`/keystatic`
+  保留为不出现在日常导航中的应急编辑器
+- `/studio/import` 是静态导入 UI，只向同源 `/api/studio/import` 提交经服务端重新解析的
+  Markdown，导入后直接进入 Studio 编辑器；`/preview/**` 为真实渲染预览。后台路由均
   noindex/no-store，静态页不包含密钥
-- Keystatic 深链接由 `src/utils/keystatic-routes.ts` 统一生成：本地模式直接进入集合，
-  GitHub 模式显式进入 `main` 分支，避免工作台和预览页各自拼接导致客户端 Not Found
+- Keystatic 应急深链接仍由 `src/utils/keystatic-routes.ts` 统一生成；Studio 日常工作流统一
+  使用 `/studio/edit/{collection}/{slug}`，不再暴露 Keystatic 的分支路由
 - 发布审计先于 Astro 构建，待发布与已发布内容的结构、分类和资产错误会阻止部署
+- 定时发布由 `publish-scheduled.yml` 每 15 分钟检查 `ready + scheduledAt` 内容，到期后
+  改为 `published` 并提交，继而触发正常部署和质量门禁
 - docs/demo 内容：`src/docs` submodule，由
   `NAVFOLIO_CONTENT_SOURCE=docs` 选择
 - docs 发布：先推送 `astro-navfolio-docs`，再更新 gitlink 并运行 docs build
@@ -92,7 +97,7 @@ navigation、scaffold 和 i18n contribution 消失。
   subset consumer
 - WeRead：生态 producer 已存在，但主站无 dependency、workflow、route 或 component
   consumer
-- 公开页仍静态预渲染；Vercel adapter 只为 Keystatic 的两组后台路由打包
+- 公开页仍静态预渲染；Vercel adapter 为 Keystatic 和 Studio 动态编辑/API 路由打包
   Node.js function。构建后处理会同步到 `.vercel/output/static`。
 
 ## 约束

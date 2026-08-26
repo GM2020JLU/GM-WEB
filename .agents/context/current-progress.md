@@ -42,6 +42,11 @@
   再进入完整过程正文。
 - `/studio/import` 复用 Markdown AST、受限 YAML、Zod、Octokit 与 Keystatic GitHub 登录，
   支持 Blog/Vibe/Media 单文件预览后导入；强制草稿、字段白名单且不覆盖同名内容。
+- `/studio` 已成为完整日常后台：Blog、Projects、Vibe、Media、About 与三类 taxonomy
+  均可在统一界面新建、源码编辑、安全渲染预览、保存草稿、设为待发布、发布、撤回、
+  删除；导入成功不再跳转 Keystatic。
+- Studio 已接入素材上传/检索/引用/删除、批量发布状态、定时发布、GitHub 内容历史和
+  非破坏性版本恢复；Keystatic 仅作为隐藏应急入口保留。
 - 构建前内容审计覆盖必填字段、日期、分类引用、图片文件/替代文本、重复 slug 和占位
   内容；草稿告警，待发布和已发布内容阻止式检查。
 - 标准 `check` 已纳入 Astro/TypeScript 全项目检查；`test:full` 覆盖主站与 docs 构建、

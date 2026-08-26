@@ -13,6 +13,11 @@ html[data-studio-transition='none']::view-transition-new(root) {
   animation: none !important;
 }
 
+html[data-studio-transition='none'] [data-astro-transition-scope],
+html[data-studio-transition='none'][data-astro-transition-fallback] [data-astro-transition-scope] {
+  animation: none !important;
+}
+
 body.studio-with-navigation .studio-topbar-theme {
   margin-left: auto;
   margin-right: 12px;

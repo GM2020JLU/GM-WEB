@@ -79,6 +79,9 @@ export default defineConfig({
 
   vite: {
     plugins: [tailwindcss()],
+    server: {
+      allowedHosts: ['goumin-mac.tailfc8e48.ts.net', 'studio.goumin.work'],
+    },
     resolve: {
       alias: {
         'virtual:navfolio/page-runtime': fileURLToPath(

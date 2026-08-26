@@ -46,6 +46,10 @@ server.stderr.on('data', (chunk) => process.stderr.write(chunk));
 
 try {
   await waitForServer();
+  const incompleteRoute = await fetch(`${origin}/api/studio/content/blog`);
+  assert.equal(incompleteRoute.status, 400);
+  assert.match((await incompleteRoute.json()).error, /缺少内容标识/);
+
   for (const definition of definitions) {
     const source = `---\ntitle: ${definition.title}\n---\n\n# 初始正文\n\n导入阶段。`;
     const imported = await json('/api/studio/import', {

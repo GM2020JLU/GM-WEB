@@ -33,8 +33,10 @@ export const prerender = false;
 function routeParams(params: Record<string, string | undefined>) {
   const collection = params.collection ?? '';
   const slug = params.slug ?? '';
-  if (!isStudioCollection(collection)) throw new Error('不支持该内容类型。');
-  if (!slug) throw new Error('缺少内容标识。');
+  if (!isStudioCollection(collection)) {
+    throw Object.assign(new Error('不支持该内容类型。'), { status: 400 });
+  }
+  if (!slug) throw Object.assign(new Error('缺少内容标识。'), { status: 400 });
   return { collection, slug };
 }
 

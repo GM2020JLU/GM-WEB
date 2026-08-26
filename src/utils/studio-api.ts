@@ -76,6 +76,9 @@ export function studioApiError(error: unknown) {
       ? error.status
       : 500;
   if (status === 404) return studioJson({ error: '内容不存在或尚未完成部署。' }, 404);
+  if (status === 400) {
+    return studioJson({ error: error instanceof Error ? error.message : '请求参数不合法。' }, 400);
+  }
   if (status === 401) return studioJson({ error: 'GitHub 登录已过期，请重新登录。' }, 401);
   if (status === 403) return studioJson({ error: '当前账号没有 GM-WEB 写入权限。' }, 403);
   if (status === 409 || status === 422) {

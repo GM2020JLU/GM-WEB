@@ -65,6 +65,11 @@
   部署追踪读取 GitHub 的 Vercel commit status，构建失败会显示失败链接，不再停留在排队状态。
 - `test:studio-modules` 通过真实同源 HTTP 对 Blog、Projects、Vibe、Media 逐一执行导入、
   编辑、发布、回读与清理；纯内容模型另覆盖 About 编辑发布和四模块生命周期。
+- 已实现 Mac 本地发布 worker、排队/构建/完成/失败状态与私有日志，构建成功才原子切换
+  Caddy 的静态 release，失败保留旧站；Studio 会按 Mac/Vercel 提供对应进度文案。
+- 已固化 macOS 的 Caddy、Cloudflare Tunnel 与 Studio launchd 配置，并复用 Mac 已运行的
+  防休眠服务；公开站入口明确封锁后台、API、Keystatic 和未发布预览路径。Tailscale
+  作为后台备用入口，Cloudflare Access 完成邮箱保护后再启用日常后台域名。
 
 ## 过渡中
 
@@ -78,6 +83,8 @@
 - deploy 使用 docs submodule `--remote`，但本地可复现仍依赖正确提交 gitlink。
 - 线上 Keystatic 若尚未完成授权，仍需要仓库拥有者创建/授权 GitHub App，并将生成的
   4 个环境变量写入 Vercel；密钥不进入仓库。
+- Mac 主部署尚处于预览与切流验证阶段；根域名在验收前仍由 Cloudflare 代理 Vercel，
+  Vercel 作为回退源站保留。
 
 ## 已存在但未接入主站
 

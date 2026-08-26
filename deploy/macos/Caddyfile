@@ -1,0 +1,21 @@
+{
+	auto_https off
+	admin off
+}
+
+127.0.0.1:8080 {
+	encode zstd gzip
+	root * /Users/goumin/Services/goumin-work/runtime/current
+
+	@private path /studio /studio/* /api /api/* /keystatic /keystatic/* /preview /preview/*
+	respond @private 404
+
+	@immutable path /_astro/*
+	header @immutable Cache-Control "public, max-age=31536000, immutable"
+
+	@document not path /_astro/*
+	header @document Cache-Control "public, max-age=0, must-revalidate"
+
+	try_files {path} {path}/ /404.html
+	file_server
+}

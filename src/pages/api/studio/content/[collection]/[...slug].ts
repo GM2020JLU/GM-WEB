@@ -17,6 +17,7 @@ import { generateStudioSlug } from '../../../../../utils/studio-slug';
 import {
   requireStudioToken,
   studioApiError,
+  studioDeploymentMetadata,
   studioJson,
   verifyStudioOrigin,
 } from '../../../../../utils/studio-api';
@@ -131,14 +132,19 @@ export const PUT: APIRoute = async ({ params, cookies, request, url }) => {
       content,
       message: `${verb} ${collection}: ${slug}`,
     });
+    const deployment = await studioDeploymentMetadata({
+      token,
+      commitSha: writeResult.commitSha,
+      deploy: payload.action === 'publish' || payload.action === 'unpublish',
+      reason: `${verb} ${collection}: ${slug}`,
+    });
     return studioJson({
       ok: true,
       slug,
       path: nextPath,
       status: status ?? 'draft',
       publicUrl: status === 'published' ? studioPublicUrl(collection, slug) : undefined,
-      deploymentPending: Boolean(token),
-      commitSha: writeResult.commitSha,
+      ...deployment,
     });
   } catch (error) {
     if (error instanceof ZodError) {
@@ -159,8 +165,14 @@ export const DELETE: APIRoute = async ({ params, cookies, request, url }) => {
     const token = requireStudioToken(cookies);
     const path = studioContentPath(collection, slug);
     const file = await readStudioFile(path, token);
+    const document = parseStudioDocument(collection, slug, file.content, file.sha);
     await deleteStudioFile(path, file.sha, token);
-    return studioJson({ ok: true });
+    const deployment = await studioDeploymentMetadata({
+      token,
+      deploy: document.metadata.publicationStatus === 'published',
+      reason: `Delete ${collection}: ${slug}`,
+    });
+    return studioJson({ ok: true, ...deployment });
   } catch (error) {
     return studioApiError(error);
   }

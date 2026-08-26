@@ -4,6 +4,7 @@ import { z, ZodError } from 'zod';
 import {
   requireStudioToken,
   studioApiError,
+  studioDeploymentMetadata,
   studioJson,
   verifyStudioOrigin,
 } from '../../../utils/studio-api';
@@ -133,10 +134,15 @@ export const PUT: APIRoute = async ({ cookies, request, url }) => {
       content: stringify(root),
       message: 'Update site settings',
     });
+    const deployment = await studioDeploymentMetadata({
+      token,
+      commitSha: written.commitSha,
+      deploy: true,
+      reason: 'Update site settings',
+    });
     return studioJson({
       ok: true,
-      commitSha: written.commitSha,
-      deploymentPending: Boolean(token),
+      ...deployment,
     });
   } catch (error) {
     if (error instanceof ZodError) {

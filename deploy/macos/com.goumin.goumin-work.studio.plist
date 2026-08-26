@@ -1,0 +1,43 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>Label</key>
+  <string>com.goumin.goumin-work.studio</string>
+  <key>ProgramArguments</key>
+  <array>
+    <string>/Users/goumin/.bun/bin/bun</string>
+    <string>run</string>
+    <string>dev</string>
+    <string>--host</string>
+    <string>127.0.0.1</string>
+    <string>--port</string>
+    <string>4321</string>
+  </array>
+  <key>WorkingDirectory</key>
+  <string>/Users/goumin/Services/goumin-work/repo</string>
+  <key>EnvironmentVariables</key>
+  <dict>
+    <key>PATH</key>
+    <string>/Users/goumin/Services/goumin-work/repo/.venv/bin:/Users/goumin/.bun/bin:/Users/goumin/.local/bin:/usr/bin:/bin:/usr/sbin:/sbin</string>
+    <key>PUBLIC_KEYSTATIC_STORAGE_KIND</key>
+    <string>local</string>
+    <key>PUBLIC_STUDIO_DEPLOYMENT_MODE</key>
+    <string>local</string>
+    <key>SITE_URL</key>
+    <string>https://goumin.work</string>
+    <key>STUDIO_RUNTIME_DIR</key>
+    <string>/Users/goumin/Services/goumin-work/runtime</string>
+  </dict>
+  <key>RunAtLoad</key>
+  <true/>
+  <key>KeepAlive</key>
+  <true/>
+  <key>ProcessType</key>
+  <string>Background</string>
+  <key>StandardOutPath</key>
+  <string>/Users/goumin/Library/Logs/goumin-work/studio.log</string>
+  <key>StandardErrorPath</key>
+  <string>/Users/goumin/Library/Logs/goumin-work/studio.error.log</string>
+</dict>
+</plist>

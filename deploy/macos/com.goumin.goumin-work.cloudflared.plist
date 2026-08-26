@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>Label</key>
+  <string>com.goumin.goumin-work.cloudflared</string>
+  <key>ProgramArguments</key>
+  <array>
+    <string>/Users/goumin/.local/bin/cloudflared</string>
+    <string>--config</string>
+    <string>/Users/goumin/.cloudflared/config.yml</string>
+    <string>tunnel</string>
+    <string>run</string>
+  </array>
+  <key>RunAtLoad</key>
+  <true/>
+  <key>KeepAlive</key>
+  <true/>
+  <key>ProcessType</key>
+  <string>Background</string>
+  <key>StandardOutPath</key>
+  <string>/Users/goumin/Library/Logs/goumin-work/cloudflared.log</string>
+  <key>StandardErrorPath</key>
+  <string>/Users/goumin/Library/Logs/goumin-work/cloudflared.error.log</string>
+</dict>
+</plist>

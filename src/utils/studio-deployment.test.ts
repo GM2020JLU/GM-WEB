@@ -22,6 +22,15 @@ describe('Studio 发布进度', () => {
     expect(copies.slice(0, 4).map((copy) => copy.progress)).toEqual([16, 38, 68, 100]);
   });
 
+  test('本地发布使用 Mac 构建提示', () => {
+    expect(
+      deploymentCopy({ phase: 'queued', provider: 'local', targetSha: 'a'.repeat(40) }).detail,
+    ).toContain('Mac');
+    expect(
+      deploymentCopy({ phase: 'building', provider: 'local', targetSha: 'a'.repeat(40) }).detail,
+    ).toContain('10—30 秒');
+  });
+
   test('只恢复具有合法提交 SHA 的待部署记录', () => {
     const pending = {
       targetSha: 'b'.repeat(40),

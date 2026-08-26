@@ -1,0 +1,7 @@
+tunnel: f714836f-59c5-4592-9172-7669a7cadfea
+credentials-file: /Users/goumin/.cloudflared/f714836f-59c5-4592-9172-7669a7cadfea.json
+
+ingress:
+  - hostname: mac-preview.goumin.work
+    service: http://127.0.0.1:8080
+  - service: http_status:404

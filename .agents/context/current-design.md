@@ -84,9 +84,10 @@ navigation、scaffold 和 i18n contribution 消失。
 - 动态 `/studio/edit/**` 以标题、摘要和正文为主，低频字段折叠到“更多设置”。网址别名
   由标题自动生成并在冲突时追加序号；`/studio/site` 与 `/api/studio/site` 编辑站点身份、
   主题、个人资料、首页介绍/关注方向/引语和公开模块文案
-- 线上发布会保存目标 Git commit SHA，并由 `/api/studio/deployment` 对比 GitHub main、
-  GitHub Deployment 与当前 Vercel runtime SHA，向编辑页和工作台持续反馈已提交、排队、
-  构建中、已上线或失败；待部署记录保存在浏览器中，换页后继续追踪
+- GitHub/Vercel 模式发布会保存目标 Git commit SHA，并由 `/api/studio/deployment` 对比
+  GitHub main、GitHub Deployment 与当前 Vercel runtime SHA；Mac 本地模式使用随机任务标识、
+  后台构建状态文件和私有日志。两种模式都向编辑页和工作台持续反馈已提交、排队、构建中、
+  已上线或失败；待部署记录保存在浏览器中，换页后继续追踪
 - `/api/studio/**` 负责读取最新 GitHub 内容、编辑、草稿/待发布/发布/撤回、批量状态、
   定时发布、素材、分类和版本恢复；线上写入复用 Keystatic GitHub 登录。`/keystatic`
   保留为不出现在日常导航中的应急编辑器
@@ -110,8 +111,15 @@ navigation、scaffold 和 i18n contribution 消失。
   subset consumer
 - WeRead：生态 producer 已存在，但主站无 dependency、workflow、route 或 component
   consumer
-- 公开页仍静态预渲染；Vercel adapter 为 Keystatic 和 Studio 动态编辑/API 路由打包
-  Node.js function。构建后处理会同步到 `.vercel/output/static`。
+- 公开页仍静态预渲染；Vercel adapter 为回退部署中的 Keystatic 和 Studio 动态编辑/API
+  路由打包 Node.js function。构建后处理会同步到 `.vercel/output/static`。
+- Mac 主部署由 `scripts/local-deploy.ts` 运行完整生产构建与产物验证，成功后创建不可变 release
+  并原子切换 `runtime/current`；失败时继续提供上一版本。Caddy 只在 loopback 提供公开静态
+  产物并拒绝 Studio/API/Keystatic/preview，Cloudflare Tunnel 是唯一公网源站入口。
+- Studio 在 Mac 上使用 Keystatic local storage 和 Astro 本地服务，通过受限的 Tailscale
+  备用入口访问；面向日常使用的 `studio.goumin.work` 只有在 Cloudflare Access 完成邮箱
+  身份保护后才接入 Tunnel。launchd 守护 Caddy、Tunnel 和 Studio，并复用 Mac 已运行的
+  系统防休眠服务。Vercel 保留为回退源站。
 
 ## 约束
 

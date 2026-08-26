@@ -2,6 +2,7 @@ export type StudioDeploymentPhase = 'submitted' | 'queued' | 'building' | 'ready
 
 export interface StudioDeploymentState {
   phase: StudioDeploymentPhase;
+  provider?: 'local' | 'vercel';
   targetSha: string;
   runtimeSha?: string;
   repositorySha?: string;
@@ -41,8 +42,13 @@ export function resolveStudioDeploymentPhase(input: {
 }
 
 export function deploymentCopy(state: StudioDeploymentState) {
+  const isLocal = state.provider === 'local';
   if (state.phase === 'ready') {
-    return { title: '网站已上线', detail: '生产域名已经切换到这次发布。', progress: 100 };
+    return {
+      title: '网站已上线',
+      detail: isLocal ? 'Mac 已切换到这次发布。' : '生产域名已经切换到这次发布。',
+      progress: 100,
+    };
   }
   if (state.phase === 'error') {
     return { title: '部署失败', detail: '内容已保存，但构建没有成功。', progress: 100 };
@@ -50,18 +56,26 @@ export function deploymentCopy(state: StudioDeploymentState) {
   if (state.phase === 'building') {
     return {
       title: '正在构建网站',
-      detail: 'Vercel 正在生成页面，通常需要约 30—90 秒。',
+      detail: isLocal
+        ? 'Mac 正在检查内容并生成页面，通常需要约 10—30 秒。'
+        : 'Vercel 正在生成页面，通常需要约 30—90 秒。',
       progress: 68,
     };
   }
   if (state.phase === 'queued') {
     return {
       title: '等待开始构建',
-      detail: 'GitHub 已收到内容，正在等待 Vercel 接手。',
+      detail: isLocal
+        ? '内容已进入 Mac 本地发布队列。'
+        : 'GitHub 已收到内容，正在等待 Vercel 接手。',
       progress: 38,
     };
   }
-  return { title: '发布已提交', detail: '内容已经保存到 GitHub。', progress: 16 };
+  return {
+    title: '发布已提交',
+    detail: isLocal ? '内容已经保存到 Mac。' : '内容已经保存到 GitHub。',
+    progress: 16,
+  };
 }
 
 export function readPendingDeployment(storage: Pick<Storage, 'getItem'>) {

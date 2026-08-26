@@ -13,6 +13,7 @@ import {
 import {
   requireStudioToken,
   studioApiError,
+  studioDeploymentMetadata,
   studioJson,
   verifyStudioOrigin,
 } from '../../../utils/studio-api';
@@ -73,12 +74,17 @@ export const POST: APIRoute = async ({ cookies, request, url }) => {
       commitSha = written.commitSha ?? commitSha;
       results.push(item);
     }
+    const deployment = await studioDeploymentMetadata({
+      token,
+      commitSha,
+      deploy: payload.action === 'publish' || payload.action === 'unpublish',
+      reason: `Bulk ${payload.action}: ${results.length} entries`,
+    });
     return studioJson({
       ok: true,
       status,
       updated: results.length,
-      deploymentPending: Boolean(token),
-      commitSha,
+      ...deployment,
     });
   } catch (error) {
     if (error instanceof ZodError) {

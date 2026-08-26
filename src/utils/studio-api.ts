@@ -1,8 +1,31 @@
 import type { AstroCookies } from 'astro';
+import { startStudioLocalDeployment } from './studio-local-deployment';
 
 const requestedStorage = import.meta.env.PUBLIC_KEYSTATIC_STORAGE_KIND;
 export const studioUsesGitHub =
   requestedStorage === 'github' || (requestedStorage !== 'local' && import.meta.env.PROD);
+export const studioUsesLocalDeployment =
+  requestedStorage === 'local' && import.meta.env.PUBLIC_STUDIO_DEPLOYMENT_MODE === 'local';
+
+export async function studioDeploymentMetadata(input: {
+  commitSha?: string;
+  deploy: boolean;
+  reason: string;
+  token?: string;
+}) {
+  if (studioUsesLocalDeployment && input.deploy) {
+    return {
+      commitSha: await startStudioLocalDeployment(input.reason),
+      deploymentPending: true,
+      deploymentProvider: 'local' as const,
+    };
+  }
+  return {
+    commitSha: input.commitSha,
+    deploymentPending: Boolean(input.token && input.deploy),
+    deploymentProvider: 'vercel' as const,
+  };
+}
 
 export function studioJson(body: Record<string, unknown>, status = 200) {
   return new Response(JSON.stringify(body), {

@@ -341,7 +341,9 @@ export function setupStudioEditor(document: Document, options: StudioEditorOptio
         `/studio/edit/${options.collection}/${result.slug}`,
       );
       const message = result.deploymentPending
-        ? '内容已保存到 GitHub，下面会持续显示网站上线进度。'
+        ? result.deploymentProvider === 'local'
+          ? '内容已保存到 Mac，下面会持续显示本地构建和上线进度。'
+          : '内容已保存到 GitHub，下面会持续显示网站上线进度。'
         : '已保存到本地内容目录。';
       showNotice(
         action === 'schedule'
@@ -352,7 +354,7 @@ export function setupStudioEditor(document: Document, options: StudioEditorOptio
         message,
         'success',
       );
-      if (action === 'publish' && result.commitSha) {
+      if ((action === 'publish' || action === 'unpublish') && result.commitSha) {
         const pending: PendingStudioDeployment = {
           targetSha: result.commitSha,
           publicUrl: result.publicUrl,
@@ -449,10 +451,20 @@ export function setupStudioEditor(document: Document, options: StudioEditorOptio
     }
   });
   document.querySelector('[data-delete]')?.addEventListener('click', async () => {
-    if (!browserWindow.confirm('确定删除这条内容吗？GitHub 历史中仍可恢复。')) return;
+    if (!browserWindow.confirm('删除后将从公开网站移除这条内容，确定继续吗？')) return;
     const response = await request(apiUrl(), { method: 'DELETE' });
     const result = await payload(response);
     if (!response.ok) return showNotice('删除失败', result.error || '请稍后重试。', 'error');
+    if (result.deploymentPending && result.commitSha) {
+      storage.setItem(
+        STUDIO_DEPLOYMENT_STORAGE_KEY,
+        JSON.stringify({
+          targetSha: result.commitSha,
+          title: title.value.trim(),
+          startedAt: new Date().toISOString(),
+        }),
+      );
+    }
     browserWindow.location.assign('/studio');
   });
   browserWindow.addEventListener('beforeunload', (event) => {

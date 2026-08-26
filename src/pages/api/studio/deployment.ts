@@ -1,5 +1,11 @@
 import type { APIRoute } from 'astro';
-import { requireStudioToken, studioApiError, studioJson } from '../../../utils/studio-api';
+import {
+  requireStudioToken,
+  studioApiError,
+  studioJson,
+  studioUsesLocalDeployment,
+} from '../../../utils/studio-api';
+import { readStudioLocalDeployment } from '../../../utils/studio-local-deployment';
 import { getStudioDeployment } from '../../../utils/studio-storage';
 
 export const prerender = false;
@@ -11,11 +17,13 @@ export const GET: APIRoute = async ({ cookies, url }) => {
       return studioJson({ error: '部署提交标识不合法。' }, 400);
     }
     return studioJson({
-      deployment: await getStudioDeployment(
-        requireStudioToken(cookies),
-        targetSha,
-        import.meta.env.VERCEL_GIT_COMMIT_SHA || undefined,
-      ),
+      deployment: studioUsesLocalDeployment
+        ? await readStudioLocalDeployment(targetSha)
+        : await getStudioDeployment(
+            requireStudioToken(cookies),
+            targetSha,
+            import.meta.env.VERCEL_GIT_COMMIT_SHA || undefined,
+          ),
     });
   } catch (error) {
     return studioApiError(error);

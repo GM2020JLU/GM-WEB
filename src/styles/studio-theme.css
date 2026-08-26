@@ -18,6 +18,12 @@ html[data-studio-transition='none'][data-astro-transition-fallback] [data-astro-
   animation: none !important;
 }
 
+html[data-studio-transition='none'] *,
+html[data-studio-transition='none'] *::before,
+html[data-studio-transition='none'] *::after {
+  transition: none !important;
+}
+
 body.studio-with-navigation .studio-topbar-theme {
   margin-left: auto;
   margin-right: 12px;

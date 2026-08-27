@@ -5,6 +5,4 @@ protocol: http2
 ingress:
   - hostname: studio.goumin.work
     service: http://127.0.0.1:8081
-  - hostname: mac-preview.goumin.work
-    service: http://127.0.0.1:8081
   - service: http_status:404

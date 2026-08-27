@@ -39,6 +39,14 @@ http://:8081 {
 	bind 127.0.0.1
 	encode zstd gzip
 
+	# The dedicated Access hostname opens the Studio directly. Keep the
+	# internal /studio route so links and API paths remain unchanged.
+	@studioRoot {
+		host studio.goumin.work
+		path /
+	}
+	rewrite @studioRoot /studio
+
 	# Astro fingerprints these assets, so both the browser and Cloudflare may reuse them safely.
 	@immutable path /_astro/*
 	header @immutable Cache-Control "public, max-age=31536000, immutable"

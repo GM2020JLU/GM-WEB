@@ -1,6 +1,18 @@
 {
   "buildCommand": "PATH=.venv/bin:$PATH bun run build",
   "installCommand": "python -m venv .venv && .venv/bin/python -m pip install --disable-pip-version-check fonttools brotli && HUSKY=0 bun install --frozen-lockfile",
+  "redirects": [
+    {
+      "source": "/studio",
+      "destination": "https://studio.goumin.work/",
+      "permanent": false
+    },
+    {
+      "source": "/studio/(.*)",
+      "destination": "https://studio.goumin.work/studio/$1",
+      "permanent": false
+    }
+  ],
   "headers": [
     {
       "source": "/keystatic",

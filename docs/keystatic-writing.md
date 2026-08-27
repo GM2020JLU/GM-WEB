@@ -35,7 +35,7 @@ Git：
 - `KEYSTATIC_SECRET`
 - `PUBLIC_KEYSTATIC_GITHUB_APP_SLUG`
 
-配置完成后，打开 `https://goumin.work/studio`。工作台提供内容新建、Markdown 导入、
+配置完成后，打开 `https://studio.goumin.work/`。工作台提供内容新建、Markdown 导入、
 编辑、真实预览、素材、分类、批量操作、版本历史与发布状态。只有对
 `GM2020JLU/GM-WEB` 有写权限的 GitHub 用户才能登录和保存。保存会更新 GitHub
 中的 Markdown/MDX 文件；Vercel 连接该仓库后会自动重新部署。

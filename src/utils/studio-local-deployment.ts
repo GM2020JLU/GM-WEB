@@ -1,10 +1,23 @@
 import { spawn } from 'node:child_process';
 import { randomBytes } from 'node:crypto';
+import { existsSync } from 'node:fs';
 import { mkdir, readFile, rename, writeFile } from 'node:fs/promises';
 import { dirname, resolve } from 'node:path';
 import type { StudioDeploymentState } from './studio-deployment';
 
 const JOB_PATTERN = /^[a-f0-9]{40}$/;
+
+function resolveBunExecutable() {
+  const configured = process.env.STUDIO_BUN_PATH?.trim();
+  if (configured) return configured;
+  const home = process.env.HOME;
+  const candidates = [
+    home ? resolve(home, '.bun/bin/bun') : '',
+    '/opt/homebrew/bin/bun',
+    '/usr/local/bin/bun',
+  ].filter(Boolean);
+  return candidates.find((candidate) => existsSync(candidate)) || 'bun';
+}
 
 function runtimeRoot() {
   return resolve(process.cwd(), process.env.STUDIO_RUNTIME_DIR || '.studio/runtime');
@@ -33,7 +46,7 @@ export async function startStudioLocalDeployment(reason: string) {
   });
 
   const worker = resolve(process.cwd(), 'scripts/local-deploy.ts');
-  const child = spawn(process.env.STUDIO_BUN_PATH || 'bun', [worker, targetSha, reason], {
+  const child = spawn(resolveBunExecutable(), [worker, targetSha, reason], {
     cwd: process.cwd(),
     detached: true,
     env: process.env,

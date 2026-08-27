@@ -8,6 +8,11 @@ const groups = [
     items: [
       { label: '总览', href: '/studio', match: (path: string) => path === '/studio' },
       {
+        label: '数据概览',
+        href: '/studio/analytics',
+        match: (path: string) => path === '/studio/analytics',
+      },
+      {
         label: '博客文章',
         href: '/studio/content/blog',
         match: (path: string) => path.includes('/blog'),

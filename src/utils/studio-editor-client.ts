@@ -109,6 +109,7 @@ export function setupStudioEditor(document: Document, options: StudioEditorOptio
   const browserWindow = document.defaultView;
   if (!browserWindow) throw new Error('编辑器需要浏览器环境。');
   const storage = browserWindow.localStorage;
+  let recoveryRevision = 0;
 
   const apiUrl = () =>
     `/api/studio/content/${encodeURIComponent(options.collection)}/${encodeURIComponent(originalSlug)}`;
@@ -255,6 +256,19 @@ export function setupStudioEditor(document: Document, options: StudioEditorOptio
     }
   };
 
+  const persistRecovery = () => {
+    if (initialSnapshot && snapshot() !== initialSnapshot) {
+      storage.setItem(recoveryKey, snapshot());
+    }
+  };
+
+  const scheduleRecovery = () => {
+    const revision = ++recoveryRevision;
+    defer(() => {
+      if (revision === recoveryRevision) persistRecovery();
+    }, 900);
+  };
+
   function renderPreview() {
     preview.innerHTML = body.value.trim()
       ? renderMarkdownPreview(body.value)
@@ -379,6 +393,8 @@ export function setupStudioEditor(document: Document, options: StudioEditorOptio
     button.addEventListener('click', () => void save(button.dataset.action));
   });
   body.addEventListener('input', renderPreview);
+  form.addEventListener('input', scheduleRecovery);
+  form.addEventListener('change', scheduleRecovery);
   title.addEventListener('input', () => {
     if (!options.isNew) return;
     slug.value = ['categories', 'series', 'tags'].includes(options.collection)
@@ -386,11 +402,7 @@ export function setupStudioEditor(document: Document, options: StudioEditorOptio
       : generateStudioSlug(title.value);
     slugPreview.textContent = slug.value || '保存时自动生成';
   });
-  browserWindow.setInterval(() => {
-    if (initialSnapshot && snapshot() !== initialSnapshot) {
-      storage.setItem(recoveryKey, snapshot());
-    }
-  }, 2000);
+  browserWindow.addEventListener('pagehide', persistRecovery);
   document.addEventListener('keydown', (event) => {
     if ((event.ctrlKey || event.metaKey) && event.key.toLocaleLowerCase('en-US') === 's') {
       event.preventDefault();
@@ -444,7 +456,7 @@ export function setupStudioEditor(document: Document, options: StudioEditorOptio
               item.append(heading, meta, restore);
               return item;
             })
-          : [document.createTextNode('本地模式暂无远程历史；可使用 Git 查看。')]),
+          : [document.createTextNode('暂无可用的本地备份；保存下一次变更后会自动生成。')]),
       );
     } catch (error) {
       historyList.textContent = error instanceof Error ? error.message : '历史记录加载失败。';

@@ -1,6 +1,7 @@
 #!/usr/bin/env bun
 
 import { spawn } from 'node:child_process';
+import { existsSync } from 'node:fs';
 import {
   appendFile,
   cp,
@@ -27,7 +28,15 @@ const stateFile = resolve(deployments, `${targetSha}.json`);
 const logFile = resolve(deployments, `${targetSha}.log`);
 const lock = resolve(runtime, 'deployment.lock');
 const astroBuildCache = resolve(runtime, 'astro-build-cache');
-const bunExecutable = process.env.STUDIO_BUN_PATH || 'bun';
+const configuredBun = process.env.STUDIO_BUN_PATH?.trim();
+const bunExecutable =
+  configuredBun ||
+  [
+    process.env.HOME ? resolve(process.env.HOME, '.bun/bin/bun') : '',
+    '/opt/homebrew/bin/bun',
+    '/usr/local/bin/bun',
+  ].find((candidate) => candidate && existsSync(candidate)) ||
+  'bun';
 const studioManagedPaths = [
   'src/assets/images/content',
   'src/config/site.toml',
@@ -125,7 +134,12 @@ async function backupToGitHub() {
     throw new Error('GitHub 已有较新更改，请先同步 Mac 再发布，以免覆盖远程内容。');
   }
 
-  await run('git', ['add', '--all', '--', ...studioManagedPaths]);
+  const existingManagedPaths = studioManagedPaths.filter((path) => existsSync(resolve(root, path)));
+  if (existingManagedPaths.length === 0) {
+    await appendLog('\nGitHub 备份：没有可提交的后台内容路径。\n');
+    return;
+  }
+  await run('git', ['add', '--all', '--', ...existingManagedPaths]);
   const noManagedChanges = await runForStatus('git', ['diff', '--cached', '--quiet']);
   if (noManagedChanges === 0) {
     await appendLog('\nGitHub 备份：没有需要提交的后台内容更改。\n');

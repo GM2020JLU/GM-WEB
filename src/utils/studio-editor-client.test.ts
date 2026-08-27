@@ -93,9 +93,12 @@ describe('Studio 编辑与发布交互', () => {
     await settle();
 
     element(window, '[data-title]').value = '测试文章';
-    element(window, '[data-title]').dispatchEvent(new window.Event('input'));
+    element(window, '[data-title]').dispatchEvent(new window.Event('input', { bubbles: true }));
     expect(element(window, '[data-slug]').value).toMatch(/^ce-shi-wen-zhang/);
     expect(element(window, '[data-slug-preview]').textContent).toMatch(/^ce-shi-wen-zhang/);
+    const recovery = deferred.shift();
+    if (typeof recovery === 'function') recovery();
+    expect(window.localStorage.getItem('gm-studio-recovery:blog:new')).toContain('测试文章');
 
     element(window, '[data-action="publish"]').click();
     await settle();

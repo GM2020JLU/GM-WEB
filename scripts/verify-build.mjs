@@ -50,12 +50,14 @@ const requiredFiles = [
   'index.html',
   '404.html',
   'about/index.html',
+  'resume/index.html',
   'blog/index.html',
   'projects/index.html',
   'projects/personal-site/index.html',
   'media/index.html',
   'vibe/index.html',
   'studio/index.html',
+  'studio/analytics/index.html',
   'studio/import/index.html',
   'studio/assets/index.html',
   'studio/organize/index.html',
@@ -137,6 +139,7 @@ for (const marker of [
   '随记',
   'Bootloader',
   '查看项目案例',
+  '查看简历',
   '邮件交流',
 ]) {
   if (!home.includes(marker)) fail(`首页缺少关键内容：${marker}`);

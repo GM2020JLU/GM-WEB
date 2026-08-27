@@ -147,6 +147,10 @@ module = "vibe"
 label = "关于"
 href = "/about"
 
+[[config.topNav.links]]
+label = "简历"
+href = "/resume"
+
 [config.home]
 
 [config.home.quote]

@@ -1,4 +1,5 @@
 import { Octokit } from '@octokit/core';
+import { createHash } from 'node:crypto';
 import { mkdir, readFile, readdir, rename, unlink, writeFile } from 'node:fs/promises';
 import { dirname, resolve } from 'node:path';
 import { resolveStudioDeploymentPhase } from './studio-deployment';
@@ -40,6 +41,62 @@ export class StudioConflictError extends Error {
     super(message);
     this.name = 'StudioConflictError';
   }
+}
+
+type LocalBackup = {
+  content: string;
+  date: string;
+  message: string;
+  path: string;
+  sha: string;
+};
+
+function localBackupRoot() {
+  return resolve(process.cwd(), process.env.STUDIO_RUNTIME_DIR || '.studio/runtime', 'backups');
+}
+
+async function createLocalBackup(path: string, content: string, message: string) {
+  const date = new Date().toISOString();
+  const sha = createHash('sha1').update(`${path}\0${date}\0${content}`).digest('hex');
+  const root = localBackupRoot();
+  await mkdir(root, { recursive: true });
+  await writeFile(
+    resolve(root, `${sha}.json`),
+    `${JSON.stringify({ content, date, message, path, sha } satisfies LocalBackup)}\n`,
+    { encoding: 'utf8', mode: 0o600, flag: 'wx' },
+  );
+  return sha;
+}
+
+async function readLocalBackups(path: string) {
+  let files: string[];
+  try {
+    files = await readdir(localBackupRoot());
+  } catch (error) {
+    if (typeof error === 'object' && error && 'code' in error && error.code === 'ENOENT') return [];
+    throw error;
+  }
+  const backups: LocalBackup[] = [];
+  for (const file of files.filter((name) => name.endsWith('.json'))) {
+    try {
+      const backup = JSON.parse(
+        await readFile(resolve(localBackupRoot(), file), 'utf8'),
+      ) as LocalBackup;
+      if (backup.path === path && backup.content !== undefined && backup.sha) backups.push(backup);
+    } catch {
+      // An incomplete backup must not hide the remaining usable history.
+    }
+  }
+  return backups.sort((a, b) => b.date.localeCompare(a.date)).slice(0, 30);
+}
+
+async function readLocalBackup(path: string, ref: string) {
+  if (!/^[a-f0-9]{7,40}$/i.test(ref)) throw new StudioConflictError('历史版本标识不合法。');
+  const backup = (await readLocalBackups(path)).find(
+    (entry) => entry.sha === ref || entry.sha.startsWith(ref),
+  );
+  if (!backup) throw new StudioConflictError('找不到这个本地备份版本。');
+  return backup.content;
 }
 
 function decodeContent(data: GitHubContent) {
@@ -107,6 +164,14 @@ export async function writeStudioFile(args: {
   if (!args.token) {
     const target = resolve(process.cwd(), args.path);
     await mkdir(dirname(target), { recursive: true });
+    try {
+      const previous = await readFile(target, 'utf8');
+      await createLocalBackup(args.path, previous, args.message);
+    } catch (error) {
+      if (!(typeof error === 'object' && error && 'code' in error && error.code === 'ENOENT')) {
+        throw error;
+      }
+    }
     if (args.previousPath && args.previousPath !== args.path) {
       await rename(resolve(process.cwd(), args.previousPath), target);
     }
@@ -174,6 +239,14 @@ export async function writeStudioBinaryFile(args: {
 
 export async function deleteStudioFile(path: string, sha: string | undefined, token?: string) {
   if (!token) {
+    try {
+      const previous = await readFile(resolve(process.cwd(), path), 'utf8');
+      await createLocalBackup(path, previous, `Delete ${path}`);
+    } catch (error) {
+      if (!(typeof error === 'object' && error && 'code' in error && error.code === 'ENOENT')) {
+        throw error;
+      }
+    }
     await unlink(resolve(process.cwd(), path));
     return;
   }
@@ -192,7 +265,15 @@ export async function listStudioHistory(
   path: string,
   token?: string,
 ): Promise<StudioHistoryEntry[]> {
-  if (!token) return [];
+  if (!token) {
+    return (await readLocalBackups(path)).map((entry) => ({
+      author: '本地后台',
+      date: entry.date,
+      message: entry.message,
+      sha: entry.sha,
+      url: '',
+    }));
+  }
   const response = await github(token).request('GET /repos/{owner}/{repo}/commits', {
     ...repository,
     path,
@@ -208,7 +289,8 @@ export async function listStudioHistory(
   }));
 }
 
-export async function readStudioFileAtRef(path: string, ref: string, token: string) {
+export async function readStudioFileAtRef(path: string, ref: string, token?: string) {
+  if (!token) return readLocalBackup(path, ref);
   const response = await github(token).request('GET /repos/{owner}/{repo}/contents/{path}', {
     ...repository,
     path,

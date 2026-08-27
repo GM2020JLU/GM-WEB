@@ -1,0 +1,285 @@
+---
+import { getCollection } from 'astro:content';
+import BaseHead from '../../components/BaseHead.astro';
+import StudioNavigation from '../../components/studio/StudioNavigation.astro';
+import { getThemePalette } from '../../data/site';
+import { hasContentFiles } from '../../utils/content-source';
+import { getStudioAnalytics } from '../../utils/studio-analytics';
+
+const [blog, projects, vibe, media, about] = await Promise.all([
+  getCollection('blog'),
+  getCollection('projects'),
+  getCollection('vibe'),
+  hasContentFiles('media') ? getCollection('media') : Promise.resolve([]),
+  getCollection('about'),
+]);
+const analytics = getStudioAnalytics([
+  ...blog.map((entry) => ({
+    collection: 'blog',
+    id: entry.id,
+    data: entry.data,
+    body: entry.body,
+  })),
+  ...projects.map((entry) => ({
+    collection: 'projects',
+    id: entry.id,
+    data: entry.data,
+    body: entry.body,
+  })),
+  ...vibe.map((entry) => ({
+    collection: 'vibe',
+    id: entry.id,
+    data: entry.data,
+    body: entry.body,
+  })),
+  ...media.map((entry) => ({
+    collection: 'media',
+    id: entry.id,
+    data: entry.data,
+    body: entry.body,
+  })),
+  ...about.map((entry) => ({
+    collection: 'about',
+    id: entry.id,
+    data: entry.data,
+    body: entry.body,
+  })),
+]);
+const palette = await getThemePalette();
+const formatNumber = (value: number) => new Intl.NumberFormat('zh-CN').format(value);
+---
+
+<!doctype html>
+<html lang="zh-CN" data-palette={palette}>
+  <head
+    ><BaseHead title="数据概览" description="查看内容状态和创作规模" /><meta
+      name="robots"
+      content="noindex,nofollow,noarchive"
+    /></head
+  >
+  <body class="studio-with-navigation">
+    <StudioNavigation />
+    <main class="shell">
+      <header class="page-header">
+        <div>
+          <p>CONTENT INSIGHTS</p><h1>数据概览</h1><span>只统计内容仓库，不采集访客身份或行为。</span
+          >
+        </div>
+        <a class="back" href="/studio">返回总览</a>
+      </header>
+
+      <section class="metrics" aria-label="内容汇总">
+        <article>
+          <small>全部内容</small><strong>{formatNumber(analytics.total)}</strong><span
+            >跨所有模块</span
+          >
+        </article>
+        <article>
+          <small>已发布</small><strong>{formatNumber(analytics.published)}</strong><span
+            >线上可见</span
+          >
+        </article>
+        <article>
+          <small>待处理</small><strong>{formatNumber(analytics.ready + analytics.draft)}</strong
+          ><span>草稿 + 待发布</span>
+        </article>
+        <article class:list={analytics.issues > 0 ? ['attention'] : []}>
+          <small>需完善</small><strong>{formatNumber(analytics.issues)}</strong><span
+            >发布前建议修复</span
+          >
+        </article>
+        <article>
+          <small>正文词数</small><strong>{formatNumber(analytics.words)}</strong><span
+            >中英文粗略统计</span
+          >
+        </article>
+      </section>
+
+      <section class="panel">
+        <div class="section-heading">
+          <div><h2>模块健康度</h2><p>快速定位空内容、缺少摘要或待完善字段。</p></div><a
+            href="/studio">管理内容 →</a
+          >
+        </div>
+        <div class="module-table" role="table" aria-label="模块健康度">
+          <div class="table-row table-head" role="row">
+            <span>模块</span><span>总数</span><span>已发布</span><span>草稿</span><span>需完善</span
+            ><span>正文词数</span>
+          </div>
+          {
+            analytics.modules.map((module) => (
+              <div class="table-row" role="row">
+                <>
+                  <strong>{module.label}</strong>
+                  <span>{module.total}</span>
+                  <span>{module.published}</span>
+                  <span>{module.draft + module.ready}</span>
+                  <span class:list={module.issues > 0 ? ['warning'] : []}>{module.issues}</span>
+                  <span>{formatNumber(module.words)}</span>
+                </>
+              </div>
+            ))
+          }
+        </div>
+      </section>
+
+      <section class="notes">
+        <article>
+          <strong>下一步建议</strong><p>
+            先处理“需完善”的内容，再把待发布内容提交部署。后台会在保存后显示部署阶段与线上链接。
+          </p>
+        </article>
+        <article>
+          <strong>隐私说明</strong><p>
+            该页面基于仓库内容静态计算，没有第三方统计脚本，也不会记录访客 IP、账号或阅读轨迹。
+          </p>
+        </article>
+      </section>
+    </main>
+  </body>
+</html>
+
+<style>
+  :global(*) {
+    box-sizing: border-box;
+  }
+  :global(body) {
+    margin: 0;
+    background: var(--paper-bg);
+    color: var(--paper-ink);
+    font-family: var(--font-ui);
+  }
+  .shell {
+    width: min(1080px, calc(100% - 32px));
+    margin: auto;
+    padding: 42px 0 90px;
+  }
+  .page-header,
+  .section-heading {
+    display: flex;
+    align-items: end;
+    justify-content: space-between;
+    gap: 24px;
+  }
+  .page-header {
+    padding-bottom: 38px;
+    border-bottom: 1px solid var(--paper-line);
+  }
+  .page-header p {
+    margin: 0;
+    color: var(--paper-accent);
+    font: 700 0.7rem var(--font-meta);
+    letter-spacing: 0.14em;
+  }
+  h1 {
+    margin: 8px 0 12px;
+    font: 400 clamp(2.5rem, 7vw, 5rem)/1 var(--font-page-heading);
+  }
+  .page-header span,
+  .section-heading p,
+  .metrics span,
+  .notes p {
+    color: var(--paper-ink-soft);
+  }
+  .back,
+  .section-heading a {
+    color: var(--paper-accent);
+    font-size: 0.82rem;
+    text-decoration: none;
+  }
+  .metrics {
+    display: grid;
+    grid-template-columns: repeat(5, 1fr);
+    gap: 12px;
+    margin: 26px 0;
+  }
+  .metrics article,
+  .panel,
+  .notes article {
+    border: 1px solid var(--paper-line);
+    border-radius: 14px;
+    background: color-mix(in srgb, var(--paper-bg) 96%, var(--paper-accent) 4%);
+  }
+  .metrics article {
+    display: grid;
+    gap: 6px;
+    padding: 18px;
+  }
+  .metrics small {
+    color: var(--paper-ink-faint);
+  }
+  .metrics strong {
+    font: 400 2.2rem/1 var(--font-page-heading);
+  }
+  .metrics span {
+    font-size: 0.75rem;
+  }
+  .metrics .attention {
+    border-color: color-mix(in srgb, #c58c2c 55%, var(--paper-line));
+  }
+  .panel {
+    padding: 24px;
+  }
+  .section-heading h2 {
+    margin: 0;
+    font: 400 2rem var(--font-page-heading);
+  }
+  .section-heading p {
+    margin: 6px 0 0;
+    font-size: 0.85rem;
+  }
+  .module-table {
+    margin-top: 22px;
+    overflow-x: auto;
+  }
+  .table-row {
+    display: grid;
+    grid-template-columns: minmax(130px, 1.6fr) repeat(5, minmax(78px, 1fr));
+    gap: 12px;
+    align-items: center;
+    padding: 13px 8px;
+    border-top: 1px solid var(--paper-line);
+    font-size: 0.82rem;
+  }
+  .table-head {
+    color: var(--paper-ink-faint);
+    font-size: 0.72rem;
+  }
+  .table-row span:not(:first-child),
+  .table-head span:not(:first-child) {
+    text-align: right;
+  }
+  .warning {
+    color: #b57917;
+    font-weight: 700;
+  }
+  .notes {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 12px;
+    margin-top: 12px;
+  }
+  .notes article {
+    padding: 18px;
+  }
+  .notes p {
+    margin: 8px 0 0;
+    font-size: 0.82rem;
+    line-height: 1.7;
+  }
+  @media (max-width: 780px) {
+    .metrics {
+      grid-template-columns: repeat(2, 1fr);
+    }
+    .metrics article:last-child {
+      grid-column: span 2;
+    }
+    .notes {
+      grid-template-columns: 1fr;
+    }
+    .page-header {
+      align-items: start;
+      flex-direction: column;
+    }
+  }
+</style>

@@ -34,7 +34,8 @@ ssh -L 8081:127.0.0.1:8081 mac
 ```
 
 然后在本机浏览器打开 `http://localhost:8081/studio/login`，页面才会显示密码恢复表单。
-认证成功后会写入 `HttpOnly + Secure + SameSite=Lax` 的 12 小时签名 Cookie；非安全方法仍必须
+GitHub 认证成功后会写入 `HttpOnly + Secure + SameSite=Lax` 的 12 小时签名 Cookie；
+回环恢复使用独立的 `HttpOnly + SameSite=Strict` Cookie，公网验证器不读取它。非安全方法仍必须
 通过精确同源校验。签名密钥独立保存在 `~/.config/goumin-work/studio-auth-session-secret`，
 同样必须为 `0600`。GitHub client ID 与 secret 分别从
 `studio-github-client-id` 和 `studio-github-client-secret` 这两个 `0600` 凭据文件读取。

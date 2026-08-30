@@ -3,6 +3,7 @@ import {
   createStudioAuthService,
   createStudioSessionToken,
   normalizeStudioNextPath,
+  STUDIO_LOCAL_SESSION_COOKIE,
   STUDIO_SESSION_COOKIE,
   verifyStudioCredentials,
   verifyStudioSessionToken,
@@ -260,6 +261,47 @@ describe('Studio 登录跳转', () => {
     const localHtml = await localPage.text();
     expect(localHtml).toContain(`<form method="post" action="/api/studio/session"`);
     expect(localHtml).not.toContain('使用 GitHub 继续');
+
+    const localLogin = await service(
+      new Request('http://127.0.0.1:4322/api/studio/session', {
+        body: new URLSearchParams({ password, username: 'goumin' }),
+        headers: {
+          'Content-Type': 'application/x-www-form-urlencoded',
+          Host: '127.0.0.1:4322',
+          Origin: 'http://127.0.0.1:4322',
+        },
+        method: 'POST',
+      }),
+    );
+    const localSetCookie = localLogin.headers.get('set-cookie') ?? '';
+    expect(localSetCookie).toContain(`${STUDIO_LOCAL_SESSION_COOKIE}=`);
+    expect(localSetCookie).toContain('HttpOnly');
+    expect(localSetCookie).toContain('SameSite=Strict');
+    expect(localSetCookie).not.toContain(`${STUDIO_LOCAL_SESSION_COOKIE}=;`);
+    const localSessionValue = localSetCookie.match(
+      new RegExp(`${STUDIO_LOCAL_SESSION_COOKIE}=([^;,]+)`),
+    )?.[1];
+    const localVerification = await service(
+      new Request('http://127.0.0.1:4322/internal/studio-auth/verify', {
+        headers: {
+          Cookie: `${STUDIO_LOCAL_SESSION_COOKIE}=${localSessionValue}`,
+          Host: '127.0.0.1:4322',
+          'X-Forwarded-Method': 'GET',
+          'X-Forwarded-Uri': '/studio',
+        },
+      }),
+    );
+    expect(localVerification.status).toBe(204);
+    const publicLocalCookieVerification = await service(
+      request('/internal/studio-auth/verify', {
+        headers: {
+          Cookie: `${STUDIO_LOCAL_SESSION_COOKIE}=${localSessionValue}`,
+          'X-Forwarded-Method': 'GET',
+          'X-Forwarded-Uri': '/studio',
+        },
+      }),
+    );
+    expect(publicLocalCookieVerification.status).toBe(401);
   });
 
   test('正确凭据签发安全 Cookie，随后通过 Caddy 前置校验', async () => {

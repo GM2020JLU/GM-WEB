@@ -12,6 +12,7 @@ const encoder = new TextEncoder();
 const decoder = new TextDecoder();
 
 export const STUDIO_SESSION_COOKIE = '__Host-goumin-studio';
+export const STUDIO_LOCAL_SESSION_COOKIE = 'goumin-studio-local';
 export const STUDIO_SESSION_TTL_SECONDS = 12 * 60 * 60;
 
 const LOGIN_PATH = '/studio/login';
@@ -599,11 +600,10 @@ export function createStudioAuthService(options: StudioGatewayOptions) {
     return 0;
   };
 
-  const setSessionCookie = (headers: Headers, token: string, maxAge: number) => {
-    headers.append(
-      'Set-Cookie',
-      `${STUDIO_SESSION_COOKIE}=${token}; Path=/; Max-Age=${maxAge}; HttpOnly; Secure; SameSite=Lax`,
-    );
+  const setSessionCookie = (headers: Headers, token: string, maxAge: number, local = false) => {
+    const name = local ? STUDIO_LOCAL_SESSION_COOKIE : STUDIO_SESSION_COOKIE;
+    const attributes = local ? 'HttpOnly; SameSite=Strict' : 'HttpOnly; Secure; SameSite=Lax';
+    headers.append('Set-Cookie', `${name}=${token}; Path=/; Max-Age=${maxAge}; ${attributes}`);
   };
 
   const clearGithubOAuthCookie = (headers: Headers) => {
@@ -856,7 +856,7 @@ export function createStudioAuthService(options: StudioGatewayOptions) {
       });
       const headers = securityHeaders();
       clearGithubOAuthCookie(headers);
-      setSessionCookie(headers, token, sessionTtlSeconds);
+      setSessionCookie(headers, token, sessionTtlSeconds, isLoopbackHost(requestHost(request)));
       return redirect(nextPath, headers);
     }
 
@@ -864,7 +864,7 @@ export function createStudioAuthService(options: StudioGatewayOptions) {
       if (!isAllowedFormOrigin(request, publicHost)) return privateTextResponse('Forbidden', 403);
       const headers = securityHeaders();
       clearGithubOAuthCookie(headers);
-      setSessionCookie(headers, '', 0);
+      setSessionCookie(headers, '', 0, isLoopbackHost(requestHost(request)));
       return redirect(LOGIN_PATH, headers);
     }
 
@@ -872,7 +872,10 @@ export function createStudioAuthService(options: StudioGatewayOptions) {
       return privateTextResponse('Not Found', 404);
     }
 
-    const token = parseCookies(request.headers.get('cookie')).get(STUDIO_SESSION_COOKIE);
+    const loopbackRequest = isLoopbackHost(requestHost(request));
+    const token = parseCookies(request.headers.get('cookie')).get(
+      loopbackRequest ? STUDIO_LOCAL_SESSION_COOKIE : STUDIO_SESSION_COOKIE,
+    );
     const allowedSubjects = new Set<string>();
     if (options.github) allowedSubjects.add(`github:${options.github.allowedUserId}`);
     if (passwordLoginAllowed(request)) allowedSubjects.add('password:local');

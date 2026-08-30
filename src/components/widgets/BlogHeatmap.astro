@@ -67,7 +67,11 @@ function getSnakeStep(dayIndex: number) {
   return weekIndex * 7 + (weekIndex % 2 === 0 ? weekdayIndex : 6 - weekdayIndex);
 }
 
-const snakeEndStep = latestActiveDayIndex >= 0 ? getSnakeStep(latestActiveDayIndex) : -1;
+const snakeTargetStep = latestActiveDayIndex >= 0 ? getSnakeStep(latestActiveDayIndex) : -1;
+const snakeEndStep =
+  snakeTargetStep >= 0
+    ? Math.min(heatmap.days.length - 1, Math.floor(snakeTargetStep / 7) * 7 + 6)
+    : -1;
 const snakeStartStep = Math.max(0, Math.ceil((snakeEndStep - maxSnakeDays + 1) / 7) * 7);
 ---
 
@@ -185,27 +189,19 @@ const snakeStartStep = Math.max(0, Math.ceil((snakeEndStep - maxSnakeDays + 1) /
   const SNAKE_PART_COUNT = 4;
   const SNAKE_PART_SCALES = [0.9, 0.769, 0.675, 0.619];
   const SNAKE_STEP_DURATION_MS = 82;
-  const SNAKE_ENTER_FADE_MS = 140;
-  const SNAKE_TARGET_HOLD_MS = 140;
-  const SNAKE_EXIT_FADE_MS = 220;
-  const SNAKE_REPLAY_COOLDOWN_MS = 9000;
+  const SNAKE_TARGET_ACTIVE_STEPS = 2.4;
 
   type SnakePoint = { x: number; y: number };
   type SnakeGeometry = {
     route: SnakePoint[];
     cellSize: number;
     moveCount: number;
+    targetMoveStep: number | null;
   };
 
   const clampSnakeProgress = (value: number) => Math.max(0, Math.min(1, value));
   const lerpSnakePosition = (from: number, to: number, progress: number) =>
     from + (to - from) * progress;
-  const smoothSnakeOpacity = (progress: number) => progress * progress * (3 - 2 * progress);
-
-  const prefersReducedSnakeMotion = () =>
-    window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ||
-    window.matchMedia?.('(forced-colors: active)').matches;
-
   const initHeatmapSnakes = () => {
     for (const card of document.querySelectorAll<HTMLElement>('[data-heatmap-snake]')) {
       if (card.dataset.snakeReady) continue;
@@ -222,13 +218,20 @@ const snakeStartStep = Math.max(0, Math.ceil((snakeEndStep - maxSnakeDays + 1) /
 
       if (!grid || !snake || parts.length !== SNAKE_PART_COUNT) continue;
 
-      let lastPlayedAt = Number.NEGATIVE_INFINITY;
       let animationFrame: number | null = null;
+      let startedAt = 0;
+      let pausedElapsed = 0;
       let geometry: SnakeGeometry | null = null;
       let geometryDirty = true;
+      let isVisible = false;
+      let isTargetActive = false;
       let disposed = false;
       let resizeObserver: ResizeObserver | null = null;
       let intersectionObserver: IntersectionObserver | null = null;
+      const reducedMotionQuery = window.matchMedia('(prefers-reduced-motion: reduce)');
+      const forcedColorsQuery = window.matchMedia('(forced-colors: active)');
+      const prefersReducedSnakeMotion = () =>
+        reducedMotionQuery.matches || forcedColorsQuery.matches;
 
       const measureGeometry = (): SnakeGeometry | null => {
         const pathCells = Array.from(grid.querySelectorAll<HTMLElement>('[data-snake-step]')).sort(
@@ -243,6 +246,7 @@ const snakeStartStep = Math.max(0, Math.ceil((snakeEndStep - maxSnakeDays + 1) /
           x: rect.left - gridRect.left + rect.width / 2,
           y: rect.top - gridRect.top + rect.height / 2,
         }));
+        const targetPointIndex = pathCells.findIndex((cell) => cell.dataset.snakeTarget === 'true');
         const firstPoint = points[0];
         const firstRect = cellRects[0];
         const gridStyle = window.getComputedStyle(grid);
@@ -266,6 +270,16 @@ const snakeStartStep = Math.max(0, Math.ceil((snakeEndStep - maxSnakeDays + 1) /
           x: entryPoint.x + bodyDirection * columnPitch * (SNAKE_PART_COUNT - index - 1),
           y: entryPoint.y,
         }));
+        const lastPoint = points.at(-1)!;
+        const previousPoint = points.at(-2) ?? firstPoint;
+        const outward = {
+          x: lastPoint.x - previousPoint.x,
+          y: lastPoint.y - previousPoint.y,
+        };
+        const exitPose = Array.from({ length: SNAKE_PART_COUNT }, (_, index) => ({
+          x: lastPoint.x + outward.x * (index + 1),
+          y: lastPoint.y + outward.y * (index + 1),
+        }));
         const cellSize = Math.min(firstRect.width, firstRect.height);
 
         parts.forEach((part, index) => {
@@ -276,39 +290,55 @@ const snakeStartStep = Math.max(0, Math.ceil((snakeEndStep - maxSnakeDays + 1) /
 
         geometryDirty = false;
         return {
-          route: [...entryPose, ...points],
+          route: [...entryPose, ...points, ...exitPose],
           cellSize,
-          moveCount: points.length,
+          moveCount: points.length + exitPose.length,
+          targetMoveStep: targetPointIndex >= 0 ? targetPointIndex + 1 : null,
         };
       };
 
-      const hideSnake = () => {
+      const setTargetActive = (active: boolean) => {
+        if (active === isTargetActive) return;
+
+        isTargetActive = active;
+        targetCell?.classList.toggle('snake-target-active', active);
+      };
+
+      const stopSnake = () => {
+        if (animationFrame !== null) {
+          if (geometry) {
+            const movementDuration = geometry.moveCount * SNAKE_STEP_DURATION_MS;
+            pausedElapsed = Math.max(0, performance.now() - startedAt) % movementDuration;
+          }
+          window.cancelAnimationFrame(animationFrame);
+        }
         animationFrame = null;
         snake.hidden = true;
-        snake.style.removeProperty('opacity');
-        targetCell?.classList.remove('snake-target-active');
+        setTargetActive(false);
         delete card.dataset.snakePlaying;
       };
 
-      const renderSnake = (startedAt: number, now: number) => {
-        if (disposed || !card.isConnected || prefersReducedSnakeMotion()) {
-          hideSnake();
+      const renderSnake = (now: number) => {
+        if (disposed || !isVisible || !card.isConnected || prefersReducedSnakeMotion()) {
+          stopSnake();
           return;
         }
 
-        if (geometryDirty || !geometry) geometry = measureGeometry();
+        if (geometryDirty || !geometry) {
+          geometry = measureGeometry();
+          startedAt = now;
+          pausedElapsed = 0;
+        }
         if (!geometry) {
-          hideSnake();
+          stopSnake();
           return;
         }
 
         const elapsed = Math.max(0, now - startedAt);
         const movementDuration = geometry.moveCount * SNAKE_STEP_DURATION_MS;
-        const fadeStart = movementDuration + SNAKE_TARGET_HOLD_MS;
-        const animationDuration = fadeStart + SNAKE_EXIT_FADE_MS;
-        const movementProgress = Math.min(elapsed / SNAKE_STEP_DURATION_MS, geometry.moveCount);
-        const step = Math.min(Math.floor(movementProgress), geometry.moveCount - 1);
-        const stepProgress = movementProgress >= geometry.moveCount ? 1 : movementProgress - step;
+        const movementProgress = (elapsed % movementDuration) / SNAKE_STEP_DURATION_MS;
+        const step = Math.floor(movementProgress);
+        const stepProgress = movementProgress - step;
         const headIndex = SNAKE_PART_COUNT - 1 + step;
 
         parts.forEach((part, index) => {
@@ -323,48 +353,48 @@ const snakeStartStep = Math.max(0, Math.ceil((snakeEndStep - maxSnakeDays + 1) /
           part.style.transform = `translate3d(${x.toFixed(2)}px, ${y.toFixed(2)}px, 0)`;
         });
 
-        const enterOpacity = smoothSnakeOpacity(clampSnakeProgress(elapsed / SNAKE_ENTER_FADE_MS));
-        const exitOpacity =
-          elapsed <= fadeStart
-            ? 1
-            : 1 -
-              smoothSnakeOpacity(clampSnakeProgress((elapsed - fadeStart) / SNAKE_EXIT_FADE_MS));
-        snake.style.opacity = `${enterOpacity * exitOpacity}`;
+        const targetMoveStep = geometry.targetMoveStep;
+        setTargetActive(
+          targetMoveStep !== null &&
+            movementProgress >= targetMoveStep &&
+            movementProgress < targetMoveStep + SNAKE_TARGET_ACTIVE_STEPS,
+        );
 
-        if (elapsed >= movementDuration) targetCell?.classList.add('snake-target-active');
+        animationFrame = window.requestAnimationFrame(renderSnake);
+      };
 
-        if (elapsed >= animationDuration) {
-          hideSnake();
+      const startSnake = () => {
+        if (disposed || !isVisible || prefersReducedSnakeMotion() || animationFrame !== null) {
           return;
         }
 
-        animationFrame = window.requestAnimationFrame((frameTime) =>
-          renderSnake(startedAt, frameTime),
-        );
-      };
-
-      const play = () => {
-        if (disposed || prefersReducedSnakeMotion() || animationFrame !== null) return;
-
-        const now = performance.now();
-        if (now - lastPlayedAt < SNAKE_REPLAY_COOLDOWN_MS) return;
-
-        geometry = measureGeometry();
+        if (geometryDirty || !geometry) {
+          geometry = measureGeometry();
+          pausedElapsed = 0;
+        }
         if (!geometry) return;
 
-        targetCell?.classList.remove('snake-target-active');
+        setTargetActive(false);
         snake.hidden = false;
-        snake.style.opacity = '0';
         card.dataset.snakePlaying = 'true';
-        lastPlayedAt = now;
-        animationFrame = window.requestAnimationFrame((frameTime) =>
-          renderSnake(frameTime, frameTime),
-        );
+        startedAt = performance.now() - pausedElapsed;
+        animationFrame = window.requestAnimationFrame(renderSnake);
       };
+
+      const syncSnakePlayback = () => {
+        if (isVisible && document.visibilityState !== 'hidden' && !prefersReducedSnakeMotion()) {
+          startSnake();
+        } else {
+          stopSnake();
+        }
+      };
+
+      const handleVisibilityChange = () => syncSnakePlayback();
 
       if ('ResizeObserver' in window) {
         resizeObserver = new ResizeObserver(() => {
           geometryDirty = true;
+          if (animationFrame === null) pausedElapsed = 0;
         });
         resizeObserver.observe(grid);
       }
@@ -372,17 +402,23 @@ const snakeStartStep = Math.max(0, Math.ceil((snakeEndStep - maxSnakeDays + 1) /
       if ('IntersectionObserver' in window) {
         intersectionObserver = new IntersectionObserver(
           (entries) => {
-            if (!entries.some((entry) => entry.isIntersecting)) return;
+            const entry = entries.find((candidate) => candidate.target === card);
+            if (!entry) return;
 
-            play();
-            intersectionObserver?.disconnect();
+            isVisible = entry.isIntersecting;
+            syncSnakePlayback();
           },
-          { threshold: 0.25 },
+          { rootMargin: '80px 0px', threshold: 0.05 },
         );
         intersectionObserver.observe(card);
       } else {
-        play();
+        isVisible = true;
+        startSnake();
       }
+
+      reducedMotionQuery.addEventListener('change', syncSnakePlayback);
+      forcedColorsQuery.addEventListener('change', syncSnakePlayback);
+      document.addEventListener('visibilitychange', handleVisibilityChange);
 
       document.addEventListener(
         'astro:before-swap',
@@ -390,16 +426,13 @@ const snakeStartStep = Math.max(0, Math.ceil((snakeEndStep - maxSnakeDays + 1) /
           disposed = true;
           resizeObserver?.disconnect();
           intersectionObserver?.disconnect();
-          if (animationFrame !== null) window.cancelAnimationFrame(animationFrame);
-          hideSnake();
+          reducedMotionQuery.removeEventListener('change', syncSnakePlayback);
+          forcedColorsQuery.removeEventListener('change', syncSnakePlayback);
+          document.removeEventListener('visibilitychange', handleVisibilityChange);
+          stopSnake();
         },
         { once: true },
       );
-
-      card.addEventListener('pointerenter', play);
-      card.addEventListener('focusin', (event) => {
-        if (!card.contains(event.relatedTarget as Node | null)) play();
-      });
     }
   };
 
@@ -596,9 +629,8 @@ const snakeStartStep = Math.max(0, Math.ceil((snakeEndStep - maxSnakeDays + 1) /
     position: absolute;
     z-index: 2;
     inset: 0;
-    opacity: 0;
+    overflow: hidden;
     pointer-events: none;
-    will-change: opacity;
   }
 
   .heatmap-snake-part {

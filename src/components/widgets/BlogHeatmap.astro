@@ -25,6 +25,11 @@ const {
 const posts = await getCollection('blog', ({ data }) => !excludeDraft || !data.draft);
 const heatmap = createRecentBlogHeatmap(posts, weeks, latestCount, startDate);
 const ui = getUiText(await getSiteConfig());
+const latestActiveDayIndex = heatmap.days.reduce(
+  (latestIndex, day, dayIndex) => (day.count > 0 && !day.isFuture ? dayIndex : latestIndex),
+  -1,
+);
+const maxSnakeDays = 24 * 7;
 const heatmapLabel = startDate
   ? ui.heatmap.writingSince(heatmap.startDate)
   : ui.heatmap.recentWeeks(heatmap.weeks);
@@ -54,9 +59,22 @@ function getDayHref(day: HeatmapDay) {
 
   return day.posts[0]?.href;
 }
+
+function getSnakeStep(dayIndex: number) {
+  const weekIndex = Math.floor(dayIndex / 7);
+  const weekdayIndex = dayIndex % 7;
+
+  return weekIndex * 7 + (weekIndex % 2 === 0 ? weekdayIndex : 6 - weekdayIndex);
+}
+
+const snakeEndStep = latestActiveDayIndex >= 0 ? getSnakeStep(latestActiveDayIndex) : -1;
+const snakeStartStep = Math.max(0, snakeEndStep - maxSnakeDays + 1);
 ---
 
-<article class="glass-card heatmap-card">
+<article
+  class="glass-card heatmap-card"
+  data-heatmap-snake={latestActiveDayIndex >= 0 ? 'true' : undefined}
+>
   <div class="stats-row">
     <div class="stat-item">
       <strong>{heatmap.totalPosts}</strong>
@@ -102,9 +120,20 @@ function getDayHref(day: HeatmapDay) {
 
     <div class="heatmap-cells" style={`--week-count: ${heatmap.weeks};`}>
       {
-        heatmap.days.map((day) => {
+        heatmap.days.map((day, dayIndex) => {
+          const snakeStep = getSnakeStep(dayIndex);
+          const isOnSnakePath = snakeStep >= snakeStartStep && snakeEndStep >= snakeStep;
+          const isSnakeTarget = dayIndex === latestActiveDayIndex;
+          const snakeStyle = `--snake-step: ${Math.max(0, snakeStep - snakeStartStep)};`;
+
           if (day.isFuture) {
-            return <span class="heatmap-cell future-cell" aria-hidden="true" />;
+            return (
+              <span
+                class:list={['heatmap-cell', 'future-cell', { 'snake-segment': isOnSnakePath }]}
+                style={snakeStyle}
+                aria-hidden="true"
+              />
+            );
           }
 
           const href = getDayHref(day);
@@ -117,11 +146,27 @@ function getDayHref(day: HeatmapDay) {
           );
 
           return href ? (
-            <a class="cell-link" href={href} aria-label={getDayTitle(day)}>
+            <a
+              class:list={[
+                'cell-link',
+                { 'snake-segment': isOnSnakePath, 'snake-target': isSnakeTarget },
+              ]}
+              style={snakeStyle}
+              href={href}
+              aria-label={getDayTitle(day)}
+            >
               {content}
             </a>
           ) : (
-            <span class="cell-link static-cell" aria-label={getDayTitle(day)}>
+            <span
+              class:list={[
+                'cell-link',
+                'static-cell',
+                { 'snake-segment': isOnSnakePath, 'snake-target': isSnakeTarget },
+              ]}
+              style={snakeStyle}
+              aria-label={getDayTitle(day)}
+            >
               {content}
             </span>
           );
@@ -136,6 +181,59 @@ function getDayHref(day: HeatmapDay) {
     <span>{ui.heatmap.more}</span>
   </footer>
 </article>
+
+<script>
+  const prefersReducedSnakeMotion = () =>
+    window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ||
+    window.matchMedia?.('(forced-colors: active)').matches;
+
+  const playHeatmapSnake = (card: HTMLElement) => {
+    if (prefersReducedSnakeMotion()) return;
+
+    delete card.dataset.snakePlaying;
+    void card.offsetWidth;
+    card.dataset.snakePlaying = 'true';
+  };
+
+  const initHeatmapSnakes = () => {
+    for (const card of document.querySelectorAll<HTMLElement>('[data-heatmap-snake]')) {
+      if (card.dataset.snakeReady) continue;
+
+      card.dataset.snakeReady = 'true';
+      let lastPlayedAt = Number.NEGATIVE_INFINITY;
+      const play = () => {
+        const now = performance.now();
+        if (now - lastPlayedAt < 3900) return;
+
+        lastPlayedAt = now;
+        playHeatmapSnake(card);
+      };
+
+      if ('IntersectionObserver' in window) {
+        const observer = new IntersectionObserver(
+          (entries) => {
+            if (!entries.some((entry) => entry.isIntersecting)) return;
+
+            play();
+            observer.disconnect();
+          },
+          { threshold: 0.2 },
+        );
+        observer.observe(card);
+      } else {
+        play();
+      }
+
+      card.addEventListener('pointerenter', play);
+      card.addEventListener('focusin', (event) => {
+        if (!card.contains(event.relatedTarget as Node | null)) play();
+      });
+    }
+  };
+
+  initHeatmapSnakes();
+  document.addEventListener('astro:page-load', initHeatmapSnakes);
+</script>
 
 <style>
   .heatmap-card {
@@ -313,8 +411,33 @@ function getDayHref(day: HeatmapDay) {
   }
 
   .future-cell {
+    position: relative;
     background: transparent;
     box-shadow: none;
+  }
+
+  .heatmap-cells .snake-segment::after {
+    position: absolute;
+    inset: -1px;
+    border-radius: 3px;
+    background: var(--paper-accent);
+    box-shadow:
+      0 0 0 1px color-mix(in srgb, var(--paper-accent) 44%, transparent),
+      0 0 8px color-mix(in srgb, var(--paper-accent) 38%, transparent);
+    content: '';
+    opacity: 0;
+    pointer-events: none;
+    transform: scale(0.55);
+  }
+
+  .heatmap-card[data-snake-playing='true'] .heatmap-cells .snake-segment::after {
+    animation: heatmap-snake-segment 360ms cubic-bezier(0.22, 1, 0.36, 1) both;
+    animation-delay: calc(150ms + var(--snake-step) * 18ms);
+  }
+
+  .heatmap-card[data-snake-playing='true'] .snake-target .heatmap-cell {
+    animation: heatmap-snake-target 480ms cubic-bezier(0.34, 1.56, 0.64, 1) both;
+    animation-delay: calc(260ms + var(--snake-step) * 18ms);
   }
 
   .level-0 {
@@ -347,6 +470,43 @@ function getDayHref(day: HeatmapDay) {
 
   footer .heatmap-cell {
     --cell-size: 9px;
+  }
+
+  @keyframes heatmap-snake-segment {
+    0% {
+      opacity: 0;
+      transform: scale(0.55);
+    }
+
+    20% {
+      opacity: 1;
+      transform: scale(1.18);
+    }
+
+    58% {
+      opacity: 0.72;
+      transform: scale(1);
+    }
+
+    100% {
+      opacity: 0;
+      transform: scale(0.72);
+    }
+  }
+
+  @keyframes heatmap-snake-target {
+    0%,
+    100% {
+      box-shadow: inset 0 0 0 1px var(--paper-line);
+      transform: scale(1);
+    }
+
+    45% {
+      box-shadow:
+        inset 0 0 0 1px var(--paper-line),
+        0 0 0 3px color-mix(in srgb, var(--paper-accent) 22%, transparent);
+      transform: scale(1.42);
+    }
   }
 
   @media (max-width: 1180px) and (min-width: 821px) {
@@ -387,6 +547,13 @@ function getDayHref(day: HeatmapDay) {
 
     .weekday-column {
       font-size: 0.58rem;
+    }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .heatmap-card[data-snake-playing='true'] .heatmap-cells .snake-segment::after,
+    .heatmap-card[data-snake-playing='true'] .snake-target .heatmap-cell {
+      animation: none;
     }
   }
 </style>

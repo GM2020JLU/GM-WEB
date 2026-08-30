@@ -84,27 +84,8 @@ const structuredData = {
     const themeTransitionState =
       window.__gouminThemeTransitionState ||
       (window.__gouminThemeTransitionState = {
-        point: null,
         running: false,
       });
-
-    const getThemeTransitionPoint = () => {
-      if (themeTransitionState.point) return themeTransitionState.point;
-
-      const toggle = document.querySelector('[data-theme-toggle]');
-      if (toggle instanceof HTMLElement) {
-        const rect = toggle.getBoundingClientRect();
-        return {
-          x: rect.left + rect.width / 2,
-          y: rect.top + rect.height / 2,
-        };
-      }
-
-      return {
-        x: document.documentElement.clientWidth / 2,
-        y: document.documentElement.clientHeight / 2,
-      };
-    };
 
     const enhanceThemeToggle = () => {
       const themeController = window.__navfolioTheme;
@@ -127,38 +108,24 @@ const structuredData = {
 
         if (!canAnimate) {
           toggleTheme();
-          themeTransitionState.point = null;
           return;
         }
 
         if (themeTransitionState.running) return;
 
-        const viewportWidth = document.documentElement.clientWidth;
-        const viewportHeight = document.documentElement.clientHeight;
-        const point = getThemeTransitionPoint();
-        const x = Math.min(Math.max(point.x, 0), viewportWidth);
-        const y = Math.min(Math.max(point.y, 0), viewportHeight);
-        const radius = Math.hypot(Math.max(x, viewportWidth - x), Math.max(y, viewportHeight - y));
         const animationId = (themeTransitionState.animationId ?? 0) + 1;
 
         themeTransitionState.animationId = animationId;
         themeTransitionState.running = true;
         root.dataset.themeTransition = 'active';
         root.dataset.themeTransitionCapture = 'true';
-        root.style.setProperty('--theme-transition-x', `${x}px`);
-        root.style.setProperty('--theme-transition-y', `${y}px`);
-        root.style.setProperty('--theme-transition-radius', `${radius}px`);
 
         const cleanupThemeTransition = () => {
           if (themeTransitionState.animationId !== animationId) return;
 
           delete root.dataset.themeTransition;
           delete root.dataset.themeTransitionCapture;
-          root.style.removeProperty('--theme-transition-x');
-          root.style.removeProperty('--theme-transition-y');
-          root.style.removeProperty('--theme-transition-radius');
           themeTransitionState.running = false;
-          themeTransitionState.point = null;
           themeTransitionState.activeTransition = null;
           themeTransitionState.cleanup = null;
         };
@@ -186,25 +153,6 @@ const structuredData = {
         transition.finished.catch(() => {}).finally(cleanupThemeTransition);
       };
     };
-
-    if (!window.__gouminThemeTransitionPointerInitialized) {
-      window.__gouminThemeTransitionPointerInitialized = true;
-      document.addEventListener(
-        'click',
-        (event) => {
-          const toggle =
-            event.target instanceof Element && event.target.closest('[data-theme-toggle]');
-          if (!(toggle instanceof HTMLElement)) return;
-
-          const rect = toggle.getBoundingClientRect();
-          const fromPointer = event.detail > 0 && Number.isFinite(event.clientX + event.clientY);
-          themeTransitionState.point = fromPointer
-            ? { x: event.clientX, y: event.clientY }
-            : { x: rect.left + rect.width / 2, y: rect.top + rect.height / 2 };
-        },
-        true,
-      );
-    }
 
     enhanceThemeToggle();
 

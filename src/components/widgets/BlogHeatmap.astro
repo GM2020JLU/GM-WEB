@@ -29,7 +29,7 @@ const latestActiveDayIndex = heatmap.days.reduce(
   (latestIndex, day, dayIndex) => (day.count > 0 && !day.isFuture ? dayIndex : latestIndex),
   -1,
 );
-const maxSnakeDays = 24 * 7;
+const maxSnakeDays = 44;
 const heatmapLabel = startDate
   ? ui.heatmap.writingSince(heatmap.startDate)
   : ui.heatmap.recentWeeks(heatmap.weeks);
@@ -68,7 +68,7 @@ function getSnakeStep(dayIndex: number) {
 }
 
 const snakeEndStep = latestActiveDayIndex >= 0 ? getSnakeStep(latestActiveDayIndex) : -1;
-const snakeStartStep = Math.max(0, snakeEndStep - maxSnakeDays + 1);
+const snakeStartStep = Math.max(0, Math.ceil((snakeEndStep - maxSnakeDays + 1) / 7) * 7);
 ---
 
 <article
@@ -124,13 +124,13 @@ const snakeStartStep = Math.max(0, snakeEndStep - maxSnakeDays + 1);
           const snakeStep = getSnakeStep(dayIndex);
           const isOnSnakePath = snakeStep >= snakeStartStep && snakeEndStep >= snakeStep;
           const isSnakeTarget = dayIndex === latestActiveDayIndex;
-          const snakeStyle = `--snake-step: ${Math.max(0, snakeStep - snakeStartStep)};`;
+          const snakePathStep = isOnSnakePath ? snakeStep - snakeStartStep : undefined;
 
           if (day.isFuture) {
             return (
               <span
-                class:list={['heatmap-cell', 'future-cell', { 'snake-segment': isOnSnakePath }]}
-                style={snakeStyle}
+                class="heatmap-cell future-cell"
+                data-snake-step={snakePathStep}
                 aria-hidden="true"
               />
             );
@@ -147,11 +147,9 @@ const snakeStartStep = Math.max(0, snakeEndStep - maxSnakeDays + 1);
 
           return href ? (
             <a
-              class:list={[
-                'cell-link',
-                { 'snake-segment': isOnSnakePath, 'snake-target': isSnakeTarget },
-              ]}
-              style={snakeStyle}
+              class="cell-link"
+              data-snake-step={snakePathStep}
+              data-snake-target={isSnakeTarget ? 'true' : undefined}
               href={href}
               aria-label={getDayTitle(day)}
             >
@@ -159,12 +157,9 @@ const snakeStartStep = Math.max(0, snakeEndStep - maxSnakeDays + 1);
             </a>
           ) : (
             <span
-              class:list={[
-                'cell-link',
-                'static-cell',
-                { 'snake-segment': isOnSnakePath, 'snake-target': isSnakeTarget },
-              ]}
-              style={snakeStyle}
+              class="cell-link static-cell"
+              data-snake-step={snakePathStep}
+              data-snake-target={isSnakeTarget ? 'true' : undefined}
               aria-label={getDayTitle(day)}
             >
               {content}
@@ -172,6 +167,10 @@ const snakeStartStep = Math.max(0, snakeEndStep - maxSnakeDays + 1);
           );
         })
       }
+
+      <span class="heatmap-snake" aria-hidden="true" hidden>
+        {[0, 1, 2, 3].map((segment) => <i class={`heatmap-snake-part part-${segment}`} />)}
+      </span>
     </div>
   </div>
 
@@ -183,46 +182,219 @@ const snakeStartStep = Math.max(0, snakeEndStep - maxSnakeDays + 1);
 </article>
 
 <script>
+  const SNAKE_PART_COUNT = 4;
+  const SNAKE_PART_SCALES = [0.9, 0.769, 0.675, 0.619];
+  const SNAKE_STEP_DURATION_MS = 82;
+  const SNAKE_ENTER_FADE_MS = 140;
+  const SNAKE_TARGET_HOLD_MS = 140;
+  const SNAKE_EXIT_FADE_MS = 220;
+  const SNAKE_REPLAY_COOLDOWN_MS = 9000;
+
+  type SnakePoint = { x: number; y: number };
+  type SnakeGeometry = {
+    route: SnakePoint[];
+    cellSize: number;
+    moveCount: number;
+  };
+
+  const clampSnakeProgress = (value: number) => Math.max(0, Math.min(1, value));
+  const lerpSnakePosition = (from: number, to: number, progress: number) =>
+    from + (to - from) * progress;
+  const smoothSnakeOpacity = (progress: number) => progress * progress * (3 - 2 * progress);
+
   const prefersReducedSnakeMotion = () =>
     window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ||
     window.matchMedia?.('(forced-colors: active)').matches;
-
-  const playHeatmapSnake = (card: HTMLElement) => {
-    if (prefersReducedSnakeMotion()) return;
-
-    delete card.dataset.snakePlaying;
-    void card.offsetWidth;
-    card.dataset.snakePlaying = 'true';
-  };
 
   const initHeatmapSnakes = () => {
     for (const card of document.querySelectorAll<HTMLElement>('[data-heatmap-snake]')) {
       if (card.dataset.snakeReady) continue;
 
       card.dataset.snakeReady = 'true';
-      let lastPlayedAt = Number.NEGATIVE_INFINITY;
-      const play = () => {
-        const now = performance.now();
-        if (now - lastPlayedAt < 3900) return;
+      const grid = card.querySelector<HTMLElement>('.heatmap-cells');
+      const snake = grid?.querySelector<HTMLElement>('.heatmap-snake');
+      const parts = snake
+        ? Array.from(snake.querySelectorAll<HTMLElement>('.heatmap-snake-part'))
+        : [];
+      const targetCell = grid?.querySelector<HTMLElement>(
+        '[data-snake-target="true"] .heatmap-cell',
+      );
 
-        lastPlayedAt = now;
-        playHeatmapSnake(card);
+      if (!grid || !snake || parts.length !== SNAKE_PART_COUNT) continue;
+
+      let lastPlayedAt = Number.NEGATIVE_INFINITY;
+      let animationFrame: number | null = null;
+      let geometry: SnakeGeometry | null = null;
+      let geometryDirty = true;
+      let disposed = false;
+      let resizeObserver: ResizeObserver | null = null;
+      let intersectionObserver: IntersectionObserver | null = null;
+
+      const measureGeometry = (): SnakeGeometry | null => {
+        const pathCells = Array.from(grid.querySelectorAll<HTMLElement>('[data-snake-step]')).sort(
+          (left, right) => Number(left.dataset.snakeStep) - Number(right.dataset.snakeStep),
+        );
+
+        if (pathCells.length === 0) return null;
+
+        const gridRect = grid.getBoundingClientRect();
+        const cellRects = pathCells.map((cell) => cell.getBoundingClientRect());
+        const points = cellRects.map((rect) => ({
+          x: rect.left - gridRect.left + rect.width / 2,
+          y: rect.top - gridRect.top + rect.height / 2,
+        }));
+        const firstPoint = points[0];
+        const firstRect = cellRects[0];
+        const gridStyle = window.getComputedStyle(grid);
+        const columnGap = Number.parseFloat(gridStyle.columnGap) || 0;
+        const rowGap = Number.parseFloat(gridStyle.rowGap) || 0;
+        const columnPitch = firstRect.width + columnGap;
+        const rowPitch = firstRect.height + rowGap;
+        const nextPoint = points[1];
+        const inward = nextPoint
+          ? { x: nextPoint.x - firstPoint.x, y: nextPoint.y - firstPoint.y }
+          : {
+              x: 0,
+              y: firstPoint.y <= gridRect.height / 2 ? rowPitch : -rowPitch,
+            };
+        const entryPoint = {
+          x: firstPoint.x - inward.x,
+          y: firstPoint.y - inward.y,
+        };
+        const bodyDirection = entryPoint.x <= gridRect.width / 2 ? 1 : -1;
+        const entryPose = Array.from({ length: SNAKE_PART_COUNT }, (_, index) => ({
+          x: entryPoint.x + bodyDirection * columnPitch * (SNAKE_PART_COUNT - index - 1),
+          y: entryPoint.y,
+        }));
+        const cellSize = Math.min(firstRect.width, firstRect.height);
+
+        parts.forEach((part, index) => {
+          const size = cellSize * SNAKE_PART_SCALES[index];
+          part.style.width = `${size}px`;
+          part.style.height = `${size}px`;
+        });
+
+        geometryDirty = false;
+        return {
+          route: [...entryPose, ...points],
+          cellSize,
+          moveCount: points.length,
+        };
       };
 
+      const hideSnake = () => {
+        animationFrame = null;
+        snake.hidden = true;
+        snake.style.removeProperty('opacity');
+        targetCell?.classList.remove('snake-target-active');
+        delete card.dataset.snakePlaying;
+      };
+
+      const renderSnake = (startedAt: number, now: number) => {
+        if (disposed || !card.isConnected || prefersReducedSnakeMotion()) {
+          hideSnake();
+          return;
+        }
+
+        if (geometryDirty || !geometry) geometry = measureGeometry();
+        if (!geometry) {
+          hideSnake();
+          return;
+        }
+
+        const elapsed = Math.max(0, now - startedAt);
+        const movementDuration = geometry.moveCount * SNAKE_STEP_DURATION_MS;
+        const fadeStart = movementDuration + SNAKE_TARGET_HOLD_MS;
+        const animationDuration = fadeStart + SNAKE_EXIT_FADE_MS;
+        const movementProgress = Math.min(elapsed / SNAKE_STEP_DURATION_MS, geometry.moveCount);
+        const step = Math.min(Math.floor(movementProgress), geometry.moveCount - 1);
+        const stepProgress = movementProgress >= geometry.moveCount ? 1 : movementProgress - step;
+        const headIndex = SNAKE_PART_COUNT - 1 + step;
+
+        parts.forEach((part, index) => {
+          const delay = (0.2 * index) / Math.max(SNAKE_PART_COUNT - 1, 1);
+          const partProgress = clampSnakeProgress((stepProgress - delay) / 0.8);
+          const from = geometry!.route[headIndex - index];
+          const to = geometry!.route[Math.min(headIndex + 1 - index, geometry!.route.length - 1)];
+          const size = geometry!.cellSize * SNAKE_PART_SCALES[index];
+          const x = lerpSnakePosition(from.x, to.x, partProgress) - size / 2;
+          const y = lerpSnakePosition(from.y, to.y, partProgress) - size / 2;
+
+          part.style.transform = `translate3d(${x.toFixed(2)}px, ${y.toFixed(2)}px, 0)`;
+        });
+
+        const enterOpacity = smoothSnakeOpacity(clampSnakeProgress(elapsed / SNAKE_ENTER_FADE_MS));
+        const exitOpacity =
+          elapsed <= fadeStart
+            ? 1
+            : 1 -
+              smoothSnakeOpacity(clampSnakeProgress((elapsed - fadeStart) / SNAKE_EXIT_FADE_MS));
+        snake.style.opacity = `${enterOpacity * exitOpacity}`;
+
+        if (elapsed >= movementDuration) targetCell?.classList.add('snake-target-active');
+
+        if (elapsed >= animationDuration) {
+          hideSnake();
+          return;
+        }
+
+        animationFrame = window.requestAnimationFrame((frameTime) =>
+          renderSnake(startedAt, frameTime),
+        );
+      };
+
+      const play = () => {
+        if (disposed || prefersReducedSnakeMotion() || animationFrame !== null) return;
+
+        const now = performance.now();
+        if (now - lastPlayedAt < SNAKE_REPLAY_COOLDOWN_MS) return;
+
+        geometry = measureGeometry();
+        if (!geometry) return;
+
+        targetCell?.classList.remove('snake-target-active');
+        snake.hidden = false;
+        snake.style.opacity = '0';
+        card.dataset.snakePlaying = 'true';
+        lastPlayedAt = now;
+        animationFrame = window.requestAnimationFrame((frameTime) =>
+          renderSnake(frameTime, frameTime),
+        );
+      };
+
+      if ('ResizeObserver' in window) {
+        resizeObserver = new ResizeObserver(() => {
+          geometryDirty = true;
+        });
+        resizeObserver.observe(grid);
+      }
+
       if ('IntersectionObserver' in window) {
-        const observer = new IntersectionObserver(
+        intersectionObserver = new IntersectionObserver(
           (entries) => {
             if (!entries.some((entry) => entry.isIntersecting)) return;
 
             play();
-            observer.disconnect();
+            intersectionObserver?.disconnect();
           },
-          { threshold: 0.2 },
+          { threshold: 0.25 },
         );
-        observer.observe(card);
+        intersectionObserver.observe(card);
       } else {
         play();
       }
+
+      document.addEventListener(
+        'astro:before-swap',
+        () => {
+          disposed = true;
+          resizeObserver?.disconnect();
+          intersectionObserver?.disconnect();
+          if (animationFrame !== null) window.cancelAnimationFrame(animationFrame);
+          hideSnake();
+        },
+        { once: true },
+      );
 
       card.addEventListener('pointerenter', play);
       card.addEventListener('focusin', (event) => {
@@ -373,6 +545,7 @@ const snakeStartStep = Math.max(0, snakeEndStep - maxSnakeDays + 1);
   }
 
   .heatmap-cells {
+    position: relative;
     display: grid;
     grid-auto-flow: column;
     grid-template-rows: repeat(7, var(--cell-size));
@@ -408,6 +581,9 @@ const snakeStartStep = Math.max(0, snakeEndStep - maxSnakeDays + 1);
     border-radius: 2.5px;
     background: rgba(102, 125, 109, 0.12);
     box-shadow: inset 0 0 0 1px var(--paper-line);
+    transition:
+      background-color 140ms ease-out,
+      box-shadow 140ms ease-out;
   }
 
   .future-cell {
@@ -416,28 +592,31 @@ const snakeStartStep = Math.max(0, snakeEndStep - maxSnakeDays + 1);
     box-shadow: none;
   }
 
-  .heatmap-cells .snake-segment::after {
+  .heatmap-snake {
     position: absolute;
-    inset: -1px;
-    border-radius: 3px;
-    background: var(--paper-accent);
-    box-shadow:
-      0 0 0 1px color-mix(in srgb, var(--paper-accent) 44%, transparent),
-      0 0 8px color-mix(in srgb, var(--paper-accent) 38%, transparent);
-    content: '';
+    z-index: 2;
+    inset: 0;
     opacity: 0;
     pointer-events: none;
-    transform: scale(0.55);
+    will-change: opacity;
   }
 
-  .heatmap-card[data-snake-playing='true'] .heatmap-cells .snake-segment::after {
-    animation: heatmap-snake-segment 360ms cubic-bezier(0.22, 1, 0.36, 1) both;
-    animation-delay: calc(150ms + var(--snake-step) * 18ms);
+  .heatmap-snake-part {
+    position: absolute;
+    top: 0;
+    left: 0;
+    display: block;
+    border-radius: 30%;
+    background: var(--paper-accent);
+    box-shadow: 0 0 0 1px color-mix(in srgb, var(--paper-accent) 18%, transparent);
+    pointer-events: none;
+    transform: translate3d(-100vw, -100vh, 0);
+    will-change: transform;
   }
 
-  .heatmap-card[data-snake-playing='true'] .snake-target .heatmap-cell {
-    animation: heatmap-snake-target 480ms cubic-bezier(0.34, 1.56, 0.64, 1) both;
-    animation-delay: calc(260ms + var(--snake-step) * 18ms);
+  .heatmap-cells .heatmap-cell.snake-target-active {
+    background: color-mix(in srgb, var(--paper-accent) 76%, transparent);
+    box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--paper-accent) 42%, transparent);
   }
 
   .level-0 {
@@ -470,43 +649,6 @@ const snakeStartStep = Math.max(0, snakeEndStep - maxSnakeDays + 1);
 
   footer .heatmap-cell {
     --cell-size: 9px;
-  }
-
-  @keyframes heatmap-snake-segment {
-    0% {
-      opacity: 0;
-      transform: scale(0.55);
-    }
-
-    20% {
-      opacity: 1;
-      transform: scale(1.18);
-    }
-
-    58% {
-      opacity: 0.72;
-      transform: scale(1);
-    }
-
-    100% {
-      opacity: 0;
-      transform: scale(0.72);
-    }
-  }
-
-  @keyframes heatmap-snake-target {
-    0%,
-    100% {
-      box-shadow: inset 0 0 0 1px var(--paper-line);
-      transform: scale(1);
-    }
-
-    45% {
-      box-shadow:
-        inset 0 0 0 1px var(--paper-line),
-        0 0 0 3px color-mix(in srgb, var(--paper-accent) 22%, transparent);
-      transform: scale(1.42);
-    }
   }
 
   @media (max-width: 1180px) and (min-width: 821px) {
@@ -550,10 +692,9 @@ const snakeStartStep = Math.max(0, snakeEndStep - maxSnakeDays + 1);
     }
   }
 
-  @media (prefers-reduced-motion: reduce) {
-    .heatmap-card[data-snake-playing='true'] .heatmap-cells .snake-segment::after,
-    .heatmap-card[data-snake-playing='true'] .snake-target .heatmap-cell {
-      animation: none;
+  @media (prefers-reduced-motion: reduce), (forced-colors: active) {
+    .heatmap-snake {
+      display: none;
     }
   }
 </style>

@@ -29,7 +29,7 @@ const latestActiveDayIndex = heatmap.days.reduce(
   (latestIndex, day, dayIndex) => (day.count > 0 && !day.isFuture ? dayIndex : latestIndex),
   -1,
 );
-const maxSnakeDays = 44;
+const hasSnake = latestActiveDayIndex >= 0;
 const heatmapLabel = startDate
   ? ui.heatmap.writingSince(heatmap.startDate)
   : ui.heatmap.recentWeeks(heatmap.weeks);
@@ -66,19 +66,9 @@ function getSnakeStep(dayIndex: number) {
 
   return weekIndex * 7 + (weekIndex % 2 === 0 ? weekdayIndex : 6 - weekdayIndex);
 }
-
-const snakeTargetStep = latestActiveDayIndex >= 0 ? getSnakeStep(latestActiveDayIndex) : -1;
-const snakeEndStep =
-  snakeTargetStep >= 0
-    ? Math.min(heatmap.days.length - 1, Math.floor(snakeTargetStep / 7) * 7 + 6)
-    : -1;
-const snakeStartStep = Math.max(0, Math.ceil((snakeEndStep - maxSnakeDays + 1) / 7) * 7);
 ---
 
-<article
-  class="glass-card heatmap-card"
-  data-heatmap-snake={latestActiveDayIndex >= 0 ? 'true' : undefined}
->
+<article class="glass-card heatmap-card" data-heatmap-snake={hasSnake ? 'true' : undefined}>
   <div class="stats-row">
     <div class="stat-item">
       <strong>{heatmap.totalPosts}</strong>
@@ -126,9 +116,8 @@ const snakeStartStep = Math.max(0, Math.ceil((snakeEndStep - maxSnakeDays + 1) /
       {
         heatmap.days.map((day, dayIndex) => {
           const snakeStep = getSnakeStep(dayIndex);
-          const isOnSnakePath = snakeStep >= snakeStartStep && snakeEndStep >= snakeStep;
           const isSnakeTarget = dayIndex === latestActiveDayIndex;
-          const snakePathStep = isOnSnakePath ? snakeStep - snakeStartStep : undefined;
+          const snakePathStep = hasSnake ? snakeStep : undefined;
 
           if (day.isFuture) {
             return (

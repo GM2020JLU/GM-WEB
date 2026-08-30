@@ -10,26 +10,38 @@ interface Quote {
   text: string[];
 }
 
-const { intro, quote, email } = Astro.props as { intro: Intro; quote?: Quote; email: string };
+const { intro, quote, email, role } = Astro.props as {
+  intro: Intro;
+  quote?: Quote;
+  email: string;
+  role: string;
+};
+const basePath = import.meta.env.BASE_URL.replace(/\/$/, '');
+
+function withBase(href: string) {
+  if (href === '/') return `${basePath}/` || '/';
+  return `${basePath}${href.startsWith('/') ? href : `/${href}`}`;
+}
 ---
 
 <article class="glass-card intro-card">
   <div class="intro-copy">
+    <p class="intro-kicker"><span aria-hidden="true"></span>{role}</p>
     {
       quote && (
         <div class="quote-mark" aria-hidden="true">
-          "
+          “
         </div>
       )
     }
     <h1>
-      <span aria-hidden="true">你好，</span>
-      {intro.title.replace(intro.name, '')}<em>{intro.name}</em>
+      <span>你好，</span>
+      {intro.title}<em>{intro.name}</em>
     </h1>
     {
       quote && (
         <blockquote>
-          <span>- {quote.text.slice(0, 2).join(' ')}</span>
+          <span>{quote.text.slice(0, 2).join(' ')}</span>
           <span>{quote.text.slice(2).join(' ')}</span>
         </blockquote>
       )
@@ -45,8 +57,7 @@ const { intro, quote, email } = Astro.props as { intro: Intro; quote?: Quote; em
       )
     }
     <nav class="intro-actions" aria-label="进一步了解">
-      <a class="primary" href="/projects">查看项目案例</a>
-      <a href="/resume">查看简历</a>
+      <a class="primary" href={withBase('/projects')}>查看项目案例</a>
       <a href={`mailto:${email}`}>邮件交流</a>
     </nav>
   </div>
@@ -56,7 +67,7 @@ const { intro, quote, email } = Astro.props as { intro: Intro; quote?: Quote; em
   .intro-card {
     display: flex;
     flex-direction: column;
-    min-height: 280px;
+    min-height: 320px;
     padding: 0;
     border-color: transparent;
     background: transparent;
@@ -79,20 +90,42 @@ const { intro, quote, email } = Astro.props as { intro: Intro; quote?: Quote; em
     align-items: flex-start;
   }
 
+  .intro-kicker {
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+    width: auto;
+    margin: 0 0 28px;
+    color: var(--paper-ink-soft);
+    font-family: var(--font-ui-label);
+    font-size: 0.72rem;
+    font-weight: 600;
+    line-height: 1.4;
+  }
+
+  .intro-kicker span {
+    width: 28px;
+    height: 1px;
+    background: var(--paper-accent);
+  }
+
   .quote-mark {
-    margin-bottom: 2px;
-    color: rgba(102, 125, 109, 0.32);
+    position: absolute;
+    top: 26px;
+    right: 0;
+    color: color-mix(in srgb, var(--paper-accent) 20%, transparent);
     font-family: var(--font-display);
-    font-size: 3rem;
-    line-height: 0.7;
+    font-size: 8rem;
+    line-height: 1;
+    pointer-events: none;
   }
 
   h1 {
-    margin: 0 0 18px;
+    margin: 0 0 24px;
     color: var(--paper-ink);
     max-width: none;
-    font-size: clamp(2.2rem, 4vw, 3.35rem);
-    line-height: 1.04;
+    font-size: clamp(2.25rem, 5vw, 4rem);
+    line-height: 1.08;
     white-space: nowrap;
   }
 
@@ -109,8 +142,8 @@ const { intro, quote, email } = Astro.props as { intro: Intro; quote?: Quote; em
 
   blockquote {
     display: block;
-    max-width: 52ch;
-    margin: 0 0 26px auto;
+    max-width: 48ch;
+    margin: 0 0 28px;
     padding: 0;
     border: 0;
     color: var(--paper-ink-soft);
@@ -118,7 +151,7 @@ const { intro, quote, email } = Astro.props as { intro: Intro; quote?: Quote; em
     font-size: clamp(0.96rem, 1.35vw, 1.12rem);
     font-style: italic;
     line-height: 1.72;
-    text-align: right;
+    text-align: left;
   }
 
   blockquote span {
@@ -130,7 +163,7 @@ const { intro, quote, email } = Astro.props as { intro: Intro; quote?: Quote; em
     margin: 0 0 12px;
     color: var(--paper-ink);
     max-width: 66ch;
-    font-size: 1.02rem;
+    font-size: 1.05rem;
     line-height: 1.92;
   }
 
@@ -163,18 +196,26 @@ const { intro, quote, email } = Astro.props as { intro: Intro; quote?: Quote; em
   }
 
   .intro-actions a {
-    padding: 9px 13px;
+    display: inline-flex;
+    align-items: center;
+    min-height: 42px;
+    padding: 9px 14px;
     border: 1px solid var(--paper-line-strong);
-    border-radius: 9px;
+    border-radius: 8px;
     color: var(--paper-ink);
     font-size: 0.82rem;
     text-decoration: none;
+    transition:
+      color 180ms ease,
+      background 180ms ease,
+      border-color 180ms ease,
+      transform 120ms ease;
   }
 
   .intro-actions .primary {
-    border-color: var(--paper-accent);
-    background: var(--paper-accent);
-    color: white;
+    border-color: var(--accent-dark);
+    background: var(--accent-dark);
+    color: var(--paper-bg);
   }
 
   .intro-actions a:hover,
@@ -184,19 +225,45 @@ const { intro, quote, email } = Astro.props as { intro: Intro; quote?: Quote; em
     box-shadow: 0 0 0 3px color-mix(in srgb, var(--paper-accent) 18%, transparent);
   }
 
+  .intro-actions a:not(.primary):hover {
+    background: var(--paper-control-hover);
+    color: var(--paper-accent);
+  }
+
+  .intro-actions a:active {
+    transform: translateY(1px);
+  }
+
   @media (max-width: 640px) {
     .intro-card {
       padding: 0;
     }
 
     h1 {
-      font-size: 1.7rem;
+      font-size: 2.15rem;
       white-space: normal;
     }
 
+    .intro-kicker {
+      margin-bottom: 20px;
+    }
+
+    .quote-mark {
+      top: 18px;
+      font-size: 5rem;
+    }
+
     blockquote {
-      margin-left: 0;
       text-align: left;
+    }
+
+    .intro-actions {
+      width: 100%;
+    }
+
+    .intro-actions .primary {
+      justify-content: center;
+      width: 100%;
     }
   }
 </style>

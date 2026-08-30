@@ -4,8 +4,12 @@ import {
   parseStudioDocument,
   serializeStudioDocument,
   studioContentPath,
+  studioImageReferences,
   studioPublicUrl,
+  studioRepositoryImagePath,
+  studioWriteSchema,
   isScheduledPublicationDue,
+  validateStudioImageReferences,
   validateStudioDocument,
   validateStudioTaxonomyReferences,
 } from './studio-content';
@@ -31,6 +35,17 @@ describe('Studio 内容模型', () => {
     expect(studioContentPath('about', 'ignored')).toBe('src/content/about.mdx');
     expect(studioContentPath('tags', 'Linux')).toBe('src/content/taxonomies/tags/Linux.yaml');
     expect(() => studioContentPath('blog', '../secret')).toThrow('网址别名');
+  });
+
+  test('写入请求只接受 GitHub SHA 或本地内容哈希', () => {
+    const base = { body: '', metadata: {}, slug: 'test' };
+    expect(studioWriteSchema.parse({ ...base, expectedSha: 'a'.repeat(40) }).expectedSha).toBe(
+      'a'.repeat(40),
+    );
+    expect(studioWriteSchema.parse({ ...base, expectedSha: 'b'.repeat(64) }).expectedSha).toBe(
+      'b'.repeat(64),
+    );
+    expect(() => studioWriteSchema.parse({ ...base, expectedSha: 'stale' })).toThrow();
   });
 
   test('解析与序列化 Markdown frontmatter 并同步发布状态', () => {
@@ -84,6 +99,118 @@ describe('Studio 内容模型', () => {
         'published',
       ),
     ).toThrow('请改用“博客文章”模块');
+  });
+
+  test('待发布和已发布内容拒绝占位文案与缺失图片替代文本', () => {
+    const metadata = {
+      title: '图片测试',
+      description: '这是一段用于验证发布校验的完整内容摘要。',
+      date: '2026-08-26T10:00:00+08:00',
+    };
+    expect(() =>
+      serializeStudioDocument('blog', 'placeholder', metadata, '测试内容', 'ready'),
+    ).toThrow('占位内容');
+    expect(() =>
+      serializeStudioDocument(
+        'blog',
+        'missing-alt',
+        metadata,
+        '![](@assets/images/content/cover.png)',
+        'published',
+      ),
+    ).toThrow('正文图片缺少替代文本');
+    expect(() =>
+      serializeStudioDocument(
+        'blog',
+        'missing-hero-alt',
+        { ...metadata, heroImage: '@assets/images/content/cover.png' },
+        '有效正文',
+        'published',
+      ),
+    ).toThrow('封面图缺少替代文本');
+    expect(() =>
+      serializeStudioDocument(
+        'blog',
+        'draft-placeholder',
+        { title: '草稿' },
+        '![](/missing.png)\n\n测试内容',
+        'draft',
+      ),
+    ).not.toThrow();
+  });
+
+  test('提取图片引用并将别名、站点根路径和相对路径归一到仓库路径', () => {
+    expect(
+      studioImageReferences(
+        {
+          heroImage: '@assets/images/content/hero.png',
+          cover: '/covers/book.webp',
+          images: ['../../assets/images/content/gallery/one.png'],
+        },
+        '![散热片](../../assets/images/content/body.png?width=800)',
+      ),
+    ).toEqual(
+      expect.arrayContaining([
+        { label: '正文图片', source: '../../assets/images/content/body.png?width=800' },
+        { label: 'heroImage', source: '@assets/images/content/hero.png' },
+        { label: 'cover', source: '/covers/book.webp' },
+        { label: 'images', source: '../../assets/images/content/gallery/one.png' },
+      ]),
+    );
+    expect(
+      studioRepositoryImagePath('@assets/images/content/hero.png', 'src/content/blog/demo.md'),
+    ).toBe('src/assets/images/content/hero.png');
+    expect(studioRepositoryImagePath('/covers/book.webp', 'src/content/blog/demo.md')).toBe(
+      'public/covers/book.webp',
+    );
+    expect(
+      studioRepositoryImagePath(
+        '../../assets/images/content/body.png?width=800',
+        'src/content/blog/demo.md',
+      ),
+    ).toBe('src/assets/images/content/body.png');
+    expect(
+      studioRepositoryImagePath('https://images.example/cover.png', 'src/content/blog/demo.md'),
+    ).toBeUndefined();
+    expect(() =>
+      studioRepositoryImagePath('../../../../secret.png', 'src/content/blog/demo.md'),
+    ).toThrow('越出内容仓库');
+  });
+
+  test('写入待发布或已发布状态前确认本地图片存在', async () => {
+    const existing = new Set(['src/assets/images/content/exists.png']);
+    expect(
+      await validateStudioImageReferences(
+        {},
+        '![已存在](@assets/images/content/exists.png)',
+        'published',
+        'src/content/blog/demo.md',
+        (path) => existing.has(path),
+      ),
+    ).toBeUndefined();
+    let missingError: unknown;
+    try {
+      await validateStudioImageReferences(
+        { heroImage: '@assets/images/content/missing.png', heroImageAlt: '封面' },
+        '正文',
+        'ready',
+        'src/content/blog/demo.md',
+        (path) => existing.has(path),
+      );
+    } catch (error) {
+      missingError = error;
+    }
+    expect(missingError).toBeInstanceOf(Error);
+    expect((missingError as Error).message).toContain('heroImage 文件不存在');
+    expect(
+      await validateStudioImageReferences(
+        { cover: '/missing.png' },
+        '',
+        'draft',
+        'src/content/media/demo.md',
+        () => false,
+      ),
+    ).toBeUndefined();
   });
 
   test('拒绝拼错字段和不属于当前模块的字段并给出中文提示', () => {

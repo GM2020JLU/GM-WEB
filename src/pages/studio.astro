@@ -45,6 +45,7 @@ const items = definitions
       type,
       collection,
       status,
+      revision: typeof data.updatedDate === 'string' ? data.updatedDate : '',
       date: data.updatedDate ?? data.date ?? data.completedAt,
       issues: getContentHealth({ collection, id: entry.id, data, body: entry.body ?? '' }),
       publicUrl,
@@ -152,9 +153,12 @@ const moduleCards = [
               data-filter="published">已发布</button
             ><button type="button" data-filter="issues">需完善</button>
           </div><div>
-            <input type="search" placeholder="搜索内容" data-search /><select
-              data-type-filter
-              aria-label="内容类型"
+            <input
+              type="search"
+              placeholder="搜索内容"
+              aria-label="搜索内容标题与摘要"
+              data-search
+            /><select data-type-filter aria-label="内容类型"
               ><option value="all">全部类型</option>{
                 [...new Set(items.map((item) => item.type))].map((type) => (
                   <option value={type}>{type}</option>
@@ -164,7 +168,14 @@ const moduleCards = [
           </div>
         </div>
 
-        <div class="bulk-bar" data-bulk-bar hidden>
+        <p
+          class="selection-announcement"
+          data-selection-announcement
+          aria-live="polite"
+          aria-atomic="true"
+        >
+        </p>
+        <div class="bulk-bar" id="studio-bulk-actions" data-bulk-bar hidden>
           <span>已选择 <strong data-selected-count>0</strong> 条</span><div>
             <button type="button" data-bulk-action="draft">转为草稿</button><button
               type="button"
@@ -172,6 +183,7 @@ const moduleCards = [
             ><button type="button" data-bulk-action="publish">发布</button>
           </div>
         </div>
+        <div class="bulk-feedback" data-bulk-feedback role="status" hidden></div>
 
         <div class="content-list" data-content-list>
           {
@@ -182,13 +194,17 @@ const moduleCards = [
                 data-type={item.type}
                 data-health={item.issues.length ? 'issues' : 'good'}
               >
-                <input
-                  type="checkbox"
-                  data-select-item
-                  data-collection={item.collection}
-                  data-slug={item.id}
-                  aria-label={`选择 ${item.title}`}
-                />
+                <label class="select-target">
+                  <input
+                    type="checkbox"
+                    data-select-item
+                    data-collection={item.collection}
+                    data-slug={item.id}
+                    data-revision={item.revision}
+                    aria-label={`选择 ${item.title}`}
+                    aria-controls="studio-bulk-actions"
+                  />
+                </label>
                 <div class="content-main">
                   <>
                     <div>
@@ -211,11 +227,17 @@ const moduleCards = [
                   </>
                 </div>
                 <div class="row-actions">
-                  <a class="edit" href={item.editorUrl}>
+                  <a class="edit" href={item.editorUrl} aria-label={`编辑 ${item.title}`}>
                     编辑
                   </a>
-                  <a href={item.previewUrl}>预览</a>
-                  {item.publicUrl && <a href={item.publicUrl}>线上</a>}
+                  <a href={item.previewUrl} aria-label={`预览 ${item.title}`}>
+                    预览
+                  </a>
+                  {item.publicUrl && (
+                    <a href={item.publicUrl} aria-label={`在线查看 ${item.title}`}>
+                      线上
+                    </a>
+                  )}
                 </div>
               </article>
             ))
@@ -226,135 +248,9 @@ const moduleCards = [
     </main>
 
     <script>
-      import {
-        deploymentCopy,
-        readPendingDeployment,
-        STUDIO_DEPLOYMENT_STORAGE_KEY,
-      } from '../utils/studio-deployment';
-      import { matchesContentFilters } from '../utils/content-metrics';
-      const filters = [...document.querySelectorAll('[data-filter]')];
-      const rows = [...document.querySelectorAll('[data-row]')];
-      const search = document.querySelector('[data-search]');
-      const type = document.querySelector('[data-type-filter]');
-      const empty = document.querySelector('[data-empty]');
-      let active = 'all';
-      const apply = () => {
-        let visible = 0;
-        for (const row of rows) {
-          if (!(row instanceof HTMLElement)) continue;
-          const show = matchesContentFilters(
-            {
-              status: row.dataset.status,
-              type: row.dataset.type,
-              health: row.dataset.health,
-              text: row.textContent ?? '',
-            },
-            {
-              status: active,
-              type: type instanceof HTMLSelectElement ? type.value : 'all',
-              query:
-                search instanceof HTMLInputElement
-                  ? search.value.trim().toLocaleLowerCase('zh-CN')
-                  : '',
-            },
-          );
-          row.hidden = !show;
-          if (show) visible++;
-        }
-        if (empty instanceof HTMLElement) empty.hidden = visible > 0;
-      };
-      filters.forEach((button) =>
-        button.addEventListener('click', () => {
-          if (!(button instanceof HTMLElement)) return;
-          active = button.dataset.filter ?? 'all';
-          filters.forEach((item) => item.setAttribute('aria-pressed', String(item === button)));
-          apply();
-        }),
-      );
-      search?.addEventListener('input', apply);
-      type?.addEventListener('change', apply);
+      import { setupStudioDashboard } from '../utils/studio-dashboard-client';
 
-      const selected = [...document.querySelectorAll('[data-select-item]')];
-      const bulk = document.querySelector('[data-bulk-bar]');
-      const count = document.querySelector('[data-selected-count]');
-      const selection = () => {
-        const total = selected.filter(
-          (item) => item instanceof HTMLInputElement && item.checked,
-        ).length;
-        if (bulk instanceof HTMLElement) bulk.hidden = total === 0;
-        if (count) count.textContent = String(total);
-      };
-      selected.forEach((item) => item.addEventListener('change', selection));
-      document.querySelectorAll('[data-bulk-action]').forEach((button) =>
-        button.addEventListener('click', async () => {
-          if (!(button instanceof HTMLButtonElement)) return;
-          const items = selected.flatMap((item) =>
-            item instanceof HTMLInputElement && item.checked
-              ? [{ collection: item.dataset.collection, slug: item.dataset.slug }]
-              : [],
-          );
-          if (!items.length || !confirm(`确定更新 ${items.length} 条内容吗？`)) return;
-          button.disabled = true;
-          const response = await fetch('/api/studio/bulk', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ action: button.dataset.bulkAction, items }),
-          });
-          const result = await response.json();
-          button.disabled = false;
-          if (!response.ok) return alert(result.error || '批量操作失败。');
-          if (button.dataset.bulkAction === 'publish' && result.commitSha) {
-            localStorage.setItem(
-              STUDIO_DEPLOYMENT_STORAGE_KEY,
-              JSON.stringify({
-                targetSha: result.commitSha,
-                title: `${items.length} 条内容`,
-                startedAt: new Date().toISOString(),
-              }),
-            );
-          }
-          location.reload();
-        }),
-      );
-
-      const pending = readPendingDeployment(localStorage);
-      const deployment = document.querySelector('[data-deployment]');
-      const title = document.querySelector('[data-deployment-title]');
-      const detail = document.querySelector('[data-deployment-detail]');
-      const track = document.querySelector('[data-deployment-track]');
-      const progress = document.querySelector('[data-deployment-progress]');
-      const link = document.querySelector('[data-deployment-link]');
-      const poll = async () => {
-        if (!pending || !(deployment instanceof HTMLElement)) return;
-        deployment.dataset.phase = 'submitted';
-        if (track instanceof HTMLElement) track.hidden = false;
-        try {
-          const response = await fetch(
-            `/api/studio/deployment?sha=${encodeURIComponent(pending.targetSha)}`,
-          );
-          const result = await response.json();
-          if (!response.ok || !result.deployment) throw new Error();
-          const copy = deploymentCopy(result.deployment);
-          deployment.dataset.phase = result.deployment.phase;
-          if (title) title.textContent = copy.title;
-          if (detail) detail.textContent = copy.detail;
-          if (progress instanceof HTMLElement) progress.style.width = `${copy.progress}%`;
-          if (result.deployment.phase === 'ready') {
-            localStorage.removeItem(STUDIO_DEPLOYMENT_STORAGE_KEY);
-            if (link instanceof HTMLAnchorElement && pending.publicUrl) {
-              link.href = pending.publicUrl;
-              link.hidden = false;
-            }
-            return;
-          }
-          if (result.deployment.phase !== 'error') setTimeout(poll, 3000);
-        } catch {
-          if (title) title.textContent = '正在等待部署状态';
-          if (detail) detail.textContent = '内容已保存，将自动重试。';
-          setTimeout(poll, 6000);
-        }
-      };
-      if (pending) void poll();
+      setupStudioDashboard(document);
     </script>
   </body>
 </html>
@@ -593,6 +489,38 @@ const moduleCards = [
   .bulk-bar[hidden] {
     display: none;
   }
+  .bulk-feedback {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    margin: 0 0 10px;
+    padding: 11px 13px;
+    border: 1px solid var(--studio-border);
+    border-radius: 9px;
+    background: var(--studio-surface-muted);
+    font-size: 0.78rem;
+  }
+  .bulk-feedback[hidden] {
+    display: none;
+  }
+  .bulk-feedback > div {
+    display: grid;
+    gap: 2px;
+  }
+  .bulk-feedback small {
+    color: var(--studio-text-secondary);
+  }
+  .bulk-feedback.error {
+    border-color: color-mix(in srgb, var(--studio-danger) 55%, var(--studio-border));
+    background: var(--studio-danger-bg);
+  }
+  .bulk-feedback button {
+    border: 1px solid var(--studio-control-border);
+    background: var(--studio-surface);
+    color: inherit;
+    cursor: pointer;
+  }
   .bulk-bar > div {
     display: flex;
     gap: 5px;
@@ -614,9 +542,33 @@ const moduleCards = [
   .content-list article:last-of-type {
     border-bottom: 0;
   }
-  .content-list article > input {
-    width: 15px;
-    height: 15px;
+  .selection-announcement {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    border: 0;
+  }
+  .select-target {
+    display: grid;
+    width: 44px;
+    height: 44px;
+    place-items: center;
+    border-radius: 8px;
+    cursor: pointer;
+  }
+  .select-target:has(input:focus-visible) {
+    outline: 3px solid var(--studio-focus-ring);
+    outline-offset: 2px;
+  }
+  .select-target input {
+    width: 18px;
+    height: 18px;
+    margin: 0;
+    cursor: pointer;
   }
   .content-main {
     display: grid;

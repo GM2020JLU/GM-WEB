@@ -1,0 +1,62 @@
+---
+title: 'K3 Pico-ITX 风扇控制与热管理调试'
+description: '梳理 Linux thermal framework、pwm-fan 与 EC 之间的控制链，形成可验证、可恢复的调试流程。'
+date: '2026-08-26T15:22:00+08:00'
+updatedDate: '2026-08-30T17:45:00+08:00'
+publicationStatus: published
+draft: false
+sticky: true
+showHeroImage: false
+icon: code-2
+iconColor: var(--paper-accent)
+role: '技术分析与文档整理'
+period: '2026.08'
+highlights:
+  - '确认 thermal zone、cooling device、pwm-fan 与 EC 的完整控制链'
+  - '避免写死 sysfs 编号，改用节点类型动态定位实际设备'
+  - '把手动调速整理成包含状态保存、温度监测和恢复自动温控的安全流程'
+authors:
+  - name: 'Gou Min'
+    url: 'https://github.com/GM2020JLU'
+links:
+  - label: '完整调试指南'
+    href: 'https://goumin.work/blog/spacemit-k3-pico-itx-fan/'
+    kind: docs
+tags:
+  - Linux
+  - Thermal
+  - Device Tree
+comments: false
+sidebar:
+  enable: false
+  toc: false
+  relatedPosts: false
+---
+
+这是一项围绕 K3 Pico-ITX 风扇策略展开的技术实践。目标不是提供一组只能在单台机器上执行的命令，而是先确认控制链，再形成能够验证、能够退出、不会和内核自动温控互相争抢的调试方法。
+
+## 问题背景
+
+风扇同时涉及 Linux thermal framework、`pwm-fan` 驱动与 EC。直接写入 PWM 或照搬固定的 `thermal_zone3`、`hwmon8` 路径，可能在不同启动顺序下访问错误节点；手动控制结束后如果没有恢复自动温控，还会让系统长期失去散热保护。
+
+## 分析与方案
+
+首先从设备树和运行时节点确认控制关系：`thermal_cluster0` 通过 `step_wise` governor 选择 cooling state，`pwm-fan` 再把档位映射为 EC PWM channel 0 的占空比。
+
+调试流程据此拆成四步：
+
+1. 按节点 `type` 或 `name` 动态查找 thermal、cooling device 和 hwmon 路径。
+2. 只读检查温度、策略、当前档位、PWM、实际 RPM 与故障状态。
+3. 保存当前状态，暂停自动温控后再执行有限时间的手动调速。
+4. 恢复原档位和 thermal zone 自动模式，并再次验证状态。
+
+## 关键取舍
+
+- 不把 `pwm1_enable` 当作 Linux 自动/手动切换开关。
+- 不把 PWM 百分比等同于实际转速百分比，而是同时读取 RPM 和故障状态。
+- 不把没有 critical trip 的 thermal zone 当作过热关机保护。
+- 不建议用 PWM 0 做常规测试，避免低占空比下风扇无法可靠起转。
+
+## 结果
+
+最终形成了一份从控制链、温度档位到 sysfs 与 `ectool` 操作的完整指南。其中的节点动态发现和状态恢复原则，也可作为其他 Linux BSP 调试工作的参考。

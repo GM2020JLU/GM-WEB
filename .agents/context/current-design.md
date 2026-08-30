@@ -1,6 +1,6 @@
 # 当前设计与架构
 
-最后核对：2026-08-26
+最后核对：2026-08-30
 证据：当前功能分支、`package.json`、`bun.lock`、当前源码、deploy workflow
 与上层生态地图。
 
@@ -9,6 +9,9 @@
 Navfolio 是以个人介绍、文章、项目、生活片段、媒体记录和外部身份入口为核心的 Astro
 starter。当前视觉是 calm editorial dashboard：纸张感色板、克制阴影、紧凑标签和
 宽松正文；响应式阅读与导航优先，动效只做增强。
+
+公开信息架构不提供独立简历路由：About 负责个人介绍，首页直接突出代表项目和联系方式，
+Projects 负责可验证的工程经历。
 
 `src/config/site.toml` 是用户配置面，管理身份、色板、字体、页面文案、首页卡片、
 导航、搜索、评论和展示设置。`navfolio.config.ts` 是构建期组合入口，显式注册
@@ -76,11 +79,13 @@ navigation、scaffold 和 i18n contribution 消失。
 - 内容文件仍是 Astro 直接消费的 Markdown/MDX，Keystatic 不成为公开页运行时依赖
 - 内容状态以 `publicationStatus`（draft/ready/published）为主，schema 向下兼容旧
   `draft` 字段并为公开路由派生布尔值；后台保存自动写入 `updatedDate`
+- 公共 Head 同时输出站点级 Person/WebSite 与详情页 BlogPosting/CreativeWork JSON-LD；
+  内容标签继续由受控 taxonomy 驱动公开发现页。
 - `src/content/taxonomies` 保存受控标签、分类和系列；图片统一写入
   `src/assets/images/content`
 - `/studio` 是模块化日常后台入口：共享侧栏将 Blog、Projects、Vibe、Media、Pages、
-  站点设置、内容组织、素材和导入分区；`/studio/content/{module}` 提供模块内列表、
-  状态筛选和创建/导入入口。所有后台页面读取主站当前 palette 和 paper tokens
+  站点设置、内容组织、素材和导入分区；侧栏在窄屏变为带焦点管理的抽屉导航；
+  `/studio/content/{module}` 提供模块内列表、状态筛选和创建/导入入口。所有后台页面读取主站当前 palette 和 paper tokens
 - 动态 `/studio/edit/**` 以标题、摘要和正文为主，低频字段折叠到“更多设置”。网址别名
   由标题自动生成并在冲突时追加序号；`/studio/site` 与 `/api/studio/site` 编辑站点身份、
   主题、个人资料、首页介绍/关注方向/引语和公开模块文案
@@ -91,6 +96,9 @@ navigation、scaffold 和 i18n contribution 消失。
 - `/api/studio/**` 负责读取最新 GitHub 内容、编辑、草稿/待发布/发布/撤回、批量状态、
   定时发布、素材、分类和版本恢复；线上写入复用 Keystatic GitHub 登录。`/keystatic`
   保留为不出现在日常导航中的应急编辑器
+- Studio 的修改契约以内容 SHA 为并发版本：覆盖、删除、历史恢复、素材操作和批量状态更新
+  都校验调用方看到的版本；本地存储把引用复验与最终写入放进同一写锁，覆盖和删除前保留
+  可恢复备份。GitHub 分支提交均进入 Vercel 进度跟踪，包括只影响后台索引的草稿变更。
 - `/studio/import` 是静态导入 UI，支持 Blog、Projects、Vibe 和 Media 的 Markdown，
   只向同源 `/api/studio/import` 提交经服务端重新解析的内容，导入后直接进入 Studio
   编辑器；`/preview/**` 为真实渲染预览。后台路由均
@@ -102,8 +110,9 @@ navigation、scaffold 和 i18n contribution 消失。
   校验；拼错字段、跨模块字段与超长随记会在写入 GitHub 前返回中文提示
 - Studio 将分类、系列和标签引用校验前移到单条/批量发布 API；未登记项在写入 GitHub
   前返回可操作错误。`scheduledAt` 只保留在待发布内容中，正式发布时自动清除
-- 定时发布由 `publish-scheduled.yml` 每 15 分钟检查 `ready + scheduledAt` 内容，到期后
-  改为 `published` 并提交，继而触发正常部署和质量门禁
+- 定时发布由 `publish-scheduled.yml` 每 15 分钟检查 `ready + scheduledAt` 内容；所有到期
+  内容先完成序列化、taxonomy、素材与内容审计，再统一改为 `published`，任一预检失败则
+  整批保持不变。提交前再次执行内容审计，随后触发正常部署和质量门禁
 - docs/demo 内容：`src/docs` submodule，由
   `NAVFOLIO_CONTENT_SOURCE=docs` 选择
 - docs 发布：先推送 `astro-navfolio-docs`，再更新 gitlink 并运行 docs build

@@ -147,10 +147,6 @@ module = "vibe"
 label = "关于"
 href = "/about"
 
-[[config.topNav.links]]
-label = "简历"
-href = "/resume"
-
 [config.home]
 
 [config.home.quote]
@@ -231,6 +227,6 @@ mark = "进行中"
 href = "/projects/personal-site"
 
 [[config.home.doing]]
-text = "整理嵌入式 Linux 与存储调试笔记"
-mark = "写作中"
-href = "/blog"
+text = "K3 Pico-ITX 风扇控制与热管理调试"
+mark = "已整理"
+href = "/projects/k3-pico-itx-fan-control"

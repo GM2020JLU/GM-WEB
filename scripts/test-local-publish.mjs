@@ -126,6 +126,7 @@ try {
       body: JSON.stringify({
         action: 'publish',
         body: `${loaded.document.body}\n\n已编辑并发布。`,
+        expectedSha: loaded.document.sha,
         metadata: loaded.document.metadata,
         originalSlug: imported.slug,
         slug: imported.slug,

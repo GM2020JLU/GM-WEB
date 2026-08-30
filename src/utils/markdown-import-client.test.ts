@@ -4,6 +4,7 @@ import { readMarkdownFile, setupMarkdownImport } from './markdown-import-client'
 import { renderMarkdownPreview } from './markdown-preview';
 
 const page = `
+  <ol><li data-import-step="1" aria-current="step"></li><li data-import-step="2"></li><li data-import-step="3"></li></ol>
   <form data-import-form>
     <label data-dropzone><input type="file" data-file><strong data-file-label>选择文件</strong></label>
     <select data-collection><option value="blog">博客</option><option value="projects">项目</option><option value="vibe">随记</option><option value="media">媒体</option></select>
@@ -63,6 +64,7 @@ describe('Markdown 导入浏览器交互', () => {
     expect(element(window, '[data-body-preview]').innerHTML).toContain('<h1>正文</h1>');
     expect(element(window, '[data-body-preview]').innerHTML).toContain('<strong>加粗内容</strong>');
     expect(element(window, '[data-submit]').disabled).toBe(false);
+    expect(element(window, '[data-import-step="2"]').getAttribute('aria-current')).toBe('step');
   });
 
   test('拖放文件与选择文件走相同解析流程', async () => {
@@ -126,6 +128,7 @@ describe('Markdown 导入浏览器交互', () => {
 
     expect(destination).toBe('/studio/edit/blog/hello-world');
     expect(element(window, '[data-result]').textContent).toContain('导入成功');
+    expect(element(window, '[data-import-step="3"]').getAttribute('aria-current')).toBe('step');
   });
 
   test('模块入口会预选项目并自动生成网址', async () => {

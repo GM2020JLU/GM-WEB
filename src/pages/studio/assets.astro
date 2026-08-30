@@ -28,7 +28,7 @@ const palette = await getThemePalette();
           <p>MEDIA LIBRARY</p><h1>素材库</h1><span
             >统一管理文章图片；上传前校验真实图片格式和大小。</span
           >
-        </div><label class="upload"
+        </div><label class="upload" data-upload
           ><input
             type="file"
             accept="image/jpeg,image/png,image/webp,image/gif,image/avif"
@@ -41,96 +41,21 @@ const palette = await getThemePalette();
       </div>
       <section>
         <div class="section-title">
-          <h2>全部素材</h2><input type="search" placeholder="搜索文件名" data-search />
+          <h2>全部素材</h2><input
+            type="search"
+            placeholder="搜索文件名"
+            aria-label="搜索素材文件名"
+            data-search
+          />
         </div><div class="asset-grid" data-assets></div><p data-empty hidden>
           还没有素材，可以上传第一张图片。
         </p>
       </section>
     </main>
     <script>
-      type Asset = { name: string; path: string; sha?: string; size: number; url: string };
-      const file = document.querySelector('[data-file]');
-      const grid = document.querySelector('[data-assets]');
-      const notice = document.querySelector('[data-notice]');
-      const empty = document.querySelector('[data-empty]');
-      const search = document.querySelector('[data-search]');
-      let assets: Asset[] = [];
-      const message = (title: string, detail: string, kind = '') => {
-        if (!(notice instanceof HTMLElement)) return;
-        notice.className = `notice ${kind}`;
-        notice.innerHTML = '<strong></strong><small></small>';
-        const heading = notice.querySelector('strong');
-        const copy = notice.querySelector('small');
-        if (heading) heading.textContent = title;
-        if (copy) copy.textContent = detail;
-      };
-      const render = () => {
-        if (!(grid instanceof HTMLElement)) return;
-        const query = search instanceof HTMLInputElement ? search.value.trim().toLowerCase() : '';
-        const visible = assets.filter((asset) => asset.name.toLowerCase().includes(query));
-        grid.replaceChildren(
-          ...visible.map((asset) => {
-            const card = document.createElement('article');
-            const image = document.createElement('img');
-            const name = document.createElement('strong');
-            const path = document.createElement('code');
-            const actions = document.createElement('div');
-            const copy = document.createElement('button');
-            const remove = document.createElement('button');
-            image.src = asset.url;
-            image.alt = '';
-            image.loading = 'lazy';
-            name.textContent = asset.name;
-            path.textContent = `@assets/images/content/${asset.path.split('/').at(-1)}`;
-            copy.type = 'button';
-            copy.textContent = '复制引用';
-            copy.addEventListener('click', async () => {
-              await navigator.clipboard.writeText(path.textContent);
-              copy.textContent = '已复制';
-            });
-            remove.type = 'button';
-            remove.textContent = '删除';
-            remove.className = 'danger';
-            remove.addEventListener('click', async () => {
-              if (!confirm(`确定删除素材 ${asset.name} 吗？请先确认没有内容正在引用。`)) return;
-              const response = await fetch('/api/studio/assets', {
-                method: 'DELETE',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ path: asset.path, sha: asset.sha }),
-              });
-              const result = await response.json();
-              if (!response.ok) return message('删除失败', result.error || '请重试。', 'error');
-              await load();
-            });
-            actions.append(copy, remove);
-            card.append(image, name, path, actions);
-            return card;
-          }),
-        );
-        if (empty instanceof HTMLElement) empty.hidden = visible.length > 0;
-      };
-      const load = async () => {
-        const response = await fetch('/api/studio/assets');
-        const result = await response.json();
-        if (!response.ok) return message('素材加载失败', result.error || '请刷新重试。', 'error');
-        assets = result.assets;
-        render();
-        message('素材已同步', `共 ${assets.length} 个文件。`, 'success');
-      };
-      search?.addEventListener('input', render);
-      file?.addEventListener('change', async () => {
-        if (!(file instanceof HTMLInputElement) || !file.files?.[0]) return;
-        const form = new FormData();
-        form.append('file', file.files[0]);
-        message('正在上传', '验证图片并写入内容仓库。');
-        const response = await fetch('/api/studio/assets', { method: 'POST', body: form });
-        const result = await response.json();
-        if (!response.ok) return message('上传失败', result.error || '请重试。', 'error');
-        message('上传成功', `可在正文中使用 ${result.reference}`, 'success');
-        file.value = '';
-        await load();
-      });
-      void load();
+      import { setupStudioAssets } from '../../utils/studio-assets-client';
+
+      setupStudioAssets(document);
     </script>
   </body>
 </html>
@@ -279,6 +204,14 @@ const palette = await getThemePalette();
   .asset-grid article > div {
     display: flex;
     gap: 7px;
+  }
+  .asset-grid article > small {
+    color: var(--paper-ink-soft);
+    font-size: 0.72rem;
+  }
+  .asset-grid article[aria-busy='true'],
+  .upload[aria-busy='true'] {
+    opacity: 0.68;
   }
   .asset-grid button {
     flex: 1;

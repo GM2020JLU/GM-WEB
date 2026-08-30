@@ -87,6 +87,7 @@ export function setupMarkdownImport(
   const bodyPreview = requiredElement<HTMLElement>(document, '[data-body-preview]');
   const submit = requiredElement<HTMLButtonElement>(document, '[data-submit]');
   const result = requiredElement<HTMLElement>(document, '[data-result]');
+  const steps = [...document.querySelectorAll<HTMLElement>('[data-import-step]')];
   let selectedSource = '';
   let selectedFilename = '';
   let loadSequence = 0;
@@ -105,6 +106,15 @@ export function setupMarkdownImport(
     strong.textContent = heading;
     small.textContent = detail;
     result.append(strong, small);
+  };
+
+  const setStep = (step: number) => {
+    steps.forEach((item) => {
+      const active = item.dataset.importStep === String(step);
+      item.classList.toggle('active', active);
+      if (active) item.setAttribute('aria-current', 'step');
+      else item.removeAttribute('aria-current');
+    });
   };
 
   const setBusy = (busy: boolean) => {
@@ -127,6 +137,7 @@ export function setupMarkdownImport(
     selectedFilename = '';
     submit.disabled = true;
     parseState.textContent = '正在读取…';
+    setStep(1);
     fileLabel.textContent = file.name;
     setResult('正在读取文件', '解析完成后会自动显示标题、摘要和正文。');
 
@@ -161,6 +172,7 @@ export function setupMarkdownImport(
       );
       warnings.hidden = parsed.warnings.length === 0;
       submit.disabled = false;
+      setStep(2);
       setResult('文件已解析，可以导入', '请确认内容类型、标题和正文。网址会自动生成。', 'success');
     } catch (error) {
       if (sequence !== loadSequence) return;
@@ -169,6 +181,7 @@ export function setupMarkdownImport(
       fileInput.value = '';
       submit.disabled = true;
       parseState.textContent = '解析失败';
+      setStep(1);
       setResult(
         '无法读取文件',
         error instanceof Error ? error.message : '请更换 Markdown 文件。',
@@ -212,6 +225,7 @@ export function setupMarkdownImport(
     }
 
     setBusy(true);
+    setStep(3);
     submit.textContent = '正在导入…';
     setResult('正在创建草稿', '将通过已登录的 Keystatic / GitHub 身份写入仓库。');
     try {
@@ -253,6 +267,7 @@ export function setupMarkdownImport(
             result.append(link);
           }
         }
+        setStep(2);
         return;
       }
 
@@ -263,6 +278,7 @@ export function setupMarkdownImport(
       const editorUrl = `/studio/edit/${encodeURIComponent(payload.collection)}/${encodeURIComponent(payload.slug)}`;
       defer(() => navigate(editorUrl), 700);
     } catch (error) {
+      setStep(2);
       setResult('网络请求失败', error instanceof Error ? error.message : '请稍后重试。', 'error');
     } finally {
       setBusy(false);

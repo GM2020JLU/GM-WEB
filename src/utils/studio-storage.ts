@@ -1,6 +1,6 @@
 import { Octokit } from '@octokit/core';
 import { createHash } from 'node:crypto';
-import { mkdir, readFile, readdir, rename, unlink, writeFile } from 'node:fs/promises';
+import { mkdir, readFile, readdir, rename, stat, unlink, writeFile } from 'node:fs/promises';
 import { dirname, resolve } from 'node:path';
 import { resolveStudioDeploymentPhase } from './studio-deployment';
 
@@ -37,15 +37,33 @@ export interface StudioAsset {
 }
 
 export class StudioConflictError extends Error {
+  readonly status = 409;
+
   constructor(message = '内容已被其他操作修改，请刷新后重试。') {
     super(message);
     this.name = 'StudioConflictError';
   }
 }
 
+function localContentSha(content: string | Buffer) {
+  return createHash('sha256').update(content).digest('hex');
+}
+
+let localWriteTail: Promise<void> = Promise.resolve();
+
+function withLocalWriteLock<T>(operation: () => Promise<T>) {
+  const result = localWriteTail.then(operation, operation);
+  localWriteTail = result.then(
+    () => undefined,
+    () => undefined,
+  );
+  return result;
+}
+
 type LocalBackup = {
   content: string;
   date: string;
+  encoding: 'base64' | 'utf8';
   message: string;
   path: string;
   sha: string;
@@ -55,14 +73,19 @@ function localBackupRoot() {
   return resolve(process.cwd(), process.env.STUDIO_RUNTIME_DIR || '.studio/runtime', 'backups');
 }
 
-async function createLocalBackup(path: string, content: string, message: string) {
+async function createLocalBackup(
+  path: string,
+  content: string,
+  message: string,
+  encoding: LocalBackup['encoding'] = 'utf8',
+) {
   const date = new Date().toISOString();
-  const sha = createHash('sha1').update(`${path}\0${date}\0${content}`).digest('hex');
+  const sha = createHash('sha1').update(`${path}\0${date}\0${encoding}\0${content}`).digest('hex');
   const root = localBackupRoot();
   await mkdir(root, { recursive: true });
   await writeFile(
     resolve(root, `${sha}.json`),
-    `${JSON.stringify({ content, date, message, path, sha } satisfies LocalBackup)}\n`,
+    `${JSON.stringify({ content, date, encoding, message, path, sha } satisfies LocalBackup)}\n`,
     { encoding: 'utf8', mode: 0o600, flag: 'wx' },
   );
   return sha;
@@ -82,7 +105,14 @@ async function readLocalBackups(path: string) {
       const backup = JSON.parse(
         await readFile(resolve(localBackupRoot(), file), 'utf8'),
       ) as LocalBackup;
-      if (backup.path === path && backup.content !== undefined && backup.sha) backups.push(backup);
+      if (
+        backup.path === path &&
+        backup.content !== undefined &&
+        backup.sha &&
+        (backup.encoding === undefined || backup.encoding === 'utf8')
+      ) {
+        backups.push({ ...backup, encoding: 'utf8' });
+      }
     } catch {
       // An incomplete backup must not hide the remaining usable history.
     }
@@ -113,7 +143,10 @@ function publicOrAuthenticatedGitHub(token?: string) {
 }
 
 export async function readStudioFile(path: string, token?: string): Promise<StudioStoredFile> {
-  if (!token) return { path, content: await readFile(resolve(process.cwd(), path), 'utf8') };
+  if (!token) {
+    const content = await readFile(resolve(process.cwd(), path), 'utf8');
+    return { path, content, sha: localContentSha(content) };
+  }
   const response = await github(token).request('GET /repos/{owner}/{repo}/contents/{path}', {
     ...repository,
     path,
@@ -122,6 +155,32 @@ export async function readStudioFile(path: string, token?: string): Promise<Stud
   });
   const data = response.data as GitHubContent;
   return { path, content: decodeContent(data), sha: data.sha };
+}
+
+export async function studioFileExists(path: string, token?: string) {
+  if (!token) {
+    try {
+      return (await stat(resolve(process.cwd(), path))).isFile();
+    } catch (error) {
+      if (typeof error === 'object' && error && 'code' in error && error.code === 'ENOENT') {
+        return false;
+      }
+      throw error;
+    }
+  }
+  try {
+    const response = await github(token).request('GET /repos/{owner}/{repo}/contents/{path}', {
+      ...repository,
+      path,
+      ref: repository.branch,
+      headers: { 'X-GitHub-Api-Version': '2022-11-28' },
+    });
+    return !Array.isArray(response.data) && (response.data as GitHubContent).type === 'file';
+  } catch (error) {
+    if (typeof error === 'object' && error && 'status' in error && error.status === 404)
+      return false;
+    throw error;
+  }
 }
 
 export async function getStudioTaxonomies(token?: string) {
@@ -154,50 +213,86 @@ export async function getStudioTaxonomies(token?: string) {
 }
 
 export async function writeStudioFile(args: {
+  beforeWrite?: () => Promise<void>;
   content: string;
+  expectedSha?: string | null;
   message: string;
   path: string;
   previousPath?: string;
-  sha?: string;
   token?: string;
 }) {
   if (!args.token) {
-    const target = resolve(process.cwd(), args.path);
-    await mkdir(dirname(target), { recursive: true });
-    try {
-      const previous = await readFile(target, 'utf8');
-      await createLocalBackup(args.path, previous, args.message);
-    } catch (error) {
-      if (!(typeof error === 'object' && error && 'code' in error && error.code === 'ENOENT')) {
-        throw error;
+    return withLocalWriteLock(async () => {
+      const target = resolve(process.cwd(), args.path);
+      const isMove = Boolean(args.previousPath && args.previousPath !== args.path);
+      const versionPath = isMove ? args.previousPath! : args.path;
+      const versionTarget = resolve(process.cwd(), versionPath);
+      let previous: string | undefined;
+      try {
+        previous = await readFile(versionTarget, 'utf8');
+      } catch (error) {
+        if (!(typeof error === 'object' && error && 'code' in error && error.code === 'ENOENT')) {
+          throw error;
+        }
       }
-    }
-    if (args.previousPath && args.previousPath !== args.path) {
-      await rename(resolve(process.cwd(), args.previousPath), target);
-    }
-    await writeFile(target, args.content, 'utf8');
-    return { path: args.path, commitSha: undefined };
+
+      if (args.expectedSha === null) {
+        if (previous !== undefined) throw new StudioConflictError('同名内容已经存在。');
+      } else if (args.expectedSha !== undefined) {
+        if (previous === undefined || localContentSha(previous) !== args.expectedSha) {
+          throw new StudioConflictError();
+        }
+      }
+
+      if (isMove) {
+        try {
+          await readFile(target, 'utf8');
+          throw new StudioConflictError('新的内容标识已经存在。');
+        } catch (error) {
+          if (
+            error instanceof StudioConflictError ||
+            !(typeof error === 'object' && error && 'code' in error && error.code === 'ENOENT')
+          ) {
+            throw error;
+          }
+        }
+      }
+
+      await args.beforeWrite?.();
+      await mkdir(dirname(target), { recursive: true });
+      if (previous !== undefined) {
+        await createLocalBackup(versionPath, previous, args.message);
+      }
+      if (isMove) await rename(versionTarget, target);
+      await writeFile(target, args.content, 'utf8');
+      return {
+        path: args.path,
+        commitSha: undefined,
+        contentSha: localContentSha(args.content),
+      };
+    });
   }
 
   const client = github(args.token);
   try {
+    await args.beforeWrite?.();
     const response = await client.request('PUT /repos/{owner}/{repo}/contents/{path}', {
       ...repository,
       path: args.path,
       branch: repository.branch,
       message: args.message,
       content: Buffer.from(args.content, 'utf8').toString('base64'),
-      ...(args.sha ? { sha: args.sha } : {}),
+      ...(!args.previousPath && args.expectedSha ? { sha: args.expectedSha } : {}),
       headers: { 'X-GitHub-Api-Version': '2022-11-28' },
     });
     if (args.previousPath && args.previousPath !== args.path) {
-      const previous = await readStudioFile(args.previousPath, args.token);
+      if (!args.expectedSha) throw new StudioConflictError('缺少内容版本，请刷新后再重命名。');
       await client.request('DELETE /repos/{owner}/{repo}/contents/{path}', {
         ...repository,
         path: args.previousPath,
         branch: repository.branch,
         message: `Move content to ${args.path}`,
-        sha: previous.sha!,
+        sha: args.expectedSha,
         headers: { 'X-GitHub-Api-Version': '2022-11-28' },
       });
     }
@@ -208,7 +303,12 @@ export async function writeStudioFile(args: {
       contentSha: data.content?.sha,
     };
   } catch (error) {
-    if (typeof error === 'object' && error && 'status' in error && error.status === 409) {
+    if (
+      typeof error === 'object' &&
+      error &&
+      'status' in error &&
+      (error.status === 409 || error.status === 422)
+    ) {
       throw new StudioConflictError();
     }
     throw error;
@@ -222,10 +322,19 @@ export async function writeStudioBinaryFile(args: {
   token?: string;
 }) {
   if (!args.token) {
-    const target = resolve(process.cwd(), args.path);
-    await mkdir(dirname(target), { recursive: true });
-    await writeFile(target, args.content);
-    return { path: args.path };
+    return withLocalWriteLock(async () => {
+      const target = resolve(process.cwd(), args.path);
+      await mkdir(dirname(target), { recursive: true });
+      try {
+        await writeFile(target, args.content, { flag: 'wx' });
+      } catch (error) {
+        if (typeof error === 'object' && error && 'code' in error && error.code === 'EEXIST') {
+          throw new StudioConflictError('同名素材已经存在。');
+        }
+        throw error;
+      }
+      return { path: args.path, contentSha: localContentSha(args.content) };
+    });
   }
   return github(args.token).request('PUT /repos/{owner}/{repo}/contents/{path}', {
     ...repository,
@@ -237,21 +346,36 @@ export async function writeStudioBinaryFile(args: {
   });
 }
 
-export async function deleteStudioFile(path: string, sha: string | undefined, token?: string) {
+export interface StudioDeleteFileOptions {
+  beforeDelete?: () => Promise<void>;
+}
+
+export async function deleteStudioFile(
+  path: string,
+  sha: string | undefined,
+  token?: string,
+  options: StudioDeleteFileOptions = {},
+) {
   if (!token) {
-    try {
-      const previous = await readFile(resolve(process.cwd(), path), 'utf8');
-      await createLocalBackup(path, previous, `Delete ${path}`);
-    } catch (error) {
-      if (!(typeof error === 'object' && error && 'code' in error && error.code === 'ENOENT')) {
-        throw error;
+    return withLocalWriteLock(async () => {
+      const target = resolve(process.cwd(), path);
+      const previous = await readFile(target);
+      if (!sha) throw new StudioConflictError('缺少内容版本，请刷新后再删除。');
+      if (localContentSha(previous) !== sha) throw new StudioConflictError();
+      await options.beforeDelete?.();
+      const binaryAsset = path.replaceAll('\\', '/').match(/(?:^|\/)src\/assets\//);
+      if (binaryAsset) {
+        await createLocalBackup(path, previous.toString('base64'), `Delete ${path}`, 'base64');
+      } else {
+        await createLocalBackup(path, previous.toString('utf8'), `Delete ${path}`);
       }
-    }
-    await unlink(resolve(process.cwd(), path));
-    return;
+      await unlink(target);
+      return { commitSha: undefined };
+    });
   }
   if (!sha) throw new StudioConflictError('缺少内容版本，请刷新后再删除。');
-  await github(token).request('DELETE /repos/{owner}/{repo}/contents/{path}', {
+  await options.beforeDelete?.();
+  const response = await github(token).request('DELETE /repos/{owner}/{repo}/contents/{path}', {
     ...repository,
     path,
     branch: repository.branch,
@@ -259,6 +383,7 @@ export async function deleteStudioFile(path: string, sha: string | undefined, to
     sha,
     headers: { 'X-GitHub-Api-Version': '2022-11-28' },
   });
+  return { commitSha: (response.data as { commit?: { sha?: string } }).commit?.sha };
 }
 
 export async function listStudioHistory(
@@ -369,10 +494,13 @@ export async function getStudioDeployment(token?: string, targetSha?: string, ru
   };
 }
 
-export async function listStudioAssets(token?: string): Promise<StudioAsset[]> {
+export async function listStudioAssets(
+  token?: string,
+  localRepositoryRoot = process.cwd(),
+): Promise<StudioAsset[]> {
   const base = 'src/assets/images/content';
   if (!token) {
-    const root = resolve(process.cwd(), base);
+    const root = resolve(localRepositoryRoot, base);
     const walk = async (directory: string): Promise<StudioAsset[]> => {
       let entries;
       try {
@@ -386,12 +514,21 @@ export async function listStudioAssets(token?: string): Promise<StudioAsset[]> {
             const path = resolve(directory, entry.name);
             if (entry.isDirectory()) return walk(path);
             const relative = `${base}/${path.slice(root.length + 1).replaceAll('\\', '/')}`;
-            return [{ name: entry.name, path: relative, size: 0, url: `/@fs/${path}` }];
+            const content = await readFile(path);
+            return [
+              {
+                name: entry.name,
+                path: relative,
+                sha: localContentSha(content),
+                size: content.byteLength,
+                url: `/@fs/${path}`,
+              },
+            ];
           }),
         )
       ).flat();
     };
-    return walk(root);
+    return withLocalWriteLock(() => walk(root));
   }
 
   const response = await github(token).request('GET /repos/{owner}/{repo}/git/trees/{tree_sha}', {

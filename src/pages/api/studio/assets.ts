@@ -1,5 +1,6 @@
 import type { APIRoute } from 'astro';
 import sharp from 'sharp';
+import { z } from 'zod';
 import {
   requireStudioToken,
   studioApiError,
@@ -11,6 +12,11 @@ import {
   listStudioAssets,
   writeStudioBinaryFile,
 } from '../../../utils/studio-storage';
+import {
+  findStudioAssetReferences,
+  StudioReferenceConflictError,
+} from '../../../utils/studio-asset-references';
+import { studioAssetReference } from '../../../utils/studio-assets';
 
 export const prerender = false;
 
@@ -22,6 +28,10 @@ const extensions: Record<string, string> = {
   gif: 'gif',
   avif: 'avif',
 };
+const deleteSchema = z.object({
+  path: z.string(),
+  sha: z.string().regex(/^(?:[a-f0-9]{40}|[a-f0-9]{64})$/i),
+});
 
 export const GET: APIRoute = async ({ cookies }) => {
   try {
@@ -68,7 +78,7 @@ export const POST: APIRoute = async ({ cookies, request, url }) => {
       content: buffer,
       message: `Upload studio asset: ${stem}.${extension}`,
     });
-    return studioJson({ ok: true, path, reference: `@assets/images/content/${stem}.${extension}` });
+    return studioJson({ ok: true, path, reference: studioAssetReference(path) });
   } catch (error) {
     return studioApiError(error);
   }
@@ -78,13 +88,32 @@ export const DELETE: APIRoute = async ({ cookies, request, url }) => {
   try {
     if (!verifyStudioOrigin(request, url)) return studioJson({ error: '请求来源不合法。' }, 403);
     const token = requireStudioToken(cookies);
-    const body = (await request.json()) as { path?: string; sha?: string };
-    if (!body.path?.startsWith('src/assets/images/content/') || body.path.includes('..')) {
+    const parsed = deleteSchema.safeParse(await request.json().catch(() => undefined));
+    if (!parsed.success) return studioJson({ error: '缺少合法的素材路径或版本。' }, 400);
+    const body = parsed.data;
+    if (!body.path.startsWith('src/assets/images/content/') || body.path.includes('..')) {
       return studioJson({ error: '素材路径不合法。' }, 400);
     }
-    await deleteStudioFile(body.path, body.sha, token);
+    await deleteStudioFile(body.path, body.sha, token, {
+      beforeDelete: async () => {
+        const references = await findStudioAssetReferences(body.path, token);
+        if (references.length) {
+          throw new StudioReferenceConflictError(
+            '素材仍被内容引用，请先移除引用后再删除。',
+            'ASSET_IN_USE',
+            references,
+          );
+        }
+      },
+    });
     return studioJson({ ok: true });
   } catch (error) {
+    if (error instanceof StudioReferenceConflictError) {
+      return studioJson(
+        { error: error.message, code: error.code, references: error.references },
+        error.status,
+      );
+    }
     return studioApiError(error);
   }
 };

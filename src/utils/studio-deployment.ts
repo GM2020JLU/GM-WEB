@@ -19,6 +19,7 @@ export interface PendingStudioDeployment {
 }
 
 export const STUDIO_DEPLOYMENT_STORAGE_KEY = 'gm-studio-pending-deployment';
+export const STUDIO_DEPLOYMENT_MAX_AGE_MS = 3 * 60 * 60 * 1000;
 
 export function resolveStudioDeploymentPhase(input: {
   commitState?: string;
@@ -78,14 +79,29 @@ export function deploymentCopy(state: StudioDeploymentState) {
   };
 }
 
-export function readPendingDeployment(storage: Pick<Storage, 'getItem'>) {
+export function readPendingDeployment(
+  storage: Pick<Storage, 'getItem'> & Partial<Pick<Storage, 'removeItem'>>,
+  now = new Date(),
+) {
   try {
     const value = storage.getItem(STUDIO_DEPLOYMENT_STORAGE_KEY);
     if (!value) return undefined;
     const parsed = JSON.parse(value) as PendingStudioDeployment;
-    if (!/^[a-f0-9]{40}$/i.test(parsed.targetSha) || !parsed.startedAt) return undefined;
+    const startedAt = new Date(parsed.startedAt).valueOf();
+    const age = now.valueOf() - startedAt;
+    if (
+      !/^[a-f0-9]{40}$/i.test(parsed.targetSha) ||
+      typeof parsed.title !== 'string' ||
+      !Number.isFinite(startedAt) ||
+      age < -5 * 60 * 1000 ||
+      age > STUDIO_DEPLOYMENT_MAX_AGE_MS
+    ) {
+      storage.removeItem?.(STUDIO_DEPLOYMENT_STORAGE_KEY);
+      return undefined;
+    }
     return parsed;
   } catch {
+    storage.removeItem?.(STUDIO_DEPLOYMENT_STORAGE_KEY);
     return undefined;
   }
 }

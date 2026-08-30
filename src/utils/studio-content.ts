@@ -1,4 +1,5 @@
 import { parseDocument, stringify } from 'yaml';
+import { posix } from 'node:path';
 import { z } from 'zod';
 
 export const studioCollections = [
@@ -121,6 +122,96 @@ const fieldLabels: Record<string, string> = {
   series: '系列',
 };
 
+const placeholderPattern =
+  /\b(?:lorem|ipsum|test)\b|(?:casdcv|scvasdv|asdf{2,}|测试内容|占位内容)/iu;
+const markdownImagePattern = /!\[([^\]]*)\]\(([^)\s]+)(?:\s+['"][^'"]*['"])?\)/gu;
+
+export interface StudioImageReference {
+  label: string;
+  source: string;
+}
+
+export function studioImageReferences(metadata: Record<string, unknown>, body: string) {
+  const references: StudioImageReference[] = [];
+  for (const match of body.matchAll(markdownImagePattern)) {
+    references.push({ label: '正文图片', source: match[2] });
+  }
+  for (const key of ['heroImage', 'cover'] as const) {
+    if (typeof metadata[key] === 'string' && metadata[key]) {
+      references.push({ label: key, source: metadata[key] });
+    }
+  }
+  for (const source of Array.isArray(metadata.images) ? metadata.images : []) {
+    if (typeof source === 'string' && source) references.push({ label: 'images', source });
+  }
+  return references;
+}
+
+export function studioRepositoryImagePath(source: string, contentPath: string) {
+  if (/^https?:\/\//iu.test(source)) return undefined;
+  let clean: string;
+  try {
+    clean = decodeURIComponent(source.split(/[?#]/u)[0]).replaceAll('\\', '/');
+  } catch {
+    throw new StudioValidationError(`图片路径无法解码：${source}`);
+  }
+  if (!clean) throw new StudioValidationError('图片路径不能为空。');
+  const repositoryPath = clean.startsWith('@assets/')
+    ? posix.normalize(`src/assets/${clean.slice('@assets/'.length)}`)
+    : clean.startsWith('/')
+      ? posix.normalize(`public/${clean.slice(1)}`)
+      : posix.normalize(posix.join(posix.dirname(contentPath), clean));
+  if (
+    repositoryPath === '..' ||
+    repositoryPath.startsWith('../') ||
+    (clean.startsWith('@assets/') && !repositoryPath.startsWith('src/assets/')) ||
+    (clean.startsWith('/') && !repositoryPath.startsWith('public/'))
+  ) {
+    throw new StudioValidationError(`图片路径越出内容仓库：${source}`);
+  }
+  return repositoryPath;
+}
+
+export async function validateStudioImageReferences(
+  metadata: Record<string, unknown>,
+  body: string,
+  status: StudioPublicationStatus,
+  contentPath: string,
+  exists: (repositoryPath: string) => boolean | Promise<boolean>,
+) {
+  if (status === 'draft') return;
+  const missing: string[] = [];
+  for (const reference of studioImageReferences(metadata, body)) {
+    const repositoryPath = studioRepositoryImagePath(reference.source, contentPath);
+    if (repositoryPath && !(await exists(repositoryPath))) {
+      missing.push(`${reference.label} 文件不存在：${reference.source}`);
+    }
+  }
+  if (missing.length) throw new StudioValidationError(missing.join(' '));
+}
+
+function validateStudioPublicationBody(
+  metadata: Record<string, unknown>,
+  body: string,
+  status: StudioPublicationStatus,
+) {
+  if (status === 'draft') return;
+  const errors: string[] = [];
+  if (placeholderPattern.test(`${metadata.title ?? ''}\n${metadata.description ?? ''}\n${body}`)) {
+    errors.push('检测到测试或占位内容。');
+  }
+  if (metadata.heroImage && !String(metadata.heroImageAlt ?? '').trim()) {
+    errors.push('封面图缺少替代文本。');
+  }
+  for (const [alt, source] of [...body.matchAll(markdownImagePattern)].map((match) => [
+    match[1],
+    match[2],
+  ])) {
+    if (!alt.trim()) errors.push(`正文图片缺少替代文本：${source}`);
+  }
+  if (errors.length) throw new StudioValidationError(errors.join(' '));
+}
+
 function validateStudioMetadataFields(
   collection: StudioCollection,
   metadata: Record<string, unknown>,
@@ -209,6 +300,10 @@ const slugSchema = z
 export const studioWriteSchema = z.object({
   action: z.enum(['draft', 'ready', 'publish', 'unpublish', 'schedule']).optional(),
   body: z.string().max(2 * 1024 * 1024, '正文不能超过 2 MB。'),
+  expectedSha: z
+    .string()
+    .regex(/^(?:[a-f0-9]{40}|[a-f0-9]{64})$/i, '内容版本标识不合法。')
+    .optional(),
   metadata: z.record(z.string(), z.unknown()),
   originalSlug: z.string().optional(),
   slug: z.string().optional().default(''),
@@ -369,6 +464,7 @@ export function serializeStudioDocument(
     publicationStatus,
     draft: publicationStatus !== 'published',
   });
+  validateStudioPublicationBody(next, body, publicationStatus);
   const bodyLength = body.replace(/\s/g, '').length;
   if (publicationStatus !== 'draft' && ['blog', 'projects', 'vibe', 'about'].includes(collection)) {
     if (!bodyLength) throw new StudioValidationError('待发布或已发布内容必须填写正文。');

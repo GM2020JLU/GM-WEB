@@ -27,7 +27,9 @@ export async function studioDeploymentMetadata(input: {
   }
   return {
     commitSha: input.commitSha,
-    deploymentPending: Boolean(input.token && input.deploy),
+    // GitHub writes land on the production branch, so even draft-only commits
+    // trigger the connected Vercel build and refresh Studio's static index.
+    deploymentPending: Boolean(input.token && input.commitSha),
     deploymentProvider: 'vercel' as const,
   };
 }
@@ -47,10 +49,15 @@ export function verifyStudioOrigin(request: Request, url: URL) {
   if (!origin && !import.meta.env.PROD) return true;
   if (origin === url.origin) return true;
 
-  const forwardedHost = request.headers.get('x-forwarded-host')?.split(',')[0]?.trim();
+  const forwardedHost = request.headers
+    .get('x-forwarded-host')
+    ?.split(',')[0]
+    ?.trim()
+    .toLowerCase();
   const forwardedProto = request.headers.get('x-forwarded-proto')?.split(',')[0]?.trim();
   if (
     forwardedHost &&
+    studioProxyHosts.has(forwardedHost) &&
     (forwardedProto === 'http' || forwardedProto === 'https') &&
     origin === `${forwardedProto}://${forwardedHost}`
   ) {
@@ -67,12 +74,14 @@ export function studioToken(cookies: AstroCookies) {
   return cookies.get('keystatic-gh-access-token')?.value;
 }
 
-export function requireStudioToken(cookies: AstroCookies) {
-  const token = studioToken(cookies);
-  if (studioUsesGitHub && !token) {
-    throw new StudioAuthenticationError();
-  }
+export function resolveStudioStorageToken(token: string | undefined, usesGitHub: boolean) {
+  if (!usesGitHub) return undefined;
+  if (!token) throw new StudioAuthenticationError();
   return token;
+}
+
+export function requireStudioToken(cookies: AstroCookies) {
+  return resolveStudioStorageToken(studioToken(cookies), studioUsesGitHub);
 }
 
 export class StudioAuthenticationError extends Error {

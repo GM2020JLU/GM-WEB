@@ -74,20 +74,23 @@ const formatNumber = (value: number) => new Intl.NumberFormat('zh-CN').format(va
             >跨所有模块</span
           >
         </article>
-        <article>
+        <a class="metric" href="/studio?status=published">
           <small>已发布</small><strong>{formatNumber(analytics.published)}</strong><span
             >线上可见</span
           >
-        </article>
+        </a>
         <article>
           <small>待处理</small><strong>{formatNumber(analytics.ready + analytics.draft)}</strong
           ><span>草稿 + 待发布</span>
         </article>
-        <article class:list={analytics.issues > 0 ? ['attention'] : []}>
+        <a
+          class:list={['metric', analytics.issues > 0 && 'attention']}
+          href="/studio?status=issues"
+        >
           <small>需完善</small><strong>{formatNumber(analytics.issues)}</strong><span
             >发布前建议修复</span
           >
-        </article>
+        </a>
         <article>
           <small>正文词数</small><strong>{formatNumber(analytics.words)}</strong><span
             >中英文粗略统计</span
@@ -101,25 +104,31 @@ const formatNumber = (value: number) => new Intl.NumberFormat('zh-CN').format(va
             href="/studio">管理内容 →</a
           >
         </div>
-        <div class="module-table" role="table" aria-label="模块健康度">
-          <div class="table-row table-head" role="row">
-            <span>模块</span><span>总数</span><span>已发布</span><span>草稿</span><span>需完善</span
-            ><span>正文词数</span>
-          </div>
-          {
-            analytics.modules.map((module) => (
-              <div class="table-row" role="row">
-                <>
-                  <strong>{module.label}</strong>
-                  <span>{module.total}</span>
-                  <span>{module.published}</span>
-                  <span>{module.draft + module.ready}</span>
-                  <span class:list={module.issues > 0 ? ['warning'] : []}>{module.issues}</span>
-                  <span>{formatNumber(module.words)}</span>
-                </>
-              </div>
-            ))
-          }
+        <div class="module-table">
+          <table>
+            <caption class="sr-only">各内容模块的总数、发布状态、待完善项目和正文词数</caption>
+            <thead>
+              <tr>
+                <th scope="col">模块</th><th scope="col">总数</th><th scope="col">已发布</th><th
+                  scope="col">草稿</th
+                ><th scope="col">需完善</th><th scope="col">正文词数</th>
+              </tr>
+            </thead>
+            <tbody>
+              {
+                analytics.modules.map((module) => (
+                  <tr>
+                    <th scope="row">{module.label}</th>
+                    <td>{module.total}</td>
+                    <td>{module.published}</td>
+                    <td>{module.draft + module.ready}</td>
+                    <td class:list={module.issues > 0 ? ['warning'] : []}>{module.issues}</td>
+                    <td>{formatNumber(module.words)}</td>
+                  </tr>
+                ))
+              }
+            </tbody>
+          </table>
         </div>
       </section>
 
@@ -194,16 +203,20 @@ const formatNumber = (value: number) => new Intl.NumberFormat('zh-CN').format(va
     margin: 26px 0;
   }
   .metrics article,
+  .metrics .metric,
   .panel,
   .notes article {
     border: 1px solid var(--paper-line);
     border-radius: 14px;
     background: color-mix(in srgb, var(--paper-bg) 96%, var(--paper-accent) 4%);
   }
-  .metrics article {
+  .metrics article,
+  .metrics .metric {
     display: grid;
     gap: 6px;
     padding: 18px;
+    color: inherit;
+    text-decoration: none;
   }
   .metrics small {
     color: var(--paper-ink-faint);
@@ -232,22 +245,26 @@ const formatNumber = (value: number) => new Intl.NumberFormat('zh-CN').format(va
     margin-top: 22px;
     overflow-x: auto;
   }
-  .table-row {
-    display: grid;
-    grid-template-columns: minmax(130px, 1.6fr) repeat(5, minmax(78px, 1fr));
-    gap: 12px;
-    align-items: center;
-    padding: 13px 8px;
-    border-top: 1px solid var(--paper-line);
+  .module-table table {
+    width: 100%;
+    min-width: 620px;
+    border-collapse: collapse;
     font-size: 0.82rem;
   }
-  .table-head {
-    color: var(--paper-ink-faint);
-    font-size: 0.72rem;
+  .module-table :is(th, td) {
+    padding: 13px 8px;
+    border-top: 1px solid var(--paper-line);
   }
-  .table-row span:not(:first-child),
-  .table-head span:not(:first-child) {
+  .module-table thead th {
+    color: var(--studio-text-meta);
+    font-size: 0.72rem;
+    font-weight: 500;
+  }
+  .module-table :is(th, td):not(:first-child) {
     text-align: right;
+  }
+  .module-table tbody th {
+    text-align: left;
   }
   .warning {
     color: #b57917;

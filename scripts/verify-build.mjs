@@ -46,14 +46,31 @@ function resolvePublicPath(value) {
   return join(dist, decoded, 'index.html');
 }
 
+function parseJsonLd(html, relative) {
+  const values = [];
+  for (const match of html.matchAll(
+    /<script[^>]*type="application\/ld\+json"[^>]*>([\s\S]*?)<\/script>/gi,
+  )) {
+    try {
+      values.push(JSON.parse(match[1]));
+    } catch {
+      fail(`${relative} 包含无效的 JSON-LD`);
+    }
+  }
+  return values;
+}
+
 const requiredFiles = [
   'index.html',
   '404.html',
   'about/index.html',
-  'resume/index.html',
   'blog/index.html',
   'projects/index.html',
+  'projects/k3-pico-itx-fan-control/index.html',
   'projects/personal-site/index.html',
+  'tags/device-tree/index.html',
+  'tags/linux/index.html',
+  'tags/thermal/index.html',
   'media/index.html',
   'vibe/index.html',
   'studio/index.html',
@@ -113,6 +130,7 @@ for (const file of htmlFiles) {
   if (!html.includes('<meta name="description"')) fail(`${relative} 缺少 description`);
   if (!html.includes('<link rel="canonical"')) fail(`${relative} 缺少 canonical`);
   if (!html.includes('application/ld+json')) fail(`${relative} 缺少结构化数据`);
+  parseJsonLd(html, relative);
 
   for (const marker of upstreamMarkers) {
     if (html.toLowerCase().includes(marker.toLowerCase())) {
@@ -123,6 +141,8 @@ for (const file of htmlFiles) {
   for (const marker of untranslatedUiMarkers) {
     if (html.includes(marker)) fail(`${relative} 残留英文界面文案：${marker}`);
   }
+
+  if (html.includes('href="/resume"')) fail(`${relative} 仍包含已移除的简历入口`);
 
   for (const match of html.matchAll(/(?:href|src)="(\/[^"]*)"/g)) {
     const target = resolvePublicPath(match[1]);
@@ -138,14 +158,19 @@ for (const marker of [
   '项目',
   '随记',
   'Bootloader',
+  'K3 Pico-ITX 风扇控制与热管理调试',
+  'href="/projects/k3-pico-itx-fan-control/"',
+  'SELECTED WORK',
   '查看项目案例',
-  '查看简历',
   '邮件交流',
 ]) {
   if (!home.includes(marker)) fail(`首页缺少关键内容：${marker}`);
 }
 if (home.includes('data-navfolio-full-font-warmup')) fail('首页仍在预取完整中文字体');
 if (home.includes('href="/media"')) fail('首页仍展示空的书影音入口');
+if (home.includes('href="/resume"') || existsSync(join(dist, 'resume/index.html'))) {
+  fail('前台仍包含已移除的简历入口或路由');
+}
 if (!home.includes('https://goumin.work/og-card.png')) fail('首页未使用自定义 OG 图');
 if (!home.includes('https://goumin.work/avatar/goumin-avatar-352.webp')) {
   fail('首页未使用本地优化头像');
@@ -173,6 +198,8 @@ for (const marker of [
   'data-deployment',
   'data-search',
   'data-content-list',
+  'data-bulk-feedback',
+  'data-selection-announcement',
   'data-filter="published"',
   '网站模块',
   '/studio/content/blog',
@@ -180,6 +207,9 @@ for (const marker of [
   '/studio/site',
   '/studio/assets',
   '/studio/edit/blog/new?new=1',
+  'data-studio-navigation-toggle',
+  'data-studio-navigation-panel',
+  'data-studio-navigation-close',
 ]) {
   if (!studio.includes(marker)) fail(`内容工作台缺少：${marker}`);
 }
@@ -192,6 +222,7 @@ for (const marker of [
   'accept=".md,text/markdown"',
   'data-import-form',
   'data-body-preview',
+  'data-import-step="1" aria-current="step"',
   'value="projects"',
 ]) {
   if (!markdownImport.includes(marker)) fail(`Markdown 导入页缺少：${marker}`);
@@ -205,8 +236,34 @@ for (const marker of [
   'site.pageTitle',
   'profile.avatar',
   'theme.palette',
+  'class="settings-index"',
+  'data-avatar-preview',
+  'data-palette-preview',
+  'data-save-state',
 ]) {
   if (!siteSettings.includes(marker)) fail(`站点设置页缺少：${marker}`);
+}
+
+const assets = readFileSync(join(dist, 'studio/assets/index.html'), 'utf8');
+for (const marker of [
+  '素材库',
+  'data-upload',
+  'data-assets',
+  'data-search',
+  'aria-label="搜索素材文件名"',
+]) {
+  if (!assets.includes(marker)) fail(`素材库缺少：${marker}`);
+}
+
+const analytics = readFileSync(join(dist, 'studio/analytics/index.html'), 'utf8');
+for (const marker of [
+  '<table',
+  '<caption',
+  'scope="col"',
+  'href="/studio?status=published"',
+  'href="/studio?status=issues"',
+]) {
+  if (!analytics.includes(marker)) fail(`Studio 数据概览缺少：${marker}`);
 }
 for (const module of ['blog', 'projects', 'vibe', 'media', 'pages']) {
   const modulePage = readFileSync(join(dist, `studio/content/${module}/index.html`), 'utf8');
@@ -231,6 +288,52 @@ if (!markdownImportScripts.length) {
 const project = readFileSync(join(dist, 'projects/personal-site/index.html'), 'utf8');
 for (const marker of ['项目概览', '我的角色', '项目周期', '关键成果', '独立产品设计']) {
   if (!project.includes(marker)) fail(`项目案例缺少证据内容：${marker}`);
+}
+
+const embeddedProject = readFileSync(
+  join(dist, 'projects/k3-pico-itx-fan-control/index.html'),
+  'utf8',
+);
+for (const marker of [
+  '技术分析与文档整理',
+  '问题背景',
+  '关键取舍',
+  '恢复自动温控',
+  'https://goumin.work/blog/spacemit-k3-pico-itx-fan/',
+]) {
+  if (!embeddedProject.includes(marker)) fail(`K3 工程案例缺少证据内容：${marker}`);
+}
+if (
+  !embeddedProject.includes(
+    '<link rel="canonical" href="https://goumin.work/projects/k3-pico-itx-fan-control/"',
+  )
+) {
+  fail('K3 工程案例 canonical 不正确');
+}
+const embeddedGraph = parseJsonLd(embeddedProject, 'projects/k3-pico-itx-fan-control/index.html')
+  .flatMap((value) => value['@graph'] ?? [])
+  .find((value) => value['@type'] === 'CreativeWork');
+if (
+  !embeddedGraph ||
+  embeddedGraph.headline !== 'K3 Pico-ITX 风扇控制与热管理调试' ||
+  embeddedGraph.url !== 'https://goumin.work/projects/k3-pico-itx-fan-control/'
+) {
+  fail('K3 工程案例缺少匹配页面内容的 CreativeWork 结构化数据');
+}
+
+const embeddedArticle = readFileSync(
+  join(dist, 'blog/spacemit-k3-pico-itx-fan/index.html'),
+  'utf8',
+);
+const articleGraph = parseJsonLd(embeddedArticle, 'blog/spacemit-k3-pico-itx-fan/index.html')
+  .flatMap((value) => value['@graph'] ?? [])
+  .find((value) => value['@type'] === 'BlogPosting');
+if (
+  !articleGraph ||
+  articleGraph.headline !== 'K3 Pico-ITX 风扇策略与配置指南' ||
+  !articleGraph.keywords?.includes('Linux')
+) {
+  fail('K3 技术文章缺少匹配页面内容的 BlogPosting 结构化数据');
 }
 if (!project.includes('问题与目标') || !project.includes('核心取舍')) {
   fail('项目案例缺少问题与决策过程');

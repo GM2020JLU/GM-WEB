@@ -36,6 +36,7 @@ interface Props {
       title: string;
       description: string;
       date: Date;
+      updatedDate?: Date;
       heroImage?: ImageMetadata | string;
       heroImageAlt?: string;
       showHeroImage?: boolean;
@@ -87,8 +88,17 @@ const post = props.post ?? {
   },
 };
 const isBlogPost = post.collection === 'blog';
+const isProject = post.collection === 'projects' && post.id !== 'index';
 const shouldMountCommentSection = supportsCommentSection(post.collection);
-const { title, description, date, heroImage, heroImageAlt, showHeroImage = true } = post.data;
+const {
+  title,
+  description,
+  date,
+  updatedDate,
+  heroImage,
+  heroImageAlt,
+  showHeroImage = true,
+} = post.data;
 const contentFont = props.contentFont ?? 'article';
 const bodyText = 'body' in post && typeof post.body === 'string' ? post.body : description;
 const englishWords = bodyText.match(/[A-Za-z0-9]+(?:['’-][A-Za-z0-9]+)*/g) ?? [];
@@ -139,12 +149,30 @@ const relatedPosts = sortByDateDesc(allBlogPosts.filter(({ id }) => id !== post.
 const hasRelatedPosts =
   shouldRenderSidebar && (sidebarConfig.relatedPosts ?? true) && relatedPosts.length > 0;
 const hasSidebar = shouldRenderSidebar && hasToc;
+const pageUrl = new URL(Astro.url.pathname, siteConfig.site.url).toString();
+const pageStructuredData =
+  isBlogPost || isProject
+    ? {
+        '@type': isBlogPost ? 'BlogPosting' : 'CreativeWork',
+        '@id': `${pageUrl}#content`,
+        url: pageUrl,
+        mainEntityOfPage: pageUrl,
+        headline: title,
+        description,
+        datePublished: date.toISOString(),
+        dateModified: (updatedDate ?? date).toISOString(),
+        inLanguage: ui.locale,
+        author: { '@id': `${siteConfig.site.url}/#person` },
+        publisher: { '@id': `${siteConfig.site.url}/#person` },
+        keywords: tags,
+      }
+    : undefined;
 ---
 
 <!doctype html>
 <html lang={ui.locale} data-palette={palette}>
   <head>
-    <BaseHead title={title} description={description} />
+    <BaseHead title={title} description={description} pageStructuredData={pageStructuredData} />
     {
       comments.provider === 'waline' && comments.enabled && (
         <link rel="stylesheet" href="https://unpkg.com/@waline/client@v3/dist/waline.css" />

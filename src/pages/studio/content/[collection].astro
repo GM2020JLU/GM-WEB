@@ -59,6 +59,11 @@ const items = entries
   })
   .sort((a, b) => new Date(b.date || 0).valueOf() - new Date(a.date || 0).valueOf());
 const statusLabel = { draft: '草稿', ready: '待发布', published: '已发布' } as const;
+const statusCounts = {
+  draft: items.filter((item) => item.status === 'draft').length,
+  ready: items.filter((item) => item.status === 'ready').length,
+  published: items.filter((item) => item.status === 'published').length,
+};
 const canCreate = collection !== 'pages';
 const palette = await getThemePalette();
 ---
@@ -92,12 +97,18 @@ const palette = await getThemePalette();
       <section class="toolbar">
         <div role="group" aria-label="状态筛选">
           <button type="button" data-filter="all" aria-pressed="true">全部 {items.length}</button>
-          <button type="button" data-filter="draft">草稿</button>
-          <button type="button" data-filter="ready">待发布</button>
-          <button type="button" data-filter="published">已发布</button>
+          <button type="button" data-filter="draft">草稿 {statusCounts.draft}</button>
+          <button type="button" data-filter="ready">待发布 {statusCounts.ready}</button>
+          <button type="button" data-filter="published">已发布 {statusCounts.published}</button>
         </div>
-        <input type="search" data-search placeholder={`搜索${definition.label}`} />
+        <input
+          type="search"
+          data-search
+          placeholder={`搜索${definition.label}`}
+          aria-label={`搜索${definition.label}`}
+        />
       </section>
+      <p class="results" data-results aria-live="polite">显示 {items.length} 条内容</p>
       <section class="entries" data-entries>
         {
           items.map((item) => (
@@ -111,12 +122,18 @@ const palette = await getThemePalette();
               </div>
               <nav aria-label={`${item.title}操作`}>
                 <>
-                  <a class="edit" href={item.editorUrl}>
+                  <a class="edit" href={item.editorUrl} aria-label={`编辑 ${item.title}`}>
                     编辑
                   </a>
-                  <a href={item.previewUrl}>预览</a>
+                  <a href={item.previewUrl} aria-label={`预览 ${item.title}`}>
+                    预览
+                  </a>
                 </>
-                {item.publicUrl && <a href={item.publicUrl}>线上</a>}
+                {item.publicUrl && (
+                  <a href={item.publicUrl} aria-label={`在线查看 ${item.title}`}>
+                    线上
+                  </a>
+                )}
               </nav>
             </article>
           ))
@@ -132,6 +149,7 @@ const palette = await getThemePalette();
       const filters = [...document.querySelectorAll('[data-filter]')];
       const search = document.querySelector('[data-search]');
       const empty = document.querySelector('[data-empty]');
+      const results = document.querySelector('[data-results]');
       let active = 'all';
       const apply = () => {
         const query = search instanceof HTMLInputElement ? search.value.trim().toLowerCase() : '';
@@ -145,6 +163,7 @@ const palette = await getThemePalette();
           if (show) visible++;
         });
         if (empty instanceof HTMLElement) empty.hidden = visible > 0;
+        if (results) results.textContent = `显示 ${visible} 条内容`;
       };
       filters.forEach((button) =>
         button.addEventListener('click', () => {
@@ -246,6 +265,12 @@ const palette = await getThemePalette();
     border: 1px solid var(--paper-line);
     border-radius: 15px;
     background: color-mix(in srgb, var(--paper-bg) 97%, transparent 3%);
+  }
+  .results {
+    margin: 0 0 9px;
+    color: var(--studio-text-meta);
+    font-size: 0.74rem;
+    text-align: right;
   }
   article {
     padding: 18px 20px;

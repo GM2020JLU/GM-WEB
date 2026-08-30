@@ -3,6 +3,7 @@ import {
   deploymentCopy,
   readPendingDeployment,
   resolveStudioDeploymentPhase,
+  STUDIO_DEPLOYMENT_MAX_AGE_MS,
   STUDIO_DEPLOYMENT_STORAGE_KEY,
   type StudioDeploymentPhase,
 } from './studio-deployment';
@@ -39,11 +40,49 @@ describe('Studio 发布进度', () => {
       publicUrl: '/blog/test',
     };
     expect(
-      readPendingDeployment({
-        getItem: (key) => (key === STUDIO_DEPLOYMENT_STORAGE_KEY ? JSON.stringify(pending) : null),
-      }),
+      readPendingDeployment(
+        {
+          getItem: (key) =>
+            key === STUDIO_DEPLOYMENT_STORAGE_KEY ? JSON.stringify(pending) : null,
+        },
+        new Date('2026-08-26T00:30:00.000Z'),
+      ),
     ).toEqual(pending);
     expect(readPendingDeployment({ getItem: () => '{"targetSha":"bad"}' })).toBeUndefined();
+  });
+
+  test('清除过期、未来或损坏的部署记录，避免页面无限轮询', () => {
+    const removed: string[] = [];
+    const storage = {
+      getItem: () =>
+        JSON.stringify({
+          targetSha: 'd'.repeat(40),
+          startedAt: '2026-08-26T00:00:00.000Z',
+          title: '旧任务',
+        }),
+      removeItem: (key: string) => removed.push(key),
+    };
+    expect(
+      readPendingDeployment(
+        storage,
+        new Date(new Date('2026-08-26T00:00:00.000Z').valueOf() + STUDIO_DEPLOYMENT_MAX_AGE_MS + 1),
+      ),
+    ).toBeUndefined();
+    expect(removed).toEqual([STUDIO_DEPLOYMENT_STORAGE_KEY]);
+
+    expect(
+      readPendingDeployment(
+        {
+          getItem: () =>
+            JSON.stringify({
+              targetSha: 'd'.repeat(40),
+              startedAt: '2026-08-26T01:00:00.000Z',
+              title: '未来任务',
+            }),
+        },
+        new Date('2026-08-26T00:00:00.000Z'),
+      ),
+    ).toBeUndefined();
   });
 
   test('以线上运行提交为最终完成依据，并识别构建失败', () => {

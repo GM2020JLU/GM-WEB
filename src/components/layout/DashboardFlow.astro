@@ -2,6 +2,7 @@
   <section class="flow-grid" aria-label="Gou Min 的个人站">
     <section class="flow-column main-column">
       <slot name="intro" />
+      <slot name="featured" />
       <slot name="doing" />
     </section>
 
@@ -23,9 +24,9 @@
 
   .flow-grid {
     display: grid;
-    grid-template-columns: minmax(0, 760px) minmax(240px, 286px);
+    grid-template-columns: minmax(0, 720px) minmax(264px, 304px);
     justify-content: center;
-    gap: 42px;
+    gap: 64px;
     align-items: start;
   }
 
@@ -41,17 +42,7 @@
 
   .flow-grid :global(.profile-card) {
     min-height: auto;
-    padding: 6px 0 2px;
-  }
-
-  .flow-grid :global(.avatar-wrap) {
-    width: 108px;
-    height: 108px;
-    margin-bottom: 16px;
-  }
-
-  .flow-grid :global(.profile-heading h2) {
-    font-size: 1.52rem;
+    margin-bottom: 20px;
   }
 
   .flow-grid :global(.heatmap-card) {
@@ -69,6 +60,10 @@
   .flow-grid :global(.intro-card) {
     min-height: 0;
     padding: 0 0 8px;
+  }
+
+  .flow-grid :global(.featured-card) {
+    margin-top: 34px;
   }
 
   @media (max-width: 920px) {
@@ -99,31 +94,20 @@
     }
 
     .flow-grid :global(.intro-card) {
-      order: 5;
       min-height: auto;
       padding: 0;
     }
 
-    .flow-grid :global(.profile-card) {
-      order: 1;
-    }
-
-    .flow-grid :global(.nav-card) {
-      order: 3;
-    }
-
     .flow-grid :global(.connect-card) {
-      order: 2;
-      margin-block: -18px -10px;
+      margin-block: 0;
     }
 
     .flow-grid :global(.heatmap-card) {
-      order: 4;
-      margin-top: -8px;
+      margin-top: 0;
     }
 
-    .flow-grid :global(.doing-card) {
-      order: 6;
+    .flow-grid :global(.featured-card) {
+      margin-top: 0;
     }
   }
 </style>

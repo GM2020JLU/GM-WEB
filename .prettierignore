@@ -1,6 +1,7 @@
 dist
 .astro
 node_modules
+.omo
 bun.lock
 homepage.png
 public/favicon.ico

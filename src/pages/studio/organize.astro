@@ -56,16 +56,24 @@ const groups = await Promise.all(
         <p>CONTENT ORGANIZATION</p><h1>分类、系列与标签</h1><span
           >统一维护内容关系，避免同义词和重复标识。</span
         >
-      </header><div class="groups">
+      </header><label class="taxonomy-search"
+        ><span>搜索组织项</span><input
+          type="search"
+          placeholder="搜索名称或说明"
+          data-taxonomy-search
+        /></label
+      ><div class="groups">
         {
           groups.map((group) => (
-            <section>
+            <section data-taxonomy-group>
               <>
                 <div class="heading">
                   <>
                     <div>
                       <>
-                        <h2>{group.label}</h2>
+                        <h2>
+                          {group.label} <small>{group.items.length} 项</small>
+                        </h2>
                         <p>{group.note}</p>
                       </>
                     </div>
@@ -76,20 +84,51 @@ const groups = await Promise.all(
                 </div>
                 <div class="items">
                   {group.items.map((item) => (
-                    <a href={`/studio/edit/${group.key}/${item.slug}`}>
+                    <a
+                      href={`/studio/edit/${group.key}/${item.slug}`}
+                      data-taxonomy-item
+                      data-search-text={`${item.title} ${item.description}`.toLocaleLowerCase(
+                        'zh-CN',
+                      )}
+                    >
                       <strong>{item.title}</strong>
                       <small>{item.description || '尚未填写说明'}</small>
                       <span>编辑 →</span>
                     </a>
                   ))}
+                  <p class="empty" data-taxonomy-empty hidden={group.items.length > 0}>
+                    还没有{group.label}，可以新建第一项。
+                  </p>
                 </div>
               </>
             </section>
           ))
         }
       </div>
-    </main></body
-  >
+    </main>
+    <script>
+      const search = document.querySelector('[data-taxonomy-search]');
+      const apply = () => {
+        const query = search instanceof HTMLInputElement ? search.value.trim().toLowerCase() : '';
+        document.querySelectorAll('[data-taxonomy-group]').forEach((group) => {
+          const items = [...group.querySelectorAll('[data-taxonomy-item]')];
+          let visible = 0;
+          items.forEach((item) => {
+            if (!(item instanceof HTMLElement)) return;
+            const show = !query || item.dataset.searchText?.includes(query);
+            item.hidden = !show;
+            if (show) visible++;
+          });
+          const empty = group.querySelector('[data-taxonomy-empty]');
+          if (empty instanceof HTMLElement) {
+            empty.hidden = visible > 0;
+            if (items.length) empty.textContent = '这个分组没有匹配项。';
+          }
+        });
+      };
+      search?.addEventListener('input', apply);
+    </script>
+  </body>
 </html>
 <style>
   :global(*) {
@@ -165,6 +204,23 @@ const groups = await Promise.all(
     display: grid;
     gap: 20px;
   }
+  .taxonomy-search {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    margin-bottom: 16px;
+    color: var(--studio-text-secondary);
+    font-size: 0.8rem;
+  }
+  .taxonomy-search input {
+    width: min(320px, 100%);
+    padding: 10px 12px;
+    border: 1px solid var(--paper-line-strong);
+    border-radius: 9px;
+    background: var(--paper-bg);
+    color: inherit;
+  }
   .groups section {
     padding: 26px;
     border: 1px solid var(--paper-line);
@@ -173,6 +229,10 @@ const groups = await Promise.all(
   .heading h2 {
     margin: 0;
     font: 400 2rem var(--font-page-heading);
+  }
+  .heading h2 small {
+    color: var(--studio-text-meta);
+    font: 500 0.72rem var(--font-ui);
   }
   .heading p {
     margin: 6px 0 0;
@@ -202,6 +262,16 @@ const groups = await Promise.all(
   .items a:hover {
     border-color: var(--paper-accent);
   }
+  .items a[hidden] {
+    display: none;
+  }
+  .items .empty {
+    grid-column: 1 / -1;
+    margin: 0;
+    padding: 24px;
+    color: var(--studio-text-meta);
+    text-align: center;
+  }
   .items span {
     margin-top: 5px;
     color: var(--paper-accent);
@@ -216,6 +286,13 @@ const groups = await Promise.all(
     }
     .items {
       grid-template-columns: 1fr;
+    }
+    .taxonomy-search {
+      align-items: stretch;
+      flex-direction: column;
+    }
+    .taxonomy-search input {
+      width: 100%;
     }
   }
 </style>

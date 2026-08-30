@@ -22,8 +22,15 @@ const palette = await getThemePalette();
       <div class="notice" data-notice role="status">
         <strong>正在读取设置</strong><small>请稍候…</small>
       </div>
+      <nav class="settings-index" aria-label="站点设置章节">
+        <a href="#settings-identity">网站身份</a><a href="#settings-home">首页内容</a><a
+          href="#settings-profile">个人资料</a
+        ><a href="#settings-blog">文章页</a><a href="#settings-projects">项目页</a><a
+          href="#settings-vibe">随记页</a
+        ><a href="#settings-media">书影音页</a>
+      </nav>
       <form data-site-form>
-        <section>
+        <section id="settings-identity">
           <div><span>01</span><h2>网站身份</h2><p>浏览器标题、搜索摘要和页脚。</p></div>
           <div class="fields">
             <label>站点名称<input required name="site.title" /></label>
@@ -38,7 +45,7 @@ const palette = await getThemePalette();
             <label class="wide">页脚文字<input name="site.footerNote" /></label>
           </div>
         </section>
-        <section>
+        <section id="settings-home">
           <div><span>02</span><h2>首页内容</h2><p>首页自我介绍、关注方向和引语。</p></div>
           <div class="fields">
             <label>引导词<input required name="home.introTitle" /></label>
@@ -58,7 +65,7 @@ const palette = await getThemePalette();
             >
           </div>
         </section>
-        <section>
+        <section id="settings-profile">
           <div><span>03</span><h2>个人资料</h2><p>首页名片和全站作者身份。</p></div>
           <div class="fields">
             <label>姓名<input required name="profile.name" /></label>
@@ -76,6 +83,12 @@ const palette = await getThemePalette();
                 ><option value="brown-soft">棕</option></select
               ></label
             >
+            <div class="profile-preview wide" aria-live="polite">
+              <img data-avatar-preview alt="头像预览" hidden /><span>
+                <strong data-palette-preview>当前主题</strong>
+                <small>修改主题色或头像网址可即时预览</small>
+              </span>
+            </div>
           </div>
         </section>
         {
@@ -85,7 +98,7 @@ const palette = await getThemePalette();
             ['vibe', '随记页'],
             ['media', '书影音页'],
           ].map(([key, label], index) => (
-            <section>
+            <section id={`settings-${key}`}>
               <div>
                 <>
                   <span>{String(index + 4).padStart(2, '0')}</span>
@@ -111,106 +124,16 @@ const palette = await getThemePalette();
           ))
         }
         <footer>
-          <span>保存后会触发网站重新构建</span><button type="submit">保存站点设置</button>
+          <span data-save-state>正在载入设置</span><button type="submit" disabled
+            >保存站点设置</button
+          >
         </footer>
       </form>
     </main>
     <script>
-      import { STUDIO_DEPLOYMENT_STORAGE_KEY } from '../../utils/studio-deployment';
-      const form = document.querySelector('[data-site-form]');
-      const notice = document.querySelector('[data-notice]');
-      const message = (title: string, detail: string, kind = '') => {
-        if (!(notice instanceof HTMLElement)) return;
-        notice.className = `notice ${kind}`;
-        notice.innerHTML = '<strong></strong><small></small>';
-        notice.querySelector('strong')!.textContent = title;
-        notice.querySelector('small')!.textContent = detail;
-      };
-      const field = (name: string) =>
-        form?.querySelector<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>(
-          `[name="${name}"]`,
-        );
-      const load = async () => {
-        const response = await fetch('/api/studio/site');
-        const result = await response.json();
-        if (!response.ok) return message('无法读取设置', result.error || '请刷新重试。', 'error');
-        const flatten = (value: Record<string, unknown>, prefix = ''): Array<[string, unknown]> =>
-          Object.entries(value).flatMap(([key, item]) =>
-            item && typeof item === 'object'
-              ? flatten(item as Record<string, unknown>, `${prefix}${key}.`)
-              : ([[`${prefix}${key}`, item]] as Array<[string, unknown]>),
-          );
-        flatten(result.settings).forEach(([name, value]) => {
-          const input = field(String(name));
-          if (input) input.value = String(value ?? '');
-        });
-        message('设置已载入', '修改后保存，线上页面会自动重新构建。', 'success');
-      };
-      form?.addEventListener('submit', async (event) => {
-        event.preventDefault();
-        if (!(form instanceof HTMLFormElement) || !form.reportValidity()) return;
-        const button = form.querySelector('button[type="submit"]') as HTMLButtonElement;
-        button.disabled = true;
-        message('正在保存', '正在写入站点配置。');
-        const value = (name: string) => field(name)?.value.trim() ?? '';
-        const pages = Object.fromEntries(
-          ['blog', 'projects', 'vibe', 'media'].map((key) => [
-            key,
-            {
-              title: value(`pages.${key}.title`),
-              subtitle: value(`pages.${key}.subtitle`),
-              note: value(`pages.${key}.note`),
-            },
-          ]),
-        );
-        const response = await fetch('/api/studio/site', {
-          method: 'PUT',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            site: {
-              title: value('site.title'),
-              description: value('site.description'),
-              pageTitle: value('site.pageTitle'),
-              pageDescription: value('site.pageDescription'),
-              footerNote: value('site.footerNote'),
-            },
-            theme: { palette: value('theme.palette') },
-            profile: {
-              name: value('profile.name'),
-              role: value('profile.role'),
-              email: value('profile.email'),
-              avatar: value('profile.avatar'),
-            },
-            home: {
-              introTitle: value('home.introTitle'),
-              introName: value('home.introName'),
-              introBody: value('home.introBody'),
-              focus: value('home.focus'),
-              quote: value('home.quote'),
-            },
-            pages,
-          }),
-        });
-        const result = await response.json();
-        button.disabled = false;
-        if (!response.ok) return message('保存失败', result.error || '请稍后重试。', 'error');
-        if (result.commitSha)
-          localStorage.setItem(
-            STUDIO_DEPLOYMENT_STORAGE_KEY,
-            JSON.stringify({
-              targetSha: result.commitSha,
-              title: '站点设置',
-              startedAt: new Date().toISOString(),
-              publicUrl: '/',
-            }),
-          );
-        message(
-          '保存成功',
-          result.deploymentPending ? '已提交，返回总览可查看上线进度。' : '本地配置已经更新。',
-          'success',
-        );
-      });
-      void load();
+      import { setupStudioSite } from '../../utils/studio-site-client';
+
+      setupStudioSite(document);
     </script>
   </body>
 </html>
@@ -249,11 +172,28 @@ const palette = await getThemePalette();
   }
   .notice {
     display: flex;
+    align-items: center;
     gap: 10px;
     margin: 22px 0;
     padding: 13px 15px;
     border: 1px solid var(--paper-line);
     border-radius: 11px;
+  }
+  .notice > div {
+    display: grid;
+    gap: 2px;
+  }
+  .notice > button,
+  .notice > a {
+    margin-left: auto;
+    padding: 8px 12px;
+    border: 1px solid var(--paper-line-strong);
+    border-radius: 8px;
+    background: var(--paper-bg);
+    color: inherit;
+    font: inherit;
+    text-decoration: none;
+    cursor: pointer;
   }
   .notice.success {
     border-color: color-mix(in srgb, var(--paper-accent) 48%, var(--paper-line));
@@ -265,6 +205,38 @@ const palette = await getThemePalette();
     display: grid;
     gap: 14px;
   }
+  .settings-index {
+    position: sticky;
+    top: 12px;
+    z-index: 4;
+    display: flex;
+    gap: 4px;
+    margin: 0 0 16px;
+    padding: 7px;
+    border: 1px solid var(--paper-line);
+    border-radius: 12px;
+    background: color-mix(in srgb, var(--paper-bg) 92%, transparent);
+    box-shadow: var(--paper-shadow-lift);
+    backdrop-filter: blur(14px);
+    overflow-x: auto;
+    scrollbar-width: none;
+  }
+  .settings-index::-webkit-scrollbar {
+    display: none;
+  }
+  .settings-index a {
+    flex: 0 0 auto;
+    padding: 8px 10px;
+    border-radius: 8px;
+    color: var(--studio-text-secondary);
+    font-size: 0.76rem;
+    text-decoration: none;
+  }
+  .settings-index a:hover,
+  .settings-index a:focus-visible {
+    background: var(--paper-control-hover);
+    color: var(--paper-ink);
+  }
   section {
     display: grid;
     grid-template-columns: 230px 1fr;
@@ -272,6 +244,7 @@ const palette = await getThemePalette();
     padding: 25px;
     border: 1px solid var(--paper-line);
     border-radius: 14px;
+    scroll-margin-top: 80px;
   }
   section > div:first-child > span {
     color: var(--paper-accent);
@@ -314,6 +287,30 @@ const palette = await getThemePalette();
   textarea {
     resize: vertical;
   }
+  .profile-preview {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    min-height: 72px;
+    padding: 10px 12px;
+    border: 1px solid var(--paper-line);
+    border-radius: 10px;
+    background: color-mix(in srgb, var(--paper-bg) 94%, var(--paper-accent) 6%);
+  }
+  .profile-preview img {
+    width: 50px;
+    height: 50px;
+    border-radius: 50%;
+    object-fit: cover;
+  }
+  .profile-preview span {
+    display: grid;
+    gap: 3px;
+  }
+  footer [data-dirty='true'] {
+    color: var(--studio-warning);
+    font-weight: 700;
+  }
   footer {
     position: sticky;
     bottom: 14px;
@@ -335,7 +332,18 @@ const palette = await getThemePalette();
     font: inherit;
     cursor: pointer;
   }
+  @media (max-width: 760px) {
+    .settings-index {
+      top: 70px;
+    }
+    section {
+      scroll-margin-top: 132px;
+    }
+  }
   @media (max-width: 720px) {
+    .settings-index {
+      margin-inline: -4px;
+    }
     section {
       grid-template-columns: 1fr;
     }

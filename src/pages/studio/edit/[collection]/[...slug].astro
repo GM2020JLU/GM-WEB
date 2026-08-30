@@ -144,7 +144,7 @@ const palette = await getThemePalette();
           </details>
         </aside>
 
-        <section class="body-panel" data-body-panel data-view="split">
+        <section class="body-panel" data-body-panel data-editor-view="split">
           <header>
             <div><h2>正文</h2><small data-word-count>0 字符</small></div><div class="view-switch">
               <button type="button" data-view="edit">编辑</button><button
@@ -160,24 +160,58 @@ const palette = await getThemePalette();
         </section>
 
         <footer class="publish-bar">
-          <span class="current-status" data-current-status>草稿</span><div>
-            <button type="button" data-action="draft">保存草稿</button><details
-              class="publish-more"
-            >
-              <summary>其他</summary><div>
-                <button type="button" data-action="ready">设为待发布</button><button
-                  type="button"
-                  data-action="schedule">定时发布</button
-                ><button type="button" data-action="unpublish">撤回发布</button>{
-                  collection !== 'about' && !isNew && (
+          {
+            taxonomy ? (
+              <>
+                <span class="current-status" data-current-status hidden>
+                  草稿
+                </span>
+                <div>
+                  {!isNew && (
                     <button type="button" class="danger" data-delete>
-                      删除内容
+                      删除{labels[collection]}
                     </button>
-                  )
-                }
-              </div>
-            </details><button type="button" class="primary" data-action="publish">发布</button>
-          </div>
+                  )}
+                  <button type="button" class="primary" data-action="draft">
+                    保存{labels[collection]}
+                  </button>
+                </div>
+              </>
+            ) : (
+              <>
+                <span class="current-status" data-current-status>
+                  草稿
+                </span>
+                <div>
+                  <button type="button" data-action="draft">
+                    保存草稿
+                  </button>
+                  <details class="publish-more">
+                    <summary>其他</summary>
+                    <div>
+                      <button type="button" data-action="ready">
+                        设为待发布
+                      </button>
+                      <button type="button" data-action="schedule">
+                        定时发布
+                      </button>
+                      <button type="button" data-action="unpublish">
+                        撤回发布
+                      </button>
+                      {collection !== 'about' && !isNew && (
+                        <button type="button" class="danger" data-delete>
+                          删除内容
+                        </button>
+                      )}
+                    </div>
+                  </details>
+                  <button type="button" class="primary" data-action="publish">
+                    发布
+                  </button>
+                </div>
+              </>
+            )
+          }
         </footer>
       </form>
     </main>
@@ -480,7 +514,10 @@ const palette = await getThemePalette();
     border-right: 1px solid var(--paper-line);
     font: 14px/1.75 var(--font-code);
     resize: none;
-    outline: none;
+  }
+  .editor-grid > textarea:focus-visible {
+    outline: 3px solid var(--studio-focus-ring);
+    outline-offset: -3px;
   }
   .markdown-preview {
     min-width: 0;
@@ -488,22 +525,22 @@ const palette = await getThemePalette();
     padding: 26px;
     line-height: 1.8;
   }
-  .body-panel[data-view='edit'] .editor-grid,
-  .body-panel[data-view='preview'] .editor-grid {
+  .body-panel[data-editor-view='edit'] .editor-grid,
+  .body-panel[data-editor-view='preview'] .editor-grid {
     grid-template-columns: 1fr;
   }
-  .body-panel[data-view='edit'] .markdown-preview,
-  .body-panel[data-view='preview'] textarea {
+  .body-panel[data-editor-view='edit'] .markdown-preview,
+  .body-panel[data-editor-view='preview'] textarea {
     display: none;
   }
   .publish-bar {
     position: fixed;
     right: 0;
     bottom: 0;
-    left: 0;
+    left: var(--studio-navigation-width);
     z-index: 5;
-    height: 68px;
-    padding: 10px max(18px, calc((100vw - 1400px) / 2));
+    min-height: 68px;
+    padding: 10px max(18px, calc((100vw - var(--studio-navigation-width) - 1400px) / 2));
     border-top: 1px solid var(--paper-line);
     background: color-mix(in srgb, var(--paper-bg) 88%, transparent);
     backdrop-filter: blur(16px);
@@ -602,6 +639,12 @@ const palette = await getThemePalette();
       border-bottom: 1px solid var(--paper-line);
     }
   }
+  @media (max-width: 760px) {
+    .publish-bar {
+      left: 0;
+      padding-inline: 12px;
+    }
+  }
   @media (max-width: 560px) {
     .shell {
       width: calc(100% - 18px);
@@ -612,14 +655,14 @@ const palette = await getThemePalette();
     .meta-panel {
       display: block;
     }
-    .body-panel[data-view='split'] .editor-grid {
+    .body-panel[data-editor-view='split'] .editor-grid {
       display: block;
     }
-    .body-panel[data-view='split'] textarea {
+    .body-panel[data-editor-view='split'] textarea {
       min-height: 400px;
     }
     .publish-bar {
-      height: 62px;
+      min-height: 64px;
     }
     .deployment-tracker {
       grid-template-columns: 1fr;

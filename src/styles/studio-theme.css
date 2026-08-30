@@ -1,5 +1,21 @@
 body.studio-with-navigation {
-  --studio-shell-max-width: min(1180px, calc(100% - 32px));
+  --studio-navigation-width: 228px;
+  --studio-shell-width: 1180px;
+  --studio-shell-gutter: 32px;
+  --studio-page-top: clamp(36px, 5vw, 52px);
+  --studio-page-bottom: 96px;
+  --studio-text: var(--paper-ink);
+  --studio-text-secondary: color-mix(in srgb, var(--paper-ink) 78%, var(--paper-bg) 22%);
+  --studio-text-meta: color-mix(in srgb, var(--paper-ink) 68%, var(--paper-bg) 32%);
+  --studio-accent-strong: var(--accent-dark);
+  --studio-on-accent: var(--paper-bg);
+  --studio-focus-ring: var(--studio-accent-strong);
+  --studio-surface: var(--paper-surface, var(--paper-bg));
+  --studio-surface-muted: var(--paper-surface-muted, var(--paper-control));
+  --studio-border: color-mix(in srgb, var(--paper-ink) 18%, var(--paper-bg) 82%);
+  --studio-control-border: color-mix(in srgb, var(--paper-ink) 32%, var(--paper-bg) 68%);
+  --studio-panel-radius: 14px;
+  --studio-control-radius: 9px;
   --studio-success: #43a364;
   --studio-success-bg: color-mix(in srgb, var(--paper-accent) 12%, transparent);
   --studio-warning: #f5b63b;
@@ -233,4 +249,213 @@ body.studio-with-navigation .danger {
 
 body.studio-with-navigation dialog::backdrop {
   background: color-mix(in srgb, #0a0e0d 74%, transparent);
+}
+
+/* Shared Studio foundations. Keep page-specific layout choices, but make the
+   workspace read and behave as one product. */
+body.studio-with-navigation {
+  color: var(--studio-text);
+  font-size: 16px;
+  line-height: 1.55;
+}
+
+body.studio-with-navigation > main:is(.shell, .module-shell, .settings-shell, .content-shell) {
+  width: min(var(--studio-shell-width), calc(100% - var(--studio-shell-gutter)));
+  max-width: none;
+  margin-inline: auto;
+  padding: var(--studio-page-top) 0 var(--studio-page-bottom);
+  color: var(--studio-text);
+}
+
+body.studio-with-navigation > main[data-editor-root] {
+  --studio-shell-width: 1400px;
+  --studio-page-top: 18px;
+}
+
+body.studio-with-navigation
+  > main:is(.shell, .module-shell, .settings-shell, .content-shell)
+  > :is(header, .page-header, .hero, .editor-header) {
+  margin: 0 0 24px;
+  padding: 0 0 28px;
+  border-bottom: 1px solid var(--studio-border);
+}
+
+body.studio-with-navigation
+  > main:is(.shell, .module-shell, .settings-shell, .content-shell)
+  > :is(header, .page-header, .hero, .editor-header)
+  h1 {
+  margin: 6px 0 10px;
+  color: var(--studio-text);
+  font: 500 clamp(2.25rem, 4.5vw, 3.25rem) / 1.05 var(--font-page-heading);
+  letter-spacing: -0.025em;
+}
+
+body.studio-with-navigation
+  > main:is(.shell, .module-shell, .settings-shell, .content-shell)
+  > :is(header, .page-header, .hero, .editor-header)
+  :is(.eyebrow, p:first-child),
+body.studio-with-navigation
+  > main:is(.shell, .module-shell, .settings-shell, .content-shell)
+  > :is(header, .page-header, .hero, .editor-header)
+  > div
+  > p:first-child {
+  color: var(--studio-accent-strong);
+}
+
+body.studio-with-navigation
+  > main:is(.shell, .module-shell, .settings-shell, .content-shell)
+  :is(
+    .panel,
+    .content-list,
+    .entries,
+    .meta-panel,
+    .body-panel,
+    .submit-bar,
+    .module-grid a,
+    .asset-grid article,
+    .notes article,
+    .groups > section,
+    form[data-site-form] > section
+  ) {
+  border-color: var(--studio-border);
+  border-radius: var(--studio-panel-radius);
+  background: var(--studio-surface);
+}
+
+body.studio-with-navigation > main:is(.shell, .module-shell, .settings-shell, .content-shell) small,
+body.studio-with-navigation
+  > main:is(.shell, .module-shell, .settings-shell, .content-shell)
+  :is(.content-meta, .meta-note, .meta-help, dt) {
+  color: var(--studio-text-meta);
+}
+
+body.studio-with-navigation
+  > main:is(.shell, .module-shell, .settings-shell, .content-shell)
+  label {
+  color: var(--studio-text-secondary);
+}
+
+body.studio-with-navigation
+  > main:is(.shell, .module-shell, .settings-shell, .content-shell)
+  :is(input, textarea, select)::placeholder {
+  color: var(--studio-text-meta);
+  opacity: 1;
+}
+
+body.studio-with-navigation
+  > main:is(.shell, .module-shell, .settings-shell, .content-shell)
+  :is(
+    button,
+    summary,
+    input:not([type='hidden']):not([type='checkbox']):not([type='radio']):not([type='file']),
+    select
+  ),
+body.studio-with-navigation > dialog :is(button, input, select),
+body.studio-with-navigation
+  > main:is(.shell, .module-shell, .settings-shell, .content-shell)
+  :is(.primary, .btn, .actions a, .header-actions a, .row-actions a, .deployment > a) {
+  min-block-size: 44px;
+  border-radius: var(--studio-control-radius);
+}
+
+body.studio-with-navigation
+  > main:is(.shell, .module-shell, .settings-shell, .content-shell)
+  :is(button, summary, .primary, .btn, .actions a, .header-actions a, .row-actions a) {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding-inline: 14px;
+}
+
+body.studio-with-navigation
+  > main:is(.shell, .module-shell, .settings-shell, .content-shell)
+  :is(input, textarea, select) {
+  border-color: var(--studio-control-border);
+  background: var(--studio-surface);
+  color: var(--studio-text);
+}
+
+body.studio-with-navigation
+  > main:is(.shell, .module-shell, .settings-shell, .content-shell)
+  :is(
+    .primary,
+    .btn,
+    button[type='submit'],
+    .new-menu > summary,
+    .view-switch button[aria-pressed='true']
+  ) {
+  border-color: var(--studio-accent-strong);
+  background: var(--studio-accent-strong);
+  color: var(--studio-on-accent);
+}
+
+body.studio-with-navigation
+  > main:is(.shell, .module-shell, .settings-shell, .content-shell)
+  .row-actions
+  .edit,
+body.studio-with-navigation
+  > main:is(.shell, .module-shell, .settings-shell, .content-shell)
+  .publish-more
+  > summary {
+  color: var(--studio-text);
+}
+
+body.studio-with-navigation
+  > main:is(.shell, .module-shell, .settings-shell, .content-shell)
+  .current-status {
+  color: var(--studio-text-meta);
+}
+
+body.studio-with-navigation
+  > main:is(.shell, .module-shell, .settings-shell, .content-shell)
+  :is(a[href], button, summary, input, textarea, select, [tabindex]):focus-visible,
+body.studio-with-navigation
+  > dialog
+  :is(a[href], button, input, textarea, select, [tabindex]):focus-visible {
+  outline: 3px solid var(--studio-focus-ring);
+  outline-offset: 3px;
+}
+
+body.studio-with-navigation
+  > main:is(.shell, .module-shell, .settings-shell, .content-shell)
+  :is(.primary, .btn, button[type='submit'], .new-menu > summary):focus-visible {
+  outline-color: var(--studio-on-accent);
+  box-shadow: 0 0 0 5px var(--studio-focus-ring);
+}
+
+body.studio-with-navigation
+  > main:is(.shell, .module-shell, .settings-shell, .content-shell)
+  :is(.dropzone, .upload):focus-within {
+  outline: 3px solid var(--studio-focus-ring);
+  outline-offset: 3px;
+}
+
+body.studio-with-navigation
+  > main:is(.shell, .module-shell, .settings-shell, .content-shell)
+  :is(button, input, textarea, select)[disabled] {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
+@media (max-width: 760px) {
+  body.studio-with-navigation {
+    --studio-shell-gutter: 24px;
+    --studio-page-top: 28px;
+    --studio-page-bottom: 84px;
+  }
+
+  body.studio-with-navigation
+    > main:is(.shell, .module-shell, .settings-shell, .content-shell)
+    > :is(header, .page-header, .hero, .editor-header) {
+    align-items: flex-start;
+    margin-bottom: 18px;
+    padding-bottom: 22px;
+  }
+
+  body.studio-with-navigation
+    > main:is(.shell, .module-shell, .settings-shell, .content-shell)
+    > :is(header, .page-header, .hero, .editor-header)
+    h1 {
+    font-size: clamp(2rem, 10vw, 2.6rem);
+  }
 }

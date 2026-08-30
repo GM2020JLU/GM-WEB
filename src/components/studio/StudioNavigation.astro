@@ -1,5 +1,5 @@
 ---
-import { Moon, Sun } from 'lucide-astro';
+import { Menu, Moon, Sun, X } from 'lucide-astro';
 
 const pathname = Astro.url.pathname;
 const groups = [
@@ -59,44 +59,87 @@ const groups = [
 ];
 ---
 
-<aside class="studio-navigation" aria-label="创作后台模块">
-  <a class="studio-brand" href="/studio" data-astro-reload
-    ><span>GM</span><strong>创作中心</strong></a
-  >
-  <nav>
-    {
-      groups.map((group) => (
-        <section>
-          <p>{group.label}</p>
-          {group.items.map((item) => (
-            <a
-              href={item.href}
-              data-astro-reload
-              aria-current={item.match(pathname) ? 'page' : undefined}
-            >
-              {item.label}
-            </a>
-          ))}
-        </section>
-      ))
-    }
-  </nav>
-  <div class="studio-nav-footer">
-    <a href="/studio/import" data-astro-reload>导入 Markdown</a>
-    <a href="/" target="_blank">查看网站 ↗</a>
-    <button
-      class="studio-nav-theme"
-      type="button"
-      data-theme-toggle
-      aria-label="切换明暗主题"
-      title="切换明暗主题"
+<aside class="studio-navigation" aria-label="创作后台模块" data-studio-navigation>
+  <div class="studio-nav-header">
+    <a class="studio-brand" href="/studio" data-astro-reload
+      ><span>GM</span><strong>创作中心</strong></a
     >
-      <Moon class="theme-icon-moon" size={17} stroke-width={2} />
-      <Sun class="theme-icon-sun" size={17} stroke-width={2} />
-      <span class="sr-only">切换明暗主题</span>
+    <button
+      class="studio-mobile-toggle"
+      type="button"
+      aria-label="打开后台导航"
+      aria-expanded="false"
+      aria-controls="studio-navigation-panel"
+      data-studio-navigation-toggle
+    >
+      <Menu class="studio-menu-icon" size={19} stroke-width={2} />
+      <X class="studio-close-icon" size={19} stroke-width={2} />
     </button>
   </div>
+
+  <div
+    class="studio-nav-panel"
+    id="studio-navigation-panel"
+    aria-label="后台导航"
+    data-studio-navigation-panel
+  >
+    <button
+      class="studio-nav-panel-close"
+      type="button"
+      aria-label="关闭后台导航"
+      data-studio-navigation-close
+    >
+      <X size={19} stroke-width={2} />
+    </button>
+    <nav>
+      {
+        groups.map((group) => (
+          <section>
+            <p>{group.label}</p>
+            {group.items.map((item) => (
+              <a
+                href={item.href}
+                data-astro-reload
+                aria-current={item.match(pathname) ? 'page' : undefined}
+              >
+                {item.label}
+              </a>
+            ))}
+          </section>
+        ))
+      }
+    </nav>
+    <div class="studio-nav-footer">
+      <a href="/studio/import" data-astro-reload>导入 Markdown</a>
+      <a href="/" target="_blank">查看网站 ↗</a>
+      <button
+        class="studio-nav-theme"
+        type="button"
+        data-theme-toggle
+        aria-label="切换明暗主题"
+        title="切换明暗主题"
+      >
+        <Moon class="theme-icon-moon" size={17} stroke-width={2} />
+        <Sun class="theme-icon-sun" size={17} stroke-width={2} />
+        <span class="sr-only">切换明暗主题</span>
+      </button>
+    </div>
+  </div>
+
+  <button
+    class="studio-nav-backdrop"
+    type="button"
+    tabindex="-1"
+    aria-label="关闭后台导航"
+    data-studio-navigation-backdrop
+    hidden></button>
 </aside>
+
+<script>
+  import { setupStudioNavigation } from '../../utils/studio-navigation-client';
+
+  setupStudioNavigation(document);
+</script>
 
 <style>
   .studio-navigation {
@@ -112,6 +155,11 @@ const groups = [
     color: var(--paper-ink);
     font-family: var(--font-ui);
   }
+  .studio-nav-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
   .studio-brand {
     display: flex;
     gap: 10px;
@@ -119,6 +167,19 @@ const groups = [
     padding: 0 8px 22px;
     color: inherit;
     text-decoration: none;
+  }
+  .studio-mobile-toggle {
+    display: none;
+  }
+  .studio-nav-panel {
+    display: flex;
+    min-height: 0;
+    flex: 1;
+    flex-direction: column;
+    overflow-y: auto;
+  }
+  .studio-nav-panel-close {
+    display: none;
   }
   .studio-brand span {
     display: grid;
@@ -140,12 +201,15 @@ const groups = [
   }
   section p {
     margin: 0 9px 7px;
-    color: var(--paper-ink-faint);
+    color: var(--paper-ink-soft);
     font: 700 0.67rem/1.3 var(--font-meta);
     letter-spacing: 0.12em;
   }
   section a,
   .studio-nav-footer a {
+    display: flex;
+    min-height: 44px;
+    align-items: center;
     padding: 9px 10px;
     border-radius: 9px;
     color: var(--paper-ink-soft);
@@ -171,8 +235,8 @@ const groups = [
 
   .studio-nav-footer button {
     display: inline-grid;
-    width: 38px;
-    height: 38px;
+    width: 44px;
+    height: 44px;
     place-items: center;
     padding: 0;
     border: 1px solid var(--paper-line-strong);
@@ -192,6 +256,9 @@ const groups = [
     background: var(--paper-control-hover);
     color: var(--paper-accent);
   }
+  .studio-nav-backdrop {
+    display: none;
+  }
   :global(body.studio-with-navigation) {
     padding-left: 228px;
     background: var(--paper-bg) !important;
@@ -206,7 +273,9 @@ const groups = [
   @media (max-width: 760px) {
     .studio-navigation {
       position: sticky;
+      inset: auto;
       top: 0;
+      z-index: 40;
       width: 100%;
       height: auto;
       padding: 10px 16px;
@@ -220,19 +289,103 @@ const groups = [
       width: 30px;
       height: 30px;
     }
-    nav,
-    .studio-nav-footer a {
+    .studio-mobile-toggle {
+      display: inline-grid;
+      width: 44px;
+      height: 44px;
+      place-items: center;
+      padding: 0;
+      border: 1px solid var(--paper-line);
+      border-radius: 8px;
+      background: var(--paper-control);
+      color: var(--paper-ink);
+      cursor: pointer;
+    }
+    .studio-mobile-toggle:focus-visible {
+      outline: 2px solid var(--paper-accent);
+      outline-offset: 3px;
+    }
+    .studio-close-icon {
       display: none;
     }
-    .studio-nav-footer {
+    .studio-navigation[data-open='true'] .studio-menu-icon {
+      display: none;
+    }
+    .studio-navigation[data-open='true'] .studio-close-icon {
+      display: block;
+    }
+    .studio-nav-panel {
+      position: fixed;
+      z-index: 2;
+      top: 65px;
+      right: 12px;
+      bottom: 12px;
       display: flex;
-      justify-content: flex-end;
-      margin-top: 0;
-      padding-top: 0;
-      border-top: 0;
+      width: min(320px, calc(100vw - 24px));
+      padding: 20px 16px 16px;
+      border: 1px solid var(--paper-line-strong);
+      border-radius: 12px;
+      background: var(--paper-bg);
+      box-shadow: var(--paper-shadow-lift);
+      opacity: 0;
+      overflow: auto;
+      pointer-events: none;
+      transform: translateX(calc(100% + 24px));
+    }
+    .studio-nav-panel-close {
+      display: inline-grid;
+      width: 44px;
+      height: 44px;
+      flex: 0 0 auto;
+      place-items: center;
+      align-self: flex-end;
+      margin: -8px -4px 8px 0;
+      padding: 0;
+      border: 1px solid var(--paper-line);
+      border-radius: 8px;
+      background: var(--paper-control);
+      color: var(--paper-ink);
+      cursor: pointer;
+    }
+    .studio-nav-panel-close:hover {
+      border-color: var(--paper-line-strong);
+      background: var(--paper-control-hover);
+    }
+    .studio-nav-panel-close:focus-visible {
+      outline: 2px solid var(--paper-accent);
+      outline-offset: 3px;
+    }
+    .studio-navigation[data-open='true'] .studio-nav-panel {
+      opacity: 1;
+      pointer-events: auto;
+      transform: translateX(0);
+    }
+    .studio-nav-panel nav {
+      display: grid;
+    }
+    .studio-nav-footer a {
+      display: block;
+    }
+    .studio-nav-footer {
+      display: grid;
+      margin-top: auto;
+      padding-top: 18px;
+      border-top: 1px solid var(--paper-line);
+    }
+    .studio-nav-backdrop:not([hidden]) {
+      position: fixed;
+      z-index: 1;
+      inset: 65px 0 0;
+      display: block;
+      width: 100%;
+      border: 0;
+      background: color-mix(in srgb, #0a0e0d 54%, transparent);
     }
     :global(body.studio-with-navigation) {
       padding-left: 0;
+    }
+    :global(html[data-studio-navigation-open='true']) {
+      overflow: hidden;
     }
   }
 </style>

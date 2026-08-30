@@ -13,6 +13,7 @@ import { readStudioFile, writeStudioFile } from '../../../utils/studio-storage';
 export const prerender = false;
 const path = 'src/config/site.toml';
 const schema = z.object({
+  expectedSha: z.string().regex(/^(?:[a-f0-9]{40}|[a-f0-9]{64})$/i, '站点设置版本标识不合法。'),
   site: z.object({
     title: z.string().trim().min(1).max(80),
     description: z.string().trim().min(1).max(240),
@@ -130,7 +131,7 @@ export const PUT: APIRoute = async ({ cookies, request, url }) => {
     const written = await writeStudioFile({
       token,
       path,
-      sha: file.sha,
+      expectedSha: next.expectedSha,
       content: stringify(root),
       message: 'Update site settings',
     });
@@ -142,6 +143,7 @@ export const PUT: APIRoute = async ({ cookies, request, url }) => {
     });
     return studioJson({
       ok: true,
+      sha: written.contentSha,
       ...deployment,
     });
   } catch (error) {

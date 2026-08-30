@@ -4,7 +4,10 @@ publicationStatus: published
 draft: false
 description: K3 Pico-ITX Linux 自动温控、sysfs 与 ectool 风扇调试，以及 DTS 配置的完整指南。
 date: 2026-08-26T15:22:00+08:00
-tags: []
+tags:
+  - Linux
+  - Thermal
+  - Device Tree
 updatedDate: 2026-08-26T15:23:15+08:00
 ---
 

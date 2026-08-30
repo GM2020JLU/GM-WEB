@@ -39,39 +39,59 @@ http://:8081 {
 	bind 127.0.0.1
 	encode zstd gzip
 
-	# Cloudflare Access remains the preferred identity layer. This Caddy
-	# challenge is a defense-in-depth fallback so the local-write APIs are
-	# never publicly reachable without credentials.
-	basic_auth {
-		goumin $2a$14$94e4zht1vaBUC1B2iyfd6O43lQLdt1ry3tGjJjlyoQ8UqTP9yY.Qi
-	}
+	# Authentication runs before every Astro/Vite request. Only the self-contained
+	# login surface reaches the auth service without a session; a failed or missing
+	# auth service therefore fails closed instead of exposing the development server.
+	route {
+		# Browsers may keep sending the retired Basic Auth credential. Never forward it.
+		request_header -Authorization
 
-	# The dedicated Access hostname opens the Studio directly. Keep the
-	# internal /studio route so links and API paths remain unchanged.
-	@studioRoot {
-		host studio.goumin.work
-		path /
-	}
-	rewrite @studioRoot /studio
+		# The dedicated hostname opens the Studio directly. Keep the internal
+		# /studio route so links and API paths remain unchanged.
+		@studioRoot {
+			host studio.goumin.work
+			path /
+		}
+		rewrite @studioRoot /studio
 
-	# Astro fingerprints these assets, so both the browser and Cloudflare may reuse them safely.
-	@immutable path /_astro/*
-	header @immutable Cache-Control "public, max-age=31536000, immutable"
+		@authSurface path /studio/login /api/studio/session /api/studio/session/logout /studio/login-assets/* /robots.txt
+		reverse_proxy @authSurface 127.0.0.1:4322
 
-	# The current local authoring server uses Vite modules. A short browser cache removes
-	# repeated cross-border requests while still picking up code changes within minutes.
-	@devAssets path /@vite/* /@id/* /@fs/* /node_modules/* /src/*
-	header @devAssets Cache-Control "private, max-age=300"
+		@keystatic path /keystatic /keystatic/* /api/keystatic /api/keystatic/*
+		header @keystatic {
+			Cache-Control "private, no-store"
+			CDN-Cache-Control "no-store"
+		}
+		respond @keystatic 404
 
-	@private not path /_astro/* /@vite/* /@id/* /@fs/* /node_modules/* /src/*
-	header @private Cache-Control "private, no-store"
+		forward_auth 127.0.0.1:4322 {
+			uri /internal/studio-auth/verify
+		}
 
-	@keystatic path /keystatic /keystatic/* /api/keystatic /api/keystatic/*
-	respond @keystatic 404
+		# Cache rules are intentionally installed only after authentication succeeds.
+		# Otherwise a browser could cache an auth redirect or 401 as if it were an asset.
+		@immutable path /_astro/*
+		header @immutable {
+			Cache-Control "private, max-age=31536000, immutable"
+			CDN-Cache-Control "no-store"
+		}
 
-	reverse_proxy 127.0.0.1:4321 {
-		# Let this edge define browser caching consistently instead of inheriting
-		# Astro/Vite's development-only no-cache header.
-		header_down -Cache-Control
+		@devAssets path /@vite/* /@id/* /@fs/* /node_modules/* /src/*
+		header @devAssets {
+			Cache-Control "private, max-age=300"
+			CDN-Cache-Control "no-store"
+		}
+
+		@private not path /_astro/* /@vite/* /@id/* /@fs/* /node_modules/* /src/*
+		header @private {
+			Cache-Control "private, no-store"
+			CDN-Cache-Control "no-store"
+		}
+
+		reverse_proxy 127.0.0.1:4321 {
+			# Let this edge define browser caching consistently instead of inheriting
+			# Astro/Vite's development-only no-cache header.
+			header_down -Cache-Control
+		}
 	}
 }

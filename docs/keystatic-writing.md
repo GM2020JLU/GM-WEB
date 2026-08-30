@@ -16,17 +16,24 @@ GitHub 登录。
 ## 线上写作
 
 正式入口是 `https://studio.goumin.work/`，由 Mac 上的 Astro 服务以本地存储模式运行。
-整个主机先经过 Caddy Basic Auth：用户名为 `goumin`，强随机密码只保存在 Mac 用户专属
-的 `0600` 凭据文件，不写入仓库或环境文件。需要取回密码时在可信终端执行：
+Caddy 会先向仅监听回环地址的认证服务校验签名会话，通过后才允许请求进入 Astro/Vite；
+因此未登录状态无法接触工作台、写入 API 或开发服务资源。登录用户名为 `goumin`，强随机
+密码只保存在 Mac 用户专属的 `0600` 凭据文件，不写入仓库或环境文件。需要取回密码时在
+可信终端执行：
 
 ```bash
 ssh mac 'cat ~/.config/goumin-work/studio-basic-auth-password'
 ```
 
-Cloudflare Access 仍是推荐的上层身份边界；Caddy 验证作为兜底，确保 Access 尚未配置或
-误配置时，本地写入 API 也不会直接暴露。认证后，工作台提供内容新建、Markdown 导入、
-编辑、真实预览、素材、分类、批量操作、版本历史与发布状态。保存会写入 Mac 工作副本，
-本地发布流程完成校验、提交和推送后，由 Vercel 的 Git 集成部署公开站。
+认证成功后会写入 `HttpOnly + Secure + SameSite=Strict` 的 12 小时签名 Cookie；签名密钥
+独立保存在 `~/.config/goumin-work/studio-auth-session-secret`，同样必须为 `0600`。登录连续
+失败会触发限速，退出按钮会立即清除当前浏览器的会话 Cookie。Cloudflare Access 仍可作为额外的上层身份边界；
+即使它尚未配置或误配置，Caddy 的前置校验也不会让本地写入 API 直接暴露。Mac 本机仍可
+通过 `http://127.0.0.1:4321/studio` 恢复访问。
+
+认证后，工作台提供内容新建、Markdown 导入、编辑、真实预览、素材、分类、批量操作、
+版本历史与发布状态。保存会写入 Mac 工作副本，本地发布流程完成校验、提交和推送后，由
+Vercel 的 Git 集成部署公开站。
 
 需要切换到 GitHub 存储模式时，首次在本地以 GitHub 模式启动，然后在 `/keystatic`
 按官方引导创建 GitHub App：

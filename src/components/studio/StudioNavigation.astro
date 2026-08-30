@@ -1,7 +1,9 @@
 ---
-import { Menu, Moon, Sun, X } from 'lucide-astro';
+import { LogOut, Menu, Moon, Sun, X } from 'lucide-astro';
 
 const pathname = Astro.url.pathname;
+const showStudioLogout =
+  import.meta.env.STUDIO_AUTH_ENABLED === 'true' && Astro.url.hostname === 'studio.goumin.work';
 const groups = [
   {
     label: '内容',
@@ -112,17 +114,29 @@ const groups = [
     <div class="studio-nav-footer">
       <a href="/studio/import" data-astro-reload>导入 Markdown</a>
       <a href="/" target="_blank">查看网站 ↗</a>
-      <button
-        class="studio-nav-theme"
-        type="button"
-        data-theme-toggle
-        aria-label="切换明暗主题"
-        title="切换明暗主题"
-      >
-        <Moon class="theme-icon-moon" size={17} stroke-width={2} />
-        <Sun class="theme-icon-sun" size={17} stroke-width={2} />
-        <span class="sr-only">切换明暗主题</span>
-      </button>
+      <div class="studio-nav-tools">
+        <button
+          class="studio-nav-theme"
+          type="button"
+          data-theme-toggle
+          aria-label="切换明暗主题"
+          title="切换明暗主题"
+        >
+          <Moon class="theme-icon-moon" size={17} stroke-width={2} />
+          <Sun class="theme-icon-sun" size={17} stroke-width={2} />
+          <span class="sr-only">切换明暗主题</span>
+        </button>
+        {
+          showStudioLogout && (
+            <form class="studio-nav-logout-form" action="/api/studio/session/logout" method="post">
+              <button type="submit" aria-label="退出创作中心" title="退出创作中心">
+                <LogOut size={17} stroke-width={2} />
+                <span class="sr-only">退出创作中心</span>
+              </button>
+            </form>
+          )
+        }
+      </div>
     </div>
   </div>
 
@@ -233,6 +247,16 @@ const groups = [
     border-top: 1px solid var(--paper-line);
   }
 
+  .studio-nav-tools {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+  }
+
+  .studio-nav-logout-form {
+    margin: 0;
+  }
+
   .studio-nav-footer button {
     display: inline-grid;
     width: 44px;
@@ -255,6 +279,12 @@ const groups = [
     border-color: var(--paper-line-strong);
     background: var(--paper-control-hover);
     color: var(--paper-accent);
+  }
+
+  .studio-nav-logout-form button:hover {
+    border-color: color-mix(in srgb, #d24d4d 52%, var(--paper-line-strong));
+    background: color-mix(in srgb, #d24d4d 10%, var(--paper-control));
+    color: color-mix(in srgb, #d24d4d 75%, var(--paper-ink));
   }
   .studio-nav-backdrop {
     display: none;

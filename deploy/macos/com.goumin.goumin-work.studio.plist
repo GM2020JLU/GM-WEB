@@ -36,6 +36,8 @@
     <string>/Users/goumin/Services/goumin-work/runtime</string>
     <key>STUDIO_BUN_PATH</key>
     <string>/Users/goumin/.bun/bin/bun</string>
+    <key>STUDIO_AUTH_ENABLED</key>
+    <string>true</string>
   </dict>
   <key>RunAtLoad</key>
   <true/>

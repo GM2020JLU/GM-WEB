@@ -1,0 +1,45 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>Label</key>
+  <string>com.goumin.goumin-work.studio-auth</string>
+  <key>ProgramArguments</key>
+  <array>
+    <string>/Users/goumin/.bun/bin/bun</string>
+    <string>run</string>
+    <string>studio:auth</string>
+  </array>
+  <key>WorkingDirectory</key>
+  <string>/Users/goumin/Services/goumin-work/repo</string>
+  <key>EnvironmentVariables</key>
+  <dict>
+    <key>NODE_ENV</key>
+    <string>production</string>
+    <key>PATH</key>
+    <string>/Users/goumin/.bun/bin:/Users/goumin/.local/bin:/usr/bin:/bin:/usr/sbin:/sbin</string>
+    <key>STUDIO_AUTH_HOST</key>
+    <string>127.0.0.1</string>
+    <key>STUDIO_AUTH_PORT</key>
+    <string>4322</string>
+    <key>STUDIO_AUTH_PUBLIC_HOST</key>
+    <string>studio.goumin.work</string>
+    <key>STUDIO_AUTH_USERNAME</key>
+    <string>goumin</string>
+    <key>STUDIO_AUTH_PASSWORD_FILE</key>
+    <string>/Users/goumin/.config/goumin-work/studio-basic-auth-password</string>
+    <key>STUDIO_AUTH_SECRET_FILE</key>
+    <string>/Users/goumin/.config/goumin-work/studio-auth-session-secret</string>
+  </dict>
+  <key>RunAtLoad</key>
+  <true/>
+  <key>KeepAlive</key>
+  <true/>
+  <key>ProcessType</key>
+  <string>Background</string>
+  <key>StandardOutPath</key>
+  <string>/Users/goumin/Library/Logs/goumin-work/studio-auth.log</string>
+  <key>StandardErrorPath</key>
+  <string>/Users/goumin/Library/Logs/goumin-work/studio-auth.error.log</string>
+</dict>
+</plist>

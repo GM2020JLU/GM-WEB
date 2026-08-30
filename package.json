@@ -8,6 +8,7 @@
   },
   "scripts": {
     "dev": "astro dev",
+    "studio:auth": "bun scripts/studio-auth-service.ts",
     "fonts:ui": "bun scripts/fonts/subset-ui-font.ts",
     "build": "node scripts/reset-astro-content-cache.mjs && bun run verify:content && bun run verify:keystatic && bun run fonts:ui && astro build && bun run localize:dist && bun run prune:dist && bun scripts/build-search.mjs && bun scripts/sync-vercel-output.mjs",
     "localize:dist": "node scripts/localize-build.mjs",

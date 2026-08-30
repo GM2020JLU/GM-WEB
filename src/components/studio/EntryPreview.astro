@@ -71,6 +71,8 @@ const {
 
 <style>
   .preview-page {
+    --studio-text-meta: color-mix(in srgb, var(--paper-ink) 68%, var(--paper-bg) 32%);
+    --studio-accent-strong: color-mix(in srgb, var(--paper-accent) 76%, var(--paper-ink) 24%);
     width: min(100% - 32px, 820px);
     margin: 0 auto;
     padding: 118px 0 72px;
@@ -84,7 +86,7 @@ const {
   }
   .eyebrow {
     margin: 0 0 12px;
-    color: var(--paper-accent);
+    color: var(--studio-accent-strong);
     font: 700 0.72rem/1.4 var(--font-meta);
     letter-spacing: 0.16em;
   }
@@ -101,7 +103,7 @@ const {
     display: flex;
     flex-wrap: wrap;
     gap: 8px 16px;
-    color: var(--paper-ink-faint);
+    color: var(--studio-text-meta);
     font: 600 0.78rem/1.6 var(--font-meta);
   }
   .meta {
@@ -113,7 +115,7 @@ const {
   }
   .tags {
     margin: 8px 0 0;
-    color: var(--paper-accent);
+    color: var(--studio-accent-strong);
   }
   .preview-card > :global(img) {
     width: min(100%, 300px);

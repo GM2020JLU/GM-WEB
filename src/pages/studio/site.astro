@@ -1,6 +1,7 @@
 ---
 import BaseHead from '../../components/BaseHead.astro';
 import StudioNavigation from '../../components/studio/StudioNavigation.astro';
+import StudioPageHeader from '../../components/studio/StudioPageHeader.astro';
 import { getThemePalette } from '../../data/site';
 const palette = await getThemePalette();
 ---
@@ -16,9 +17,11 @@ const palette = await getThemePalette();
   <body class="studio-with-navigation">
     <StudioNavigation />
     <main class="settings-shell">
-      <header>
-        <p>SITE MODULE</p><h1>站点设置</h1><span>编辑网站身份、主题和各模块公开文案。</span>
-      </header>
+      <StudioPageHeader
+        eyebrow="SITE / SETTINGS"
+        title="站点设置"
+        description="编辑网站身份、主题和各模块公开文案。"
+      />
       <div class="notice" data-notice role="status">
         <strong>正在读取设置</strong><small>请稍候…</small>
       </div>
@@ -156,7 +159,7 @@ const palette = await getThemePalette();
   }
   header p {
     margin: 0;
-    color: var(--paper-accent);
+    color: var(--studio-accent-strong);
     font: 700 0.68rem var(--font-meta);
     letter-spacing: 0.14em;
   }
@@ -185,6 +188,7 @@ const palette = await getThemePalette();
   }
   .notice > button,
   .notice > a {
+    flex: 0 0 auto;
     margin-left: auto;
     padding: 8px 12px;
     border: 1px solid var(--paper-line-strong);
@@ -193,6 +197,7 @@ const palette = await getThemePalette();
     color: inherit;
     font: inherit;
     text-decoration: none;
+    white-space: nowrap;
     cursor: pointer;
   }
   .notice.success {
@@ -219,10 +224,15 @@ const palette = await getThemePalette();
     box-shadow: var(--paper-shadow-lift);
     backdrop-filter: blur(14px);
     overflow-x: auto;
-    scrollbar-width: none;
+    scrollbar-color: var(--paper-line-strong) transparent;
+    scrollbar-width: thin;
   }
   .settings-index::-webkit-scrollbar {
-    display: none;
+    height: 4px;
+  }
+  .settings-index::-webkit-scrollbar-thumb {
+    border-radius: 999px;
+    background: var(--paper-line-strong);
   }
   .settings-index a {
     flex: 0 0 auto;
@@ -247,7 +257,7 @@ const palette = await getThemePalette();
     scroll-margin-top: 80px;
   }
   section > div:first-child > span {
-    color: var(--paper-accent);
+    color: var(--studio-accent-strong);
     font: 700 0.68rem var(--font-meta);
   }
   h2 {
@@ -332,15 +342,22 @@ const palette = await getThemePalette();
     font: inherit;
     cursor: pointer;
   }
-  @media (max-width: 760px) {
+  @media (max-width: 920px) {
     .settings-index {
-      top: 70px;
+      top: 76px;
     }
     section {
       scroll-margin-top: 132px;
     }
   }
   @media (max-width: 720px) {
+    .notice {
+      flex-wrap: wrap;
+    }
+    .notice > button,
+    .notice > a {
+      margin-left: 0;
+    }
     .settings-index {
       margin-inline: -4px;
     }

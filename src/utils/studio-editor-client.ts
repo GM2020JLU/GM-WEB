@@ -618,11 +618,22 @@ export function setupStudioEditor(document: Document, options: StudioEditorOptio
     }
   });
   const viewButtons = [...document.querySelectorAll<HTMLElement>('.view-switch [data-view]')];
+  const setEditorView = (view: string) => {
+    viewButtons.forEach((item) =>
+      item.setAttribute('aria-pressed', String(item.dataset.view === view)),
+    );
+    document.querySelector<HTMLElement>('[data-body-panel]')!.dataset.editorView = view;
+  };
+  if (
+    typeof browserWindow.matchMedia === 'function' &&
+    browserWindow.matchMedia('(max-width: 820px)').matches
+  ) {
+    setEditorView('edit');
+  }
   viewButtons.forEach((button) => {
     button.addEventListener('click', () => {
       const view = button.dataset.view;
-      viewButtons.forEach((item) => item.setAttribute('aria-pressed', String(item === button)));
-      document.querySelector<HTMLElement>('[data-body-panel]')!.dataset.editorView = view;
+      if (view) setEditorView(view);
     });
   });
 

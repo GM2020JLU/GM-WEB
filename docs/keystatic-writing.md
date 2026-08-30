@@ -17,19 +17,30 @@ GitHub 登录。
 
 正式入口是 `https://studio.goumin.work/`，由 Mac 上的 Astro 服务以本地存储模式运行。
 Caddy 会先向仅监听回环地址的认证服务校验签名会话，通过后才允许请求进入 Astro/Vite；
-因此未登录状态无法接触工作台、写入 API 或开发服务资源。登录用户名为 `goumin`，强随机
-密码只保存在 Mac 用户专属的 `0600` 凭据文件，不写入仓库或环境文件。需要取回密码时在
-可信终端执行：
+因此未登录状态无法接触工作台、写入 API 或开发服务资源。
+
+登录页默认使用 GitHub 验证，只接受 allowlist 中的数字 GitHub User ID，不依赖可改名的
+login 名。授权流程使用签名 `state` 和 PKCE S256，回调地址必须精确登记为
+`https://studio.goumin.work/api/studio/auth/github/callback`。认证服务只用临时 GitHub token
+读取 `/user` 的不变 ID，验证后必须撤销 token 才会签发会话，不写入 Cookie、日志
+或磁盘。OAuth 入口同时有 IP 窗口限速和外部交换并发上限。
+
+公网登录页只提供 GitHub 验证，`/api/studio/session` 密码提交路径不会在公网主机名
+路由。用户名 `goumin` 和强随机密码仅用于 Mac 回环地址上的应急恢复，密码只保存在
+Mac 用户专属的 `0600` 凭据文件。需要恢复时，先建立 SSH 端口转发：
 
 ```bash
-ssh mac 'cat ~/.config/goumin-work/studio-basic-auth-password'
+ssh -L 8081:127.0.0.1:8081 mac
 ```
 
-认证成功后会写入 `HttpOnly + Secure + SameSite=Strict` 的 12 小时签名 Cookie；签名密钥
-独立保存在 `~/.config/goumin-work/studio-auth-session-secret`，同样必须为 `0600`。登录连续
-失败会触发限速，退出按钮会立即清除当前浏览器的会话 Cookie。Cloudflare Access 仍可作为额外的上层身份边界；
+然后在本机浏览器打开 `http://localhost:8081/studio/login`，页面才会显示密码恢复表单。
+认证成功后会写入 `HttpOnly + Secure + SameSite=Lax` 的 12 小时签名 Cookie；非安全方法仍必须
+通过精确同源校验。签名密钥独立保存在 `~/.config/goumin-work/studio-auth-session-secret`，
+同样必须为 `0600`。GitHub client ID 与 secret 分别从
+`studio-github-client-id` 和 `studio-github-client-secret` 这两个 `0600` 凭据文件读取。
+密码登录连续失败会触发限速，退出按钮会立即清除当前浏览器的会话与 OAuth 事务 Cookie。Cloudflare Access 仍可作为额外的上层身份边界；
 即使它尚未配置或误配置，Caddy 的前置校验也不会让本地写入 API 直接暴露。Mac 本机仍可
-通过 `http://127.0.0.1:4321/studio` 恢复访问。
+通过上述 `localhost:8081` 的受保护入口恢复访问。
 
 认证后，工作台提供内容新建、Markdown 导入、编辑、真实预览、素材、分类、批量操作、
 版本历史与发布状态。保存会写入 Mac 工作副本，本地发布流程完成校验、提交和推送后，由

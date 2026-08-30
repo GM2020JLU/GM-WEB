@@ -2,6 +2,7 @@
 import { getCollection } from 'astro:content';
 import BaseHead from '../../components/BaseHead.astro';
 import StudioNavigation from '../../components/studio/StudioNavigation.astro';
+import StudioPageHeader from '../../components/studio/StudioPageHeader.astro';
 import { getThemePalette } from '../../data/site';
 import { hasContentFiles } from '../../utils/content-source';
 import { getStudioAnalytics } from '../../utils/studio-analytics';
@@ -60,13 +61,13 @@ const formatNumber = (value: number) => new Intl.NumberFormat('zh-CN').format(va
   <body class="studio-with-navigation">
     <StudioNavigation />
     <main class="shell">
-      <header class="page-header">
-        <div>
-          <p>CONTENT INSIGHTS</p><h1>数据概览</h1><span>只统计内容仓库，不采集访客身份或行为。</span
-          >
-        </div>
-        <a class="back" href="/studio">返回总览</a>
-      </header>
+      <StudioPageHeader
+        eyebrow="CONTENT / INSIGHTS"
+        title="数据概览"
+        description="只统计内容仓库，不采集访客身份或行为。"
+      >
+        <a slot="actions" class="back" href="/studio">返回总览</a>
+      </StudioPageHeader>
 
       <section class="metrics" aria-label="内容汇总">
         <article>
@@ -176,7 +177,7 @@ const formatNumber = (value: number) => new Intl.NumberFormat('zh-CN').format(va
   }
   .page-header p {
     margin: 0;
-    color: var(--paper-accent);
+    color: var(--studio-accent-strong);
     font: 700 0.7rem var(--font-meta);
     letter-spacing: 0.14em;
   }
@@ -192,7 +193,7 @@ const formatNumber = (value: number) => new Intl.NumberFormat('zh-CN').format(va
   }
   .back,
   .section-heading a {
-    color: var(--paper-accent);
+    color: var(--studio-accent-strong);
     font-size: 0.82rem;
     text-decoration: none;
   }
@@ -219,7 +220,7 @@ const formatNumber = (value: number) => new Intl.NumberFormat('zh-CN').format(va
     text-decoration: none;
   }
   .metrics small {
-    color: var(--paper-ink-faint);
+    color: var(--studio-text-meta);
   }
   .metrics strong {
     font: 400 2.2rem/1 var(--font-page-heading);
@@ -235,11 +236,13 @@ const formatNumber = (value: number) => new Intl.NumberFormat('zh-CN').format(va
   }
   .section-heading h2 {
     margin: 0;
-    font: 400 2rem var(--font-page-heading);
+    font: 550 1.22rem/1.25 var(--studio-font-heading);
+    letter-spacing: -0.02em;
   }
   .section-heading p {
     margin: 6px 0 0;
-    font-size: 0.85rem;
+    font: 400 0.8rem/1.6 var(--studio-font-ui);
+    letter-spacing: 0;
   }
   .module-table {
     margin-top: 22px;

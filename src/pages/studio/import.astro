@@ -1,6 +1,7 @@
 ---
 import BaseHead from '../../components/BaseHead.astro';
 import StudioNavigation from '../../components/studio/StudioNavigation.astro';
+import StudioPageHeader from '../../components/studio/StudioPageHeader.astro';
 import { getThemePalette } from '../../data/site';
 const palette = await getThemePalette();
 ---
@@ -14,27 +15,17 @@ const palette = await getThemePalette();
   <body class="studio-with-navigation">
     <StudioNavigation />
     <main class="shell">
-      <nav class="topbar" aria-label="后台导航">
-        <a class="brand" href="/studio"
-          ><span aria-hidden="true">GM</span><strong>创作中心</strong></a
-        >
-        <div><a href="/studio">返回工作台</a><a href="/studio/assets">素材库</a></div>
-      </nav>
-
-      <header class="hero">
-        <div>
-          <p class="eyebrow">SAFE IMPORT</p>
-          <h1>导入 Markdown</h1>
-          <p>
-            选择文件后先检查字段和正文，确认后才创建草稿。导入不会直接发布，也不会覆盖同名内容。
-          </p>
-        </div>
-        <ol aria-label="导入流程">
+      <StudioPageHeader
+        eyebrow="CONTENT / IMPORT"
+        title="导入 Markdown"
+        description="选择文件后先检查字段和正文，确认后才创建草稿；不会直接发布或覆盖同名内容。"
+      >
+        <ol class="import-steps" slot="actions" aria-label="导入流程">
           <li class="active" data-import-step="1" aria-current="step"><span>1</span>选文件</li>
           <li data-import-step="2"><span>2</span>检查</li>
           <li data-import-step="3"><span>3</span>导入草稿</li>
         </ol>
-      </header>
+      </StudioPageHeader>
 
       <form class="import-grid" data-import-form>
         <section class="panel setup" aria-labelledby="setup-title">
@@ -217,37 +208,38 @@ const palette = await getThemePalette();
   }
   .eyebrow {
     margin: 0 0 7px;
-    color: var(--paper-accent);
+    color: var(--studio-accent-strong);
     font-size: 0.7rem;
     font-weight: 800;
     letter-spacing: 0.14em;
   }
-  .hero ol {
+  .import-steps {
     display: flex;
     gap: 0;
     margin: 0;
     padding: 0;
     list-style: none;
   }
-  .hero li {
+  .import-steps li {
     display: flex;
     gap: 7px;
     align-items: center;
-    color: var(--paper-ink-faint);
+    color: var(--studio-text-meta);
     font-size: 0.75rem;
+    white-space: nowrap;
   }
-  .hero li:not(:last-child)::after {
+  .import-steps li:not(:last-child)::after {
     width: 28px;
     height: 1px;
     margin: 0 9px;
     background: var(--paper-line-strong);
     content: '';
   }
-  .hero li.active {
-    color: var(--paper-accent);
+  .import-steps li.active {
+    color: var(--studio-accent-strong);
     font-weight: 700;
   }
-  .hero li span {
+  .import-steps li span {
     display: grid;
     width: 25px;
     height: 25px;
@@ -280,7 +272,7 @@ const palette = await getThemePalette();
     padding: 6px 9px;
     border-radius: 99px;
     background: color-mix(in srgb, var(--paper-accent) 12%, transparent);
-    color: var(--paper-accent);
+    color: var(--studio-accent-strong);
     font-size: 0.72rem;
     font-weight: 700;
   }
@@ -307,9 +299,13 @@ const palette = await getThemePalette();
     height: 1px;
     opacity: 0;
   }
+  .dropzone:has(input:focus-visible) {
+    outline: 3px solid var(--studio-focus-ring);
+    outline-offset: 3px;
+  }
   .dropzone small,
   label small {
-    color: var(--paper-ink-faint);
+    color: var(--studio-text-meta);
     font-size: 0.72rem;
     line-height: 1.5;
   }
@@ -321,7 +317,7 @@ const palette = await getThemePalette();
     border: 1px solid var(--paper-line-strong);
     border-radius: 9px;
     background: var(--paper-bg);
-    color: var(--paper-accent);
+    color: var(--studio-accent-strong);
     font:
       800 0.7rem/1 ui-monospace,
       monospace;
@@ -364,7 +360,7 @@ const palette = await getThemePalette();
     min-height: 410px;
     place-items: center;
     align-content: center;
-    color: var(--paper-ink-faint);
+    color: var(--studio-text-meta);
     text-align: center;
   }
   .empty-preview span {
@@ -386,7 +382,7 @@ const palette = await getThemePalette();
     background: color-mix(in srgb, var(--paper-bg) 96%, var(--paper-accent) 4%);
   }
   dt {
-    color: var(--paper-ink-faint);
+    color: var(--studio-text-meta);
     font-size: 0.68rem;
   }
   dd {
@@ -425,7 +421,7 @@ const palette = await getThemePalette();
     font-size: 0.78rem;
   }
   article header small {
-    color: var(--paper-ink-faint);
+    color: var(--studio-text-meta);
   }
   .markdown-preview {
     overflow: auto;
@@ -467,7 +463,7 @@ const palette = await getThemePalette();
     margin: 0.85em 0;
   }
   :global(.markdown-preview a) {
-    color: var(--paper-accent);
+    color: var(--studio-accent-strong);
     text-decoration: underline;
     text-underline-offset: 0.18em;
   }
@@ -529,12 +525,12 @@ const palette = await getThemePalette();
     color: var(--studio-danger);
   }
   .result.success strong {
-    color: var(--paper-accent);
+    color: var(--studio-accent-strong);
   }
   .result a {
     width: fit-content;
     margin-top: 5px;
-    color: var(--paper-accent);
+    color: var(--studio-accent-strong);
     font-size: 0.78rem;
     font-weight: 700;
     text-decoration: underline;
@@ -566,8 +562,25 @@ const palette = await getThemePalette();
     .hero {
       padding-top: 42px;
     }
-    .hero ol {
-      flex-wrap: wrap;
+    .import-steps {
+      display: grid;
+      width: 100%;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 6px;
+    }
+    .import-steps li {
+      justify-content: center;
+      padding: 8px 6px;
+      border: 1px solid var(--studio-border);
+      border-radius: var(--studio-radius-control);
+      background: var(--studio-surface);
+    }
+    .import-steps li.active {
+      border-color: color-mix(in srgb, var(--studio-accent-strong) 44%, var(--studio-border) 56%);
+      background: var(--studio-accent-soft);
+    }
+    .import-steps li:not(:last-child)::after {
+      display: none;
     }
     .submit-bar {
       align-items: stretch;
@@ -588,9 +601,13 @@ const palette = await getThemePalette();
     .panel {
       padding: 20px;
     }
-    .hero li:not(:last-child)::after {
-      width: 10px;
-      margin-inline: 5px;
+    .import-steps li {
+      gap: 5px;
+      font-size: 0.69rem;
+    }
+    .import-steps li span {
+      width: 22px;
+      height: 22px;
     }
   }
 </style>

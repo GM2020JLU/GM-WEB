@@ -192,8 +192,8 @@ if (process.env.NAVFOLIO_CONTENT_SOURCE !== 'docs') {
 
 const studio = readFileSync(join(dist, 'studio/index.html'), 'utf8');
 for (const marker of [
-  '>内容</h1>',
-  '>新建</summary>',
+  '>内容工作台</h1>',
+  '>新建内容</summary>',
   '导入 Markdown',
   'data-deployment',
   'data-search',
@@ -267,7 +267,7 @@ for (const marker of [
 }
 for (const module of ['blog', 'projects', 'vibe', 'media', 'pages']) {
   const modulePage = readFileSync(join(dist, `studio/content/${module}/index.html`), 'utf8');
-  if (!modulePage.includes('studio-navigation') || !modulePage.includes('CONTENT MODULE')) {
+  if (!modulePage.includes('studio-navigation') || !modulePage.includes('CONTENT / MODULE')) {
     fail(`Studio ${module} 模块缺少统一导航或模块标题`);
   }
 }

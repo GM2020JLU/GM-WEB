@@ -7,6 +7,7 @@ import {
   verifyStudioCredentials,
   verifyStudioSessionToken,
 } from './studio-auth-gateway';
+import { STUDIO_GITHUB_OAUTH_COOKIE, type StudioGithubOAuthConfig } from './studio-github-oauth';
 
 const password = 'a-strong-password-kept-outside-the-repository';
 const sessionSecret = 'a-different-session-signing-secret-with-enough-entropy';
@@ -18,14 +19,39 @@ function request(path: string, init: RequestInit = {}) {
   });
 }
 
-function createService(now = 1_800_000_000_000) {
+function createService(now = 1_800_000_000_000, github?: StudioGithubOAuthConfig) {
   return createStudioAuthService({
+    github,
     now: () => now,
     password,
+    passwordLogin: 'public',
     randomBytes: (length) => new Uint8Array(length).fill(7),
     sessionSecret,
     username: 'goumin',
   });
+}
+
+function githubConfig(userId = 66_173_922) {
+  const requests: Array<{ method: string; url: string }> = [];
+  const config: StudioGithubOAuthConfig = {
+    allowedUserId: 66_173_922,
+    callbackUrl: 'https://studio.goumin.work/api/studio/auth/github/callback',
+    clientId: 'Iv1.studio-test-client',
+    clientSecret: 'studio-test-client-secret-with-enough-length',
+    fetch: async (input, init) => {
+      const url = String(input);
+      requests.push({ method: init?.method ?? 'GET', url });
+      if (url.endsWith('/login/oauth/access_token')) {
+        return Response.json({ access_token: 'ghu_one-use-studio-token' });
+      }
+      if (url.endsWith('/user')) return Response.json({ id: userId, login: 'GM2020JLU' });
+      if (url.includes('/applications/') && init?.method === 'DELETE') {
+        return new Response(null, { status: 204 });
+      }
+      return new Response(null, { status: 404 });
+    },
+  };
+  return { config, requests };
 }
 
 describe('Studio 会话签名', () => {
@@ -52,6 +78,29 @@ describe('Studio 会话签名', () => {
     expect(
       await verifyStudioSessionToken({ now, secret: sessionSecret, token: 'x'.repeat(513) }),
     ).toBe(false);
+    expect(
+      await verifyStudioSessionToken({
+        allowedSubjects: new Set(['github:66173922']),
+        now,
+        secret: sessionSecret,
+        token,
+      }),
+    ).toBe(false);
+    expect(
+      await verifyStudioSessionToken({
+        allowedSubjects: new Set(['test']),
+        now,
+        secret: sessionSecret,
+        token,
+      }),
+    ).toBe(true);
+    expect(
+      await verifyStudioSessionToken({
+        now,
+        secret: sessionSecret,
+        token: 'v1.1800000060.invalid.invalid',
+      }),
+    ).toBe(false);
   });
 
   test('账号和密码同时匹配才通过', async () => {
@@ -75,6 +124,22 @@ describe('Studio 会话签名', () => {
 });
 
 describe('Studio 登录跳转', () => {
+  test('拒绝未配置或格式异常的 Host', async () => {
+    const service = createService();
+    const foreignHost = await service(
+      new Request('https://attacker.example/studio/login', {
+        headers: { Host: 'attacker.example' },
+      }),
+    );
+    expect(foreignHost.status).toBe(421);
+    const invalidHost = await service(
+      new Request('https://studio.goumin.work/studio/login', {
+        headers: { Host: 'studio.goumin.work:invalid' },
+      }),
+    );
+    expect(invalidHost.status).toBe(421);
+  });
+
   test('只允许后台与预览站内路径', () => {
     expect(normalizeStudioNextPath('/studio/edit/blog/demo?new=1')).toBe(
       '/studio/edit/blog/demo?new=1',
@@ -123,12 +188,78 @@ describe('Studio 登录跳转', () => {
     expect(response.status).toBe(200);
     expect(response.headers.get('content-security-policy')).toContain("default-src 'none'");
     expect(response.headers.get('cache-control')).toBe('private, no-store');
-    expect(response.headers.get('referrer-policy')).toBe('same-origin');
+    expect(response.headers.get('referrer-policy')).toBe('strict-origin');
     expect(html).toContain('回来继续创作。');
     expect(html).toContain('账号或密码不正确，请重试。');
     expect(html).toContain('data-theme-toggle');
     expect(html).toContain('autocomplete="current-password"');
     expect(html).not.toContain(password);
+  });
+
+  test('GitHub 是主登录入口，密码作为可展开的备用方式', async () => {
+    const { config } = githubConfig();
+    const service = createService(1_800_000_000_000, config);
+    const response = await service(request('/studio/login?next=/studio/edit/blog/demo'));
+    const html = await response.text();
+
+    expect(html).toContain('使用 GitHub 继续');
+    expect(html).toContain('class="password-fallback"');
+    expect(html).toContain('/api/studio/auth/github/start?next=%2Fstudio%2Fedit%2Fblog%2Fdemo');
+    expect(html).not.toContain('class="password-fallback" open');
+  });
+
+  test('公网只展示 GitHub 并拒绝密码提交，密码仅在回环地址恢复', async () => {
+    const { config } = githubConfig();
+    const service = createStudioAuthService({
+      github: config,
+      now: () => 1_800_000_000_000,
+      password,
+      passwordLogin: 'loopback',
+      randomBytes: (length) => new Uint8Array(length).fill(7),
+      sessionSecret,
+      username: 'goumin',
+    });
+
+    const publicPage = await service(request('/studio/login'));
+    const publicHtml = await publicPage.text();
+    expect(publicHtml).toContain('使用 GitHub 继续');
+    expect(publicHtml).not.toContain(`<form method="post" action="/api/studio/session"`);
+    const publicPassword = await service(
+      request('/api/studio/session', {
+        body: new URLSearchParams({ password, username: 'goumin' }),
+        headers: {
+          'Content-Type': 'application/x-www-form-urlencoded',
+          Origin: 'https://studio.goumin.work',
+        },
+        method: 'POST',
+      }),
+    );
+    expect(publicPassword.status).toBe(404);
+    const passwordToken = await createStudioSessionToken({
+      nonce: new Uint8Array(18).fill(2),
+      now: 1_800_000_000_000,
+      secret: sessionSecret,
+      subject: 'password:local',
+    });
+    const publicVerification = await service(
+      request('/internal/studio-auth/verify', {
+        headers: {
+          Cookie: `${STUDIO_SESSION_COOKIE}=${passwordToken}`,
+          'X-Forwarded-Method': 'GET',
+          'X-Forwarded-Uri': '/studio',
+        },
+      }),
+    );
+    expect(publicVerification.status).toBe(401);
+
+    const localPage = await service(
+      new Request('http://127.0.0.1:4322/studio/login', {
+        headers: { Host: '127.0.0.1:4322' },
+      }),
+    );
+    const localHtml = await localPage.text();
+    expect(localHtml).toContain(`<form method="post" action="/api/studio/session"`);
+    expect(localHtml).not.toContain('使用 GitHub 继续');
   });
 
   test('正确凭据签发安全 Cookie，随后通过 Caddy 前置校验', async () => {
@@ -154,9 +285,11 @@ describe('Studio 登录跳转', () => {
     expect(setCookie).toContain(`${STUDIO_SESSION_COOKIE}=`);
     expect(setCookie).toContain('HttpOnly');
     expect(setCookie).toContain('Secure');
-    expect(setCookie).toContain('SameSite=Strict');
+    expect(setCookie).toContain('SameSite=Lax');
 
-    const cookie = setCookie.split(';')[0]!;
+    const sessionValue = setCookie.match(new RegExp(`${STUDIO_SESSION_COOKIE}=([^;,]+)`))?.[1];
+    expect(sessionValue).toBeTruthy();
+    const cookie = `${STUDIO_SESSION_COOKIE}=${sessionValue}`;
     const verification = await service(
       request('/internal/studio-auth/verify', {
         headers: {
@@ -167,6 +300,85 @@ describe('Studio 登录跳转', () => {
       }),
     );
     expect(verification.status).toBe(204);
+  });
+
+  test('GitHub OAuth 使用 state、PKCE 和数字用户 ID 签发会话，且拒绝重放', async () => {
+    const now = 1_800_000_000_000;
+    const { config, requests } = githubConfig();
+    const service = createService(now, config);
+    const start = await service(
+      request('/api/studio/auth/github/start?next=/studio/edit/blog/demo'),
+    );
+    const authorize = new URL(start.headers.get('location')!);
+    const transactionCookie = (start.headers.get('set-cookie') ?? '').split(';')[0]!;
+
+    expect(start.status).toBe(303);
+    expect(authorize.origin).toBe('https://github.com');
+    expect(authorize.searchParams.get('code_challenge_method')).toBe('S256');
+    expect(transactionCookie).toStartWith(`${STUDIO_GITHUB_OAUTH_COOKIE}=`);
+    expect(start.headers.get('set-cookie')).toContain('SameSite=Lax');
+
+    const callbackPath = `/api/studio/auth/github/callback?code=one-time-code&state=${encodeURIComponent(authorize.searchParams.get('state')!)}`;
+    const callback = await service(
+      request(callbackPath, { headers: { Cookie: transactionCookie } }),
+    );
+    const setCookie = callback.headers.get('set-cookie') ?? '';
+
+    expect(callback.status).toBe(303);
+    expect(callback.headers.get('location')).toBe('/studio/edit/blog/demo');
+    expect(setCookie).toContain(`${STUDIO_SESSION_COOKIE}=`);
+    expect(setCookie).toContain(`${STUDIO_GITHUB_OAUTH_COOKIE}=;`);
+    expect(requests.map((entry) => entry.method)).toEqual(['POST', 'GET', 'DELETE']);
+
+    const replay = await service(request(callbackPath, { headers: { Cookie: transactionCookie } }));
+    expect(replay.headers.get('location')).toContain('error=github');
+    expect(requests).toHaveLength(3);
+  });
+
+  test('GitHub 回调拒绝未授权账号与不匹配的 state', async () => {
+    const { config } = githubConfig(123_456);
+    const service = createService(1_800_000_000_000, config);
+    const start = await service(request('/api/studio/auth/github/start?next=/studio'));
+    const authorize = new URL(start.headers.get('location')!);
+    const transactionCookie = (start.headers.get('set-cookie') ?? '').split(';')[0]!;
+    const state = authorize.searchParams.get('state')!;
+
+    const mismatched = await service(
+      request('/api/studio/auth/github/callback?code=x&state=wrong', {
+        headers: { Cookie: transactionCookie },
+      }),
+    );
+    expect(mismatched.headers.get('location')).toBe('/studio/login?error=github&next=%2Fstudio');
+
+    const unauthorized = await service(
+      request(`/api/studio/auth/github/callback?code=x&state=${encodeURIComponent(state)}`, {
+        headers: { Cookie: transactionCookie },
+      }),
+    );
+    expect(unauthorized.headers.get('location')).toBe('/studio/login?error=account&next=%2Fstudio');
+    expect(unauthorized.headers.get('set-cookie')).not.toContain(`${STUDIO_SESSION_COOKIE}=`);
+  });
+
+  test('GitHub OAuth 入口按客户端地址限速', async () => {
+    const { config } = githubConfig();
+    const service = createService(1_800_000_000_000, config);
+    for (let attempt = 0; attempt < 30; attempt++) {
+      const response = await service(
+        request('/api/studio/auth/github/start', {
+          headers: { 'CF-Connecting-IP': '203.0.113.20' },
+        }),
+      );
+      expect(response.headers.get('location')).toStartWith(
+        'https://github.com/login/oauth/authorize',
+      );
+    }
+    const limited = await service(
+      request('/api/studio/auth/github/start', {
+        headers: { 'CF-Connecting-IP': '203.0.113.20' },
+      }),
+    );
+    expect(limited.headers.get('location')).toBe('/studio/login?error=rate&next=%2Fstudio');
+    expect(limited.headers.get('retry-after')).toBe('900');
   });
 
   test('拒绝跨站登录，并在连续失败后限速', async () => {
@@ -268,6 +480,7 @@ describe('Studio 登录跳转', () => {
       nonce: new Uint8Array(18).fill(2),
       now,
       secret: sessionSecret,
+      subject: 'password:local',
     });
     const cookie = `${STUDIO_SESSION_COOKIE}=${token}`;
 
@@ -291,6 +504,7 @@ describe('Studio 登录跳转', () => {
     );
     expect(logout.status).toBe(303);
     expect(logout.headers.get('set-cookie')).toContain('Max-Age=0');
+    expect(logout.headers.get('set-cookie')).toContain(`${STUDIO_GITHUB_OAUTH_COOKIE}=;`);
     expect(logout.headers.get('location')).toBe('/studio/login');
   });
 });

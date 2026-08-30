@@ -1,266 +1,82 @@
+/* Studio is a compact authoring product, not a public reading page. Keep its
+   paper-and-blue-ink character while giving every module one shared system. */
 body.studio-with-navigation {
-  --studio-navigation-width: 228px;
+  --studio-navigation-width: 252px;
   --studio-shell-width: 1180px;
-  --studio-shell-gutter: 32px;
-  --studio-page-top: clamp(36px, 5vw, 52px);
-  --studio-page-bottom: 96px;
+  --studio-editor-width: 1440px;
+  --studio-shell-gutter: clamp(22px, 3.6vw, 52px);
+  --studio-page-top: clamp(32px, 4vw, 48px);
+  --studio-page-bottom: 104px;
+  --studio-font-ui: var(--font-ui-cjk);
+  --studio-font-meta: var(--font-meta);
+  --studio-font-heading: var(--font-page-heading);
+  --font-ui: var(--studio-font-ui);
+  --studio-canvas: var(--paper-bg-deep);
+  --studio-navigation-bg: var(--paper-surface);
+  --studio-surface: var(--paper-surface);
+  --studio-surface-muted: var(--paper-surface-muted);
   --studio-text: var(--paper-ink);
-  --studio-text-secondary: color-mix(in srgb, var(--paper-ink) 78%, var(--paper-bg) 22%);
+  --studio-text-secondary: color-mix(in srgb, var(--paper-ink) 76%, var(--paper-bg) 24%);
   --studio-text-meta: color-mix(in srgb, var(--paper-ink) 68%, var(--paper-bg) 32%);
-  --studio-accent-strong: var(--accent-dark);
+  --studio-accent-strong: color-mix(in srgb, var(--paper-accent) 76%, var(--paper-ink) 24%);
+  --studio-accent-soft: color-mix(in srgb, var(--paper-accent) 11%, var(--studio-surface) 89%);
   --studio-on-accent: var(--paper-bg);
-  --studio-focus-ring: var(--studio-accent-strong);
-  --studio-surface: var(--paper-surface, var(--paper-bg));
-  --studio-surface-muted: var(--paper-surface-muted, var(--paper-control));
-  --studio-border: color-mix(in srgb, var(--paper-ink) 18%, var(--paper-bg) 82%);
-  --studio-control-border: color-mix(in srgb, var(--paper-ink) 32%, var(--paper-bg) 68%);
-  --studio-panel-radius: 14px;
-  --studio-control-radius: 9px;
-  --studio-success: #43a364;
-  --studio-success-bg: color-mix(in srgb, var(--paper-accent) 12%, transparent);
-  --studio-warning: #f5b63b;
-  --studio-warning-bg: color-mix(in srgb, #f5b63b 14%, transparent);
-  --studio-danger: #d24d4d;
-  --studio-danger-bg: color-mix(in srgb, #d24d4d 10%, transparent);
-}
-
-html[data-studio-transition='none']::view-transition-old(root),
-html[data-studio-transition='none']::view-transition-new(root) {
-  animation: none !important;
-}
-
-html[data-studio-transition='none'] [data-astro-transition-scope],
-html[data-studio-transition='none'][data-astro-transition-fallback] [data-astro-transition-scope] {
-  animation: none !important;
-}
-
-html[data-studio-transition='none'] *,
-html[data-studio-transition='none'] *::before,
-html[data-studio-transition='none'] *::after {
-  transition: none !important;
-}
-
-body.studio-with-navigation .studio-topbar-theme {
-  margin-left: auto;
-  margin-right: 12px;
-  padding: 7px 12px;
-  border: 1px solid var(--paper-line-strong);
-  border-radius: 999px;
-  background: var(--paper-bg);
-  color: var(--paper-ink);
-  font: 500 0.74rem/1 var(--font-ui);
-  cursor: pointer;
-}
-
-body.studio-with-navigation .studio-topbar-theme:hover {
-  border-color: color-mix(in srgb, var(--paper-accent) 45%, var(--paper-line-strong) 55%);
-}
-
-body.studio-with-navigation .studio-nav-theme {
-  display: inline-grid;
-  width: 38px;
-  height: 38px;
-  padding: 0;
-  place-items: center;
-}
-
-body.studio-with-navigation .topbar,
-body.studio-with-navigation .studio-navigation {
-  background: color-mix(in srgb, var(--paper-bg) 98%, var(--paper-line-strong) 2%);
-}
-
-body.studio-with-navigation .topbar {
-  border-bottom-color: var(--paper-line) !important;
-}
-
-body.studio-with-navigation .topbar > div a,
-body.studio-with-navigation .brand,
-body.studio-with-navigation .topbar .brand strong {
-  color: var(--paper-ink) !important;
-}
-
-body.studio-with-navigation .topbar > div a {
-  color: var(--paper-ink-soft) !important;
-}
-
-body.studio-with-navigation .topbar .brand span {
-  background: var(--paper-ink) !important;
-  color: var(--paper-bg) !important;
-}
-
-body.studio-with-navigation .notice,
-body.studio-with-navigation .deployment,
-body.studio-with-navigation .content-list,
-body.studio-with-navigation .deployment-tracker,
-body.studio-with-navigation .meta-panel,
-body.studio-with-navigation .body-panel,
-body.studio-with-navigation .shell,
-body.studio-with-navigation .module-shell,
-body.studio-with-navigation .settings-shell,
-body.studio-with-navigation .content-shell,
-body.studio-with-navigation .panel {
-  color: var(--paper-ink);
-}
-
-body.studio-with-navigation .notice.success,
-body.studio-with-navigation .status-badge.status-success {
-  background: color-mix(in srgb, var(--paper-accent) 16%, transparent);
-  border-color: color-mix(in srgb, var(--paper-accent) 55%, var(--paper-line-strong) 45%);
-}
-
-body.studio-with-navigation .notice.error,
-body.studio-with-navigation .status-badge.status-error {
-  background: color-mix(in srgb, #b74f4f 14%, transparent);
-  border-color: color-mix(in srgb, #b74f4f 55%, var(--paper-line-strong) 45%);
-}
-
-body.studio-with-navigation .current-status,
-body.studio-with-navigation .row-actions .edit,
-body.studio-with-navigation .primary,
-body.studio-with-navigation .new-menu > summary,
-body.studio-with-navigation .btn,
-body.studio-with-navigation .publish-more > summary {
-  color: var(--paper-bg);
-}
-
-body.studio-with-navigation .publish-bar {
-  backdrop-filter: blur(16px);
-  background: color-mix(in srgb, var(--paper-bg) 86%, transparent);
-  border-top: 1px solid var(--paper-line);
-}
-
-body.studio-with-navigation .deploy-copy small,
-body.studio-with-navigation .history-list small,
-body.studio-with-navigation .auto-link code,
-body.studio-with-navigation .markdown-preview code,
-body.studio-with-navigation .markdown-preview pre,
-body.studio-with-navigation code,
-body.studio-with-navigation pre,
-body.studio-with-navigation dl dt,
-body.studio-with-navigation dl dd {
-  color: var(--paper-ink);
-}
-
-body.studio-with-navigation .markdown-preview code,
-body.studio-with-navigation .markdown-preview pre,
-body.studio-with-navigation code {
-  background: color-mix(in srgb, var(--paper-line) 20%, transparent);
-}
-
-body.studio-with-navigation .deploy-track,
-body.studio-with-navigation .current-status {
-  background: color-mix(in srgb, var(--paper-line-strong) 55%, transparent);
-}
-
-body.studio-with-navigation .deployment-tracker {
-  box-shadow: 0 12px 30px color-mix(in srgb, var(--paper-bg) 72%, transparent);
-}
-
-body.studio-with-navigation .editor-grid > textarea {
-  background: var(--paper-bg) !important;
-  color: var(--paper-ink);
-}
-
-body.studio-with-navigation dialog {
-  border-color: var(--paper-line-strong);
-  background: color-mix(in srgb, var(--paper-bg) 95%, transparent);
-  color: var(--paper-ink);
-  backdrop-filter: blur(6px);
-}
-
-body.studio-with-navigation .editor-header p,
-body.studio-with-navigation .editor-header h1 {
-  color: var(--paper-ink);
-}
-
-body.studio-with-navigation .notice.success {
-  background: color-mix(in srgb, var(--paper-accent) 14%, transparent);
-  border-color: color-mix(in srgb, var(--paper-accent) 60%, var(--paper-line) 40%);
-}
-
-body.studio-with-navigation .notice.error {
-  background: color-mix(in srgb, #cf5c5c 16%, transparent);
-  border-color: color-mix(in srgb, #cf5c5c 58%, var(--paper-line) 42%);
-}
-
-body.studio-with-navigation .notice small,
-body.studio-with-navigation .deployment-tracker small {
-  color: var(--paper-ink-soft);
-}
-
-body.studio-with-navigation .deployment-tracker {
-  border-color: color-mix(in srgb, var(--paper-accent) 30%, var(--paper-line) 70%);
-  background: color-mix(in srgb, var(--paper-bg) 95%, var(--paper-accent) 5%);
-}
-
-body.studio-with-navigation .deployment-tracker[data-phase='ready'] {
-  border-color: color-mix(in srgb, var(--paper-accent) 68%, var(--paper-line) 32%);
-  background: color-mix(in srgb, var(--paper-accent) 12%, transparent);
-}
-
-body.studio-with-navigation .deployment-tracker[data-phase='error'] {
-  border-color: color-mix(in srgb, #d24d4d 63%, var(--paper-line) 37%);
-  background: color-mix(in srgb, #d24d4d 10%, transparent);
-}
-
-body.studio-with-navigation .deploy-steps,
-body.studio-with-navigation .deploy-copy small,
-body.studio-with-navigation .auto-link,
-body.studio-with-navigation .history-list small,
-body.studio-with-navigation label,
-body.studio-with-navigation .content-main small,
-body.studio-with-navigation .content-meta,
-body.studio-with-navigation .meta-note,
-body.studio-with-navigation .meta-help {
-  color: var(--paper-ink-soft);
-}
-
-body.studio-with-navigation .deploy-track,
-body.studio-with-navigation .body-panel > header,
-body.studio-with-navigation .editor-grid > textarea {
-  border-color: var(--paper-line);
-}
-
-body.studio-with-navigation .body-panel,
-body.studio-with-navigation .meta-panel {
-  border-color: var(--paper-line);
-}
-
-body.studio-with-navigation .auto-link code,
-body.studio-with-navigation .markdown-preview pre,
-body.studio-with-navigation .markdown-preview code {
-  background: color-mix(in srgb, var(--paper-line) 16%, transparent);
-}
-
-body.studio-with-navigation .publish-bar,
-body.studio-with-navigation .publish-more > div,
-body.studio-with-navigation .history-list article {
-  border-color: var(--paper-line);
-}
-
-body.studio-with-navigation .current-status {
-  background: color-mix(in srgb, var(--paper-line) 30%, transparent);
-  color: var(--paper-ink-faint);
-}
-
-body.studio-with-navigation .danger {
-  color: color-mix(in srgb, #d24d4d 72%, var(--paper-ink) 28%);
-}
-
-body.studio-with-navigation dialog::backdrop {
-  background: color-mix(in srgb, #0a0e0d 74%, transparent);
-}
-
-/* Shared Studio foundations. Keep page-specific layout choices, but make the
-   workspace read and behave as one product. */
-body.studio-with-navigation {
+  --studio-border: color-mix(in srgb, var(--paper-ink) 11%, transparent);
+  --studio-border-strong: color-mix(in srgb, var(--paper-ink) 19%, transparent);
+  --studio-control-border: color-mix(in srgb, var(--paper-ink) 23%, transparent);
+  --studio-focus-ring: color-mix(in srgb, var(--paper-accent) 78%, var(--paper-ink) 22%);
+  --studio-radius-control: 9px;
+  --studio-radius-panel: 14px;
+  --studio-radius-float: 18px;
+  --studio-shadow-panel: 0 1px 2px color-mix(in srgb, var(--paper-ink) 5%, transparent);
+  --studio-shadow-float:
+    0 2px 4px color-mix(in srgb, var(--paper-ink) 5%, transparent),
+    0 20px 52px color-mix(in srgb, var(--paper-ink) 9%, transparent);
+  --studio-success: #43865a;
+  --studio-success-bg: color-mix(in srgb, #43865a 10%, var(--studio-surface) 90%);
+  --studio-warning: #a16c17;
+  --studio-warning-bg: color-mix(in srgb, #c68a2a 12%, var(--studio-surface) 88%);
+  --studio-danger: #b84b4b;
+  --studio-danger-bg: color-mix(in srgb, #c75555 10%, var(--studio-surface) 90%);
+  min-height: 100svh;
+  margin: 0;
+  background:
+    radial-gradient(
+      circle at 18% -10%,
+      color-mix(in srgb, var(--paper-accent) 9%, transparent),
+      transparent 34rem
+    ),
+    linear-gradient(
+      to bottom,
+      transparent 31px,
+      color-mix(in srgb, var(--paper-accent) 3.5%, transparent) 32px
+    ),
+    var(--studio-canvas);
+  background-size:
+    auto,
+    100% 32px,
+    auto;
   color: var(--studio-text);
-  font-size: 16px;
+  font-family: var(--studio-font-ui);
+  font-size: 14px;
   line-height: 1.55;
 }
 
+:root[data-theme='dark'] body.studio-with-navigation {
+  --studio-accent-strong: color-mix(in srgb, var(--paper-accent) 86%, white 14%);
+  --studio-on-accent: #151916;
+  --studio-shadow-panel: 0 1px 2px rgb(0 0 0 / 14%);
+  --studio-shadow-float: 0 2px 5px rgb(0 0 0 / 18%), 0 20px 52px rgb(0 0 0 / 22%);
+}
+
+body.studio-with-navigation *,
+body.studio-with-navigation *::before,
+body.studio-with-navigation *::after {
+  box-sizing: border-box;
+}
+
 body.studio-with-navigation > main:is(.shell, .module-shell, .settings-shell, .content-shell) {
-  width: min(var(--studio-shell-width), calc(100% - var(--studio-shell-gutter)));
+  width: min(var(--studio-shell-width), calc(100% - (var(--studio-shell-gutter) * 2)));
   max-width: none;
   margin-inline: auto;
   padding: var(--studio-page-top) 0 var(--studio-page-bottom);
@@ -268,38 +84,208 @@ body.studio-with-navigation > main:is(.shell, .module-shell, .settings-shell, .c
 }
 
 body.studio-with-navigation > main[data-editor-root] {
-  --studio-shell-width: 1400px;
-  --studio-page-top: 18px;
+  --studio-shell-width: var(--studio-editor-width);
+  --studio-page-top: 24px;
+}
+
+body.studio-with-navigation .topbar {
+  display: none;
+}
+
+body.studio-with-navigation :is(a, button, input, textarea, select, summary) {
+  -webkit-tap-highlight-color: transparent;
+}
+
+body.studio-with-navigation a {
+  color: inherit;
+  text-decoration: none;
 }
 
 body.studio-with-navigation
   > main:is(.shell, .module-shell, .settings-shell, .content-shell)
-  > :is(header, .page-header, .hero, .editor-header) {
-  margin: 0 0 24px;
-  padding: 0 0 28px;
-  border-bottom: 1px solid var(--studio-border);
+  :is(button, summary, a, input, textarea, select) {
+  font-family: var(--studio-font-ui);
 }
 
 body.studio-with-navigation
   > main:is(.shell, .module-shell, .settings-shell, .content-shell)
-  > :is(header, .page-header, .hero, .editor-header)
-  h1 {
-  margin: 6px 0 10px;
+  :is(
+    input:not([type='hidden']):not([type='checkbox']):not([type='radio']):not([type='file']),
+    select
+  ) {
+  min-height: 42px;
+  padding: 8px 11px;
+  border: 1px solid var(--studio-control-border);
+  border-radius: var(--studio-radius-control);
+  outline: 0;
+  background: color-mix(in srgb, var(--studio-surface) 93%, transparent);
   color: var(--studio-text);
-  font: 500 clamp(2.25rem, 4.5vw, 3.25rem) / 1.05 var(--font-page-heading);
-  letter-spacing: -0.025em;
+  transition:
+    border-color 140ms ease,
+    box-shadow 140ms ease,
+    background 140ms ease;
 }
 
 body.studio-with-navigation
   > main:is(.shell, .module-shell, .settings-shell, .content-shell)
-  > :is(header, .page-header, .hero, .editor-header)
-  :is(.eyebrow, p:first-child),
+  textarea {
+  padding: 10px 11px;
+  border: 1px solid var(--studio-control-border);
+  border-radius: var(--studio-radius-control);
+  outline: 0;
+  background: color-mix(in srgb, var(--studio-surface) 93%, transparent);
+  color: var(--studio-text);
+  resize: vertical;
+  transition:
+    border-color 140ms ease,
+    box-shadow 140ms ease,
+    background 140ms ease;
+}
+
 body.studio-with-navigation
   > main:is(.shell, .module-shell, .settings-shell, .content-shell)
-  > :is(header, .page-header, .hero, .editor-header)
-  > div
-  > p:first-child {
-  color: var(--studio-accent-strong);
+  :is(input, textarea, select):hover {
+  border-color: var(--studio-border-strong);
+  background: var(--studio-surface);
+}
+
+body.studio-with-navigation
+  > main:is(.shell, .module-shell, .settings-shell, .content-shell)
+  :is(input, textarea, select):focus {
+  border-color: var(--studio-accent-strong);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--paper-accent) 17%, transparent);
+  background: var(--studio-surface);
+}
+
+body.studio-with-navigation
+  > main:is(.shell, .module-shell, .settings-shell, .content-shell)
+  :is(input, textarea)::placeholder {
+  color: var(--studio-text-meta);
+  opacity: 1;
+}
+
+body.studio-with-navigation
+  > main:is(.shell, .module-shell, .settings-shell, .content-shell)
+  :is(
+    button,
+    .new-menu > summary,
+    .publish-more > summary,
+    .primary,
+    .btn,
+    .actions a,
+    .header-actions a,
+    .row-actions a,
+    .back,
+    .deployment > a
+  ) {
+  min-height: 40px;
+  border-radius: var(--studio-radius-control);
+}
+
+body.studio-with-navigation
+  > main:is(.shell, .module-shell, .settings-shell, .content-shell)
+  :is(
+    button,
+    .new-menu > summary,
+    .publish-more > summary,
+    .primary,
+    .btn,
+    .actions a,
+    .header-actions a,
+    .row-actions a,
+    .back
+  ) {
+  display: inline-flex;
+  gap: 7px;
+  align-items: center;
+  justify-content: center;
+  padding: 8px 13px;
+  border: 1px solid var(--studio-border-strong);
+  background: var(--studio-surface);
+  color: var(--studio-text-secondary);
+  font-size: 0.78rem;
+  cursor: pointer;
+  transition:
+    border-color 140ms ease,
+    background 140ms ease,
+    color 140ms ease,
+    transform 140ms ease;
+}
+
+body.studio-with-navigation
+  > main:is(.shell, .module-shell, .settings-shell, .content-shell)
+  :is(
+    button,
+    .new-menu > summary,
+    .publish-more > summary,
+    .primary,
+    .btn,
+    .actions a,
+    .header-actions a,
+    .row-actions a,
+    .back
+  ):hover {
+  border-color: color-mix(in srgb, var(--paper-accent) 42%, var(--studio-border-strong) 58%);
+  background: var(--studio-accent-soft);
+  color: var(--studio-text);
+}
+
+body.studio-with-navigation
+  > main:is(.shell, .module-shell, .settings-shell, .content-shell)
+  :is(
+    .primary,
+    button[type='submit'],
+    .new-menu > summary,
+    .view-switch button[aria-pressed='true']
+  ) {
+  border-color: var(--studio-accent-strong);
+  background: var(--studio-accent-strong);
+  color: var(--studio-on-accent);
+  font-weight: 650;
+}
+
+body.studio-with-navigation
+  > main:is(.shell, .module-shell, .settings-shell, .content-shell)
+  :is(.primary, button[type='submit'], .new-menu > summary):hover {
+  border-color: color-mix(in srgb, var(--studio-accent-strong) 82%, var(--studio-text) 18%);
+  background: color-mix(in srgb, var(--studio-accent-strong) 88%, var(--studio-text) 12%);
+  color: var(--studio-on-accent);
+  transform: translateY(-1px);
+}
+
+body.studio-with-navigation
+  > main:is(.shell, .module-shell, .settings-shell, .content-shell)
+  :is(a[href], button, summary, input, textarea, select, [tabindex]):focus-visible,
+body.studio-with-navigation
+  > dialog
+  :is(a[href], button, input, textarea, select, [tabindex]):focus-visible {
+  outline: 2px solid var(--studio-accent-strong);
+  outline-offset: 3px;
+}
+
+body.studio-with-navigation
+  > main:is(.shell, .module-shell, .settings-shell, .content-shell)
+  :is(input, textarea, select):focus-visible {
+  outline: 0;
+}
+
+body.studio-with-navigation
+  > main:is(.shell, .module-shell, .settings-shell, .content-shell)
+  :is(button, input, textarea, select)[disabled] {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
+body.studio-with-navigation
+  > main:is(.shell, .module-shell, .settings-shell, .content-shell)
+  :is(label, .content-meta, .meta-note, .meta-help, dt) {
+  color: var(--studio-text-secondary);
+}
+
+body.studio-with-navigation
+  > main:is(.shell, .module-shell, .settings-shell, .content-shell)
+  :is(small, .content-meta, .meta-note, .meta-help, dt) {
+  color: var(--studio-text-meta);
 }
 
 body.studio-with-navigation
@@ -317,145 +303,398 @@ body.studio-with-navigation
     .groups > section,
     form[data-site-form] > section
   ) {
+  border: 1px solid var(--studio-border);
+  border-radius: var(--studio-radius-panel);
+  background: var(--studio-surface);
+  box-shadow: var(--studio-shadow-panel);
+  color: var(--studio-text);
+}
+
+body.studio-with-navigation .notice,
+body.studio-with-navigation .deployment,
+body.studio-with-navigation .deployment-tracker,
+body.studio-with-navigation .bulk-bar,
+body.studio-with-navigation .bulk-feedback {
   border-color: var(--studio-border);
-  border-radius: var(--studio-panel-radius);
+  background: color-mix(in srgb, var(--studio-surface) 88%, var(--paper-accent) 12%);
+  color: var(--studio-text);
+}
+
+body.studio-with-navigation .notice.success,
+body.studio-with-navigation .bulk-feedback.success,
+body.studio-with-navigation .status-badge.status-success {
+  border-color: color-mix(in srgb, var(--studio-success) 44%, var(--studio-border) 56%);
+  background: var(--studio-success-bg);
+}
+
+body.studio-with-navigation .notice.error,
+body.studio-with-navigation .bulk-feedback.error,
+body.studio-with-navigation .status-badge.status-error {
+  border-color: color-mix(in srgb, var(--studio-danger) 48%, var(--studio-border) 52%);
+  background: var(--studio-danger-bg);
+}
+
+body.studio-with-navigation .deployment-tracker[data-phase='ready'] {
+  border-color: color-mix(in srgb, var(--studio-success) 50%, var(--studio-border) 50%);
+  background: var(--studio-success-bg);
+}
+
+body.studio-with-navigation .deployment-tracker[data-phase='error'] {
+  border-color: color-mix(in srgb, var(--studio-danger) 52%, var(--studio-border) 48%);
+  background: var(--studio-danger-bg);
+}
+
+body.studio-with-navigation :is(.badge, .status, .current-status, .safe-badge, .parse-state) {
+  min-height: 22px;
+  padding: 3px 8px;
+  border-radius: 999px;
+  font: 650 0.67rem/1.35 var(--studio-font-meta);
+}
+
+body.studio-with-navigation :is(.badge-published, .status.published) {
+  background: color-mix(in srgb, var(--paper-accent) 17%, transparent);
+  color: var(--studio-accent-strong);
+}
+
+body.studio-with-navigation :is(.badge-ready, .status.ready) {
+  background: var(--studio-warning-bg);
+  color: var(--studio-warning);
+}
+
+body.studio-with-navigation :is(.badge-draft, .status.draft, .current-status) {
+  background: var(--studio-surface-muted);
+  color: var(--studio-text-meta);
+}
+
+body.studio-with-navigation :is(.issue, .attention) {
+  color: var(--studio-warning);
+}
+
+body.studio-with-navigation .danger {
+  color: var(--studio-danger);
+}
+
+body.studio-with-navigation :is(code, pre) {
+  color: var(--studio-text);
+}
+
+body.studio-with-navigation :is(.auto-link code, .markdown-preview code, .markdown-preview pre) {
+  background: color-mix(in srgb, var(--studio-surface-muted) 82%, transparent);
+}
+
+body.studio-with-navigation .metrics {
+  gap: 10px;
+  margin: 20px 0;
+}
+
+body.studio-with-navigation .metrics :is(article, .metric) {
+  border-color: var(--studio-border);
+  border-radius: var(--studio-radius-panel);
+  background: var(--studio-surface);
+  box-shadow: var(--studio-shadow-panel);
+}
+
+body.studio-with-navigation .metrics :is(article, .metric):is(a):hover {
+  border-color: color-mix(in srgb, var(--paper-accent) 40%, var(--studio-border) 60%);
+  background: var(--studio-accent-soft);
+  transform: translateY(-1px);
+}
+
+body.studio-with-navigation .metrics strong {
+  color: var(--studio-text);
+  font-family: var(--studio-font-heading);
+  font-variant-numeric: tabular-nums;
+}
+
+body.studio-with-navigation :is(.section-heading, .section-title, .modules-heading) h2,
+body.studio-with-navigation .groups h2 {
+  color: var(--studio-text);
+  font: 550 1.22rem/1.25 var(--studio-font-heading);
+  letter-spacing: -0.02em;
+}
+
+body.studio-with-navigation :is(.section-heading, .section-title, .modules-heading) p {
+  color: var(--studio-accent-strong);
+  font: 700 0.64rem/1.2 var(--studio-font-meta);
+  letter-spacing: 0.12em;
+}
+
+body.studio-with-navigation :is(.content-list, .entries) {
+  overflow: hidden;
+}
+
+body.studio-with-navigation :is(.content-list article, .entries article) {
+  min-height: 70px;
+  border-bottom-color: var(--studio-border);
+  transition: background 140ms ease;
+}
+
+body.studio-with-navigation :is(.content-list article, .entries article):hover {
+  background: color-mix(in srgb, var(--paper-accent) 4.5%, transparent);
+}
+
+body.studio-with-navigation .row-actions .edit,
+body.studio-with-navigation .entries article nav .edit {
+  border-color: color-mix(in srgb, var(--paper-accent) 18%, transparent);
+  background: var(--studio-accent-soft);
+  color: var(--studio-accent-strong);
+}
+
+body.studio-with-navigation :is(.toolbar, .controls, .settings-index) {
+  border-color: var(--studio-border);
+  background: color-mix(in srgb, var(--studio-surface) 90%, transparent);
+}
+
+body.studio-with-navigation :is(.toolbar, .controls) button[aria-pressed='true'] {
+  border-color: color-mix(in srgb, var(--paper-accent) 22%, transparent);
+  background: var(--studio-accent-soft);
+  color: var(--studio-accent-strong);
+}
+
+body.studio-with-navigation .asset-grid article {
+  padding: 11px;
+  transition:
+    border-color 140ms ease,
+    transform 140ms ease;
+}
+
+body.studio-with-navigation .asset-grid article:hover {
+  border-color: color-mix(in srgb, var(--paper-accent) 42%, var(--studio-border) 58%);
+  transform: translateY(-1px);
+}
+
+body.studio-with-navigation .upload {
+  border-color: color-mix(in srgb, var(--paper-accent) 44%, var(--studio-border) 56%);
+  background: var(--studio-accent-soft);
+}
+
+body.studio-with-navigation .groups > section,
+body.studio-with-navigation form[data-site-form] > section {
+  overflow: clip;
+}
+
+body.studio-with-navigation .groups .items a {
+  border-color: var(--studio-border);
+  background: var(--studio-surface);
+  transition:
+    border-color 140ms ease,
+    background 140ms ease,
+    transform 140ms ease;
+}
+
+body.studio-with-navigation .groups .items a:hover {
+  border-color: color-mix(in srgb, var(--paper-accent) 40%, var(--studio-border) 60%);
+  background: var(--studio-accent-soft);
+  transform: translateY(-1px);
+}
+
+body.studio-with-navigation .settings-index {
+  top: 12px;
+  border-radius: 12px;
+  box-shadow: 0 8px 24px color-mix(in srgb, var(--paper-ink) 7%, transparent);
+  backdrop-filter: blur(16px);
+}
+
+body.studio-with-navigation form[data-site-form] > footer,
+body.studio-with-navigation .publish-bar {
+  border-color: var(--studio-border);
+  background: color-mix(in srgb, var(--studio-surface) 88%, transparent);
+  box-shadow: 0 -12px 32px color-mix(in srgb, var(--paper-ink) 5%, transparent);
+  backdrop-filter: blur(18px) saturate(1.1);
+}
+
+body.studio-with-navigation .editor-header {
+  margin: 0 0 16px;
+  padding: 0 0 20px;
+  border-bottom: 1px solid var(--studio-border);
+}
+
+body.studio-with-navigation .editor-header p {
+  color: var(--studio-accent-strong);
+  font: 700 0.66rem/1.2 var(--studio-font-meta);
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+body.studio-with-navigation .editor-header h1 {
+  color: var(--studio-text);
+  font: 550 2rem/1.1 var(--studio-font-heading);
+  letter-spacing: -0.03em;
+}
+
+body.studio-with-navigation form[data-editor-form] {
+  grid-template-columns: 288px minmax(0, 1fr);
+  gap: 14px;
+}
+
+body.studio-with-navigation .meta-panel,
+body.studio-with-navigation .body-panel {
+  border-color: var(--studio-border);
   background: var(--studio-surface);
 }
 
-body.studio-with-navigation > main:is(.shell, .module-shell, .settings-shell, .content-shell) small,
-body.studio-with-navigation
-  > main:is(.shell, .module-shell, .settings-shell, .content-shell)
-  :is(.content-meta, .meta-note, .meta-help, dt) {
-  color: var(--studio-text-meta);
+body.studio-with-navigation .meta-panel {
+  padding: 20px;
 }
 
-body.studio-with-navigation
-  > main:is(.shell, .module-shell, .settings-shell, .content-shell)
-  label {
-  color: var(--studio-text-secondary);
+body.studio-with-navigation .body-panel > header {
+  min-height: 58px;
+  border-color: var(--studio-border);
+  background: color-mix(in srgb, var(--studio-surface-muted) 70%, transparent);
 }
 
-body.studio-with-navigation
-  > main:is(.shell, .module-shell, .settings-shell, .content-shell)
-  :is(input, textarea, select)::placeholder {
-  color: var(--studio-text-meta);
-  opacity: 1;
+body.studio-with-navigation .view-switch {
+  gap: 3px;
+  padding: 3px;
+  border: 1px solid var(--studio-border);
+  border-radius: 10px;
+  background: var(--studio-surface);
 }
 
-body.studio-with-navigation
-  > main:is(.shell, .module-shell, .settings-shell, .content-shell)
-  :is(
-    button,
-    summary,
-    input:not([type='hidden']):not([type='checkbox']):not([type='radio']):not([type='file']),
-    select
-  ),
-body.studio-with-navigation > dialog :is(button, input, select),
-body.studio-with-navigation
-  > main:is(.shell, .module-shell, .settings-shell, .content-shell)
-  :is(.primary, .btn, .actions a, .header-actions a, .row-actions a, .deployment > a) {
-  min-block-size: 44px;
-  border-radius: var(--studio-control-radius);
+body.studio-with-navigation .view-switch button {
+  min-height: 32px;
+  padding: 5px 9px;
+  border: 0;
 }
 
-body.studio-with-navigation
-  > main:is(.shell, .module-shell, .settings-shell, .content-shell)
-  :is(button, summary, .primary, .btn, .actions a, .header-actions a, .row-actions a) {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  padding-inline: 14px;
-}
-
-body.studio-with-navigation
-  > main:is(.shell, .module-shell, .settings-shell, .content-shell)
-  :is(input, textarea, select) {
-  border-color: var(--studio-control-border);
+body.studio-with-navigation .editor-grid > textarea {
+  border-color: var(--studio-border);
+  border-radius: 0;
   background: var(--studio-surface);
   color: var(--studio-text);
 }
 
-body.studio-with-navigation
-  > main:is(.shell, .module-shell, .settings-shell, .content-shell)
-  :is(
-    .primary,
-    .btn,
-    button[type='submit'],
-    .new-menu > summary,
-    .view-switch button[aria-pressed='true']
-  ) {
-  border-color: var(--studio-accent-strong);
-  background: var(--studio-accent-strong);
-  color: var(--studio-on-accent);
-}
-
-body.studio-with-navigation
-  > main:is(.shell, .module-shell, .settings-shell, .content-shell)
-  .row-actions
-  .edit,
-body.studio-with-navigation
-  > main:is(.shell, .module-shell, .settings-shell, .content-shell)
-  .publish-more
-  > summary {
+body.studio-with-navigation .markdown-preview {
   color: var(--studio-text);
 }
 
-body.studio-with-navigation
-  > main:is(.shell, .module-shell, .settings-shell, .content-shell)
-  .current-status {
-  color: var(--studio-text-meta);
+body.studio-with-navigation .publish-bar {
+  left: var(--studio-navigation-width);
+  padding-bottom: max(10px, env(safe-area-inset-bottom));
 }
 
-body.studio-with-navigation
-  > main:is(.shell, .module-shell, .settings-shell, .content-shell)
-  :is(a[href], button, summary, input, textarea, select, [tabindex]):focus-visible,
-body.studio-with-navigation
-  > dialog
-  :is(a[href], button, input, textarea, select, [tabindex]):focus-visible {
-  outline: 3px solid var(--studio-focus-ring);
-  outline-offset: 3px;
+body.studio-with-navigation dialog {
+  border-color: var(--studio-border-strong);
+  border-radius: var(--studio-radius-float);
+  background: var(--studio-surface);
+  box-shadow: var(--studio-shadow-float);
+  color: var(--studio-text);
 }
 
-body.studio-with-navigation
-  > main:is(.shell, .module-shell, .settings-shell, .content-shell)
-  :is(.primary, .btn, button[type='submit'], .new-menu > summary):focus-visible {
-  outline-color: var(--studio-on-accent);
-  box-shadow: 0 0 0 5px var(--studio-focus-ring);
+body.studio-with-navigation dialog::backdrop {
+  background: color-mix(in srgb, #0a0e0d 68%, transparent);
+  backdrop-filter: blur(3px);
 }
 
-body.studio-with-navigation
-  > main:is(.shell, .module-shell, .settings-shell, .content-shell)
-  :is(.dropzone, .upload):focus-within {
-  outline: 3px solid var(--studio-focus-ring);
-  outline-offset: 3px;
+@media (max-width: 1180px) {
+  body.studio-with-navigation > main[data-editor-root] form[data-editor-form] {
+    grid-template-columns: 1fr;
+  }
+
+  body.studio-with-navigation > main[data-editor-root] .meta-panel {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 0 14px;
+  }
+
+  body.studio-with-navigation > main[data-editor-root] .meta-panel :is(h2, .more-settings) {
+    grid-column: 1 / -1;
+  }
+
+  body.studio-with-navigation .metrics {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
 }
 
-body.studio-with-navigation
-  > main:is(.shell, .module-shell, .settings-shell, .content-shell)
-  :is(button, input, textarea, select)[disabled] {
-  cursor: not-allowed;
-  opacity: 0.55;
+@media (max-width: 920px) {
+  body.studio-with-navigation {
+    --studio-navigation-width: 0px;
+    --studio-shell-gutter: clamp(18px, 4vw, 34px);
+    --studio-page-top: 30px;
+    --studio-page-bottom: 92px;
+  }
+
+  body.studio-with-navigation .publish-bar {
+    left: 0;
+  }
+
+  body.studio-with-navigation .settings-index {
+    top: 76px;
+  }
 }
 
 @media (max-width: 760px) {
   body.studio-with-navigation {
-    --studio-shell-gutter: 24px;
-    --studio-page-top: 28px;
-    --studio-page-bottom: 84px;
+    --studio-shell-gutter: 16px;
+    --studio-page-top: 24px;
+  }
+
+  body.studio-with-navigation :is(.toolbar, .controls, .section-heading, .section-title) {
+    gap: 12px;
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  body.studio-with-navigation :is(.toolbar, .controls) > div {
+    width: 100%;
+    overflow-x: auto;
+  }
+
+  body.studio-with-navigation :is(.toolbar, .controls) input[type='search'] {
+    width: 100%;
+  }
+
+  body.studio-with-navigation .metrics {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  body.studio-with-navigation > main[data-editor-root] .meta-panel {
+    display: block;
   }
 
   body.studio-with-navigation
-    > main:is(.shell, .module-shell, .settings-shell, .content-shell)
-    > :is(header, .page-header, .hero, .editor-header) {
-    align-items: flex-start;
-    margin-bottom: 18px;
-    padding-bottom: 22px;
+    > main[data-editor-root]
+    .body-panel[data-editor-view='split']
+    .editor-grid {
+    grid-template-columns: 1fr;
   }
 
   body.studio-with-navigation
-    > main:is(.shell, .module-shell, .settings-shell, .content-shell)
-    > :is(header, .page-header, .hero, .editor-header)
-    h1 {
-    font-size: clamp(2rem, 10vw, 2.6rem);
+    > main[data-editor-root]
+    .body-panel[data-editor-view='split']
+    .editor-grid
+    > textarea {
+    border-right: 0;
+    border-bottom: 1px solid var(--studio-border);
+  }
+
+  body.studio-with-navigation form[data-site-form] > footer,
+  body.studio-with-navigation .publish-bar {
+    padding-bottom: max(10px, env(safe-area-inset-bottom));
+  }
+}
+
+@media (max-width: 560px) {
+  body.studio-with-navigation .metrics {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  body.studio-with-navigation :is(.content-list article, .entries article) {
+    min-height: 0;
+  }
+
+  body.studio-with-navigation .publish-bar {
+    gap: 8px;
+    padding-inline: 10px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce), (forced-colors: active) {
+  body.studio-with-navigation *,
+  body.studio-with-navigation *::before,
+  body.studio-with-navigation *::after {
+    scroll-behavior: auto !important;
+    animation: none !important;
+    transition: none !important;
   }
 }

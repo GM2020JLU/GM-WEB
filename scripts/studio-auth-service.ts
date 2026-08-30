@@ -32,20 +32,72 @@ const port = Number(process.env.STUDIO_AUTH_PORT || 4322);
 if (!Number.isSafeInteger(port) || port < 1 || port > 65_535) {
   throw new Error('STUDIO_AUTH_PORT must be a valid TCP port.');
 }
+const publicHost = process.env.STUDIO_AUTH_PUBLIC_HOST || 'studio.goumin.work';
+const githubSettings = {
+  allowedUserId: process.env.STUDIO_GITHUB_ALLOWED_USER_ID,
+  callbackUrl: process.env.STUDIO_GITHUB_CALLBACK_URL,
+  clientIdFile: process.env.STUDIO_GITHUB_CLIENT_ID_FILE,
+  clientSecretFile: process.env.STUDIO_GITHUB_CLIENT_SECRET_FILE,
+};
+const githubSettingCount = Object.values(githubSettings).filter(Boolean).length;
+if (githubSettingCount !== 0 && githubSettingCount !== Object.keys(githubSettings).length) {
+  throw new Error('GitHub login settings must be configured together.');
+}
+const githubEnabled = githubSettingCount > 0;
 
-const [password, sessionSecret, mapleMono, studioChinese] = await Promise.all([
-  readCredential(process.env.STUDIO_AUTH_PASSWORD_FILE, 'Studio password', 16),
-  readCredential(process.env.STUDIO_AUTH_SECRET_FILE, 'Studio session secret', 32),
-  readFile(
-    new URL(
-      '../node_modules/@fontsource/maple-mono/files/maple-mono-latin-500-normal.woff2',
-      import.meta.url,
+const [password, sessionSecret, mapleMono, studioChinese, githubClientId, githubClientSecret] =
+  await Promise.all([
+    readCredential(process.env.STUDIO_AUTH_PASSWORD_FILE, 'Studio password', 16),
+    readCredential(process.env.STUDIO_AUTH_SECRET_FILE, 'Studio session secret', 32),
+    readFile(
+      new URL(
+        '../node_modules/@fontsource/maple-mono/files/maple-mono-latin-500-normal.woff2',
+        import.meta.url,
+      ),
     ),
-  ),
-  readFile(
-    new URL('../public/fonts/LXGWWenKai-Regular-content-subset-ui-subset.woff2', import.meta.url),
-  ).catch(() => null),
-]);
+    readFile(
+      new URL('../public/fonts/LXGWWenKai-Regular-content-subset-ui-subset.woff2', import.meta.url),
+    ).catch(() => null),
+    githubEnabled
+      ? readCredential(githubSettings.clientIdFile, 'Studio GitHub client ID', 12)
+      : Promise.resolve(undefined),
+    githubEnabled
+      ? readCredential(githubSettings.clientSecretFile, 'Studio GitHub client secret', 32)
+      : Promise.resolve(undefined),
+  ]);
+
+let github:
+  | {
+      allowedUserId: number;
+      callbackUrl: string;
+      clientId: string;
+      clientSecret: string;
+    }
+  | undefined;
+if (githubEnabled) {
+  const allowedUserId = Number(githubSettings.allowedUserId);
+  if (!Number.isSafeInteger(allowedUserId) || allowedUserId <= 0) {
+    throw new Error('STUDIO_GITHUB_ALLOWED_USER_ID must be a positive numeric GitHub user ID.');
+  }
+  const callback = new URL(githubSettings.callbackUrl!);
+  if (
+    callback.protocol !== 'https:' ||
+    callback.host.toLowerCase() !== publicHost.toLowerCase() ||
+    callback.pathname !== '/api/studio/auth/github/callback' ||
+    callback.username ||
+    callback.password ||
+    callback.search ||
+    callback.hash
+  ) {
+    throw new Error('STUDIO_GITHUB_CALLBACK_URL must be the exact public Studio callback URL.');
+  }
+  github = {
+    allowedUserId,
+    callbackUrl: callback.toString(),
+    clientId: githubClientId!,
+    clientSecret: githubClientSecret!,
+  };
+}
 
 const loginAssets: Record<string, { body: BodyInit; contentType: string }> = {
   '/studio/login-assets/maple-mono.woff2': {
@@ -61,9 +113,11 @@ if (studioChinese) {
 }
 
 const handleRequest = createStudioAuthService({
+  github,
   loginAssets,
   password,
-  publicHost: process.env.STUDIO_AUTH_PUBLIC_HOST || 'studio.goumin.work',
+  passwordLogin: 'loopback',
+  publicHost,
   randomBytes,
   sessionSecret,
   username: process.env.STUDIO_AUTH_USERNAME || 'goumin',

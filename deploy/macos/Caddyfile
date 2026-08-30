@@ -54,7 +54,15 @@ http://:8081 {
 		}
 		rewrite @studioRoot /studio
 
-		@authSurface path /studio/login /api/studio/session /api/studio/session/logout /studio/login-assets/* /robots.txt
+		# Password recovery exists only on the loopback hostname. The public Studio
+		# hostname never routes the legacy password submission endpoint.
+		@localPassword {
+			host 127.0.0.1 localhost
+			path /api/studio/session
+		}
+		reverse_proxy @localPassword 127.0.0.1:4322
+
+		@authSurface path /studio/login /api/studio/session/logout /api/studio/auth/github/start /api/studio/auth/github/callback /studio/login-assets/* /robots.txt
 		reverse_proxy @authSurface 127.0.0.1:4322
 
 		@keystatic path /keystatic /keystatic/* /api/keystatic /api/keystatic/*

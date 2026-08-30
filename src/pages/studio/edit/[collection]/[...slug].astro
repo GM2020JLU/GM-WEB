@@ -1,8 +1,10 @@
 ---
 import BaseHead from '../../../../components/BaseHead.astro';
 import StudioNavigation from '../../../../components/studio/StudioNavigation.astro';
+import StudioPageHeader from '../../../../components/studio/StudioPageHeader.astro';
 import { getThemePalette } from '../../../../data/site';
 import { isStudioCollection, isTaxonomyCollection } from '../../../../utils/studio-content';
+import { ExternalLink, History } from 'lucide-astro';
 
 export const prerender = false;
 const collection = Astro.params.collection ?? '';
@@ -46,22 +48,29 @@ const palette = await getThemePalette();
         >
       </nav>
 
-      <header class="editor-header">
-        <div><p>{labels[collection]}</p><h1>{isNew ? '新建' : '编辑'}</h1></div><div
-          class="header-actions"
-        >
-          <button type="button" data-history>历史</button>{
+      <StudioPageHeader
+        eyebrow={`${labels[collection]} / EDITOR`}
+        title={`${isNew ? '新建' : '编辑'}${labels[collection]}`}
+        description={taxonomy
+          ? '完善组织信息，让内容在站点中更容易被发现。'
+          : '专注编辑 Markdown 正文，随时预览并管理发布状态。'}
+      >
+        <div slot="actions" class="header-actions">
+          <button type="button" data-history
+            ><History size={16} aria-hidden="true" />版本历史</button
+          >{
             !taxonomy && !isNew && (
               <a
                 href={collection === 'about' ? '/preview/about' : `/preview/${collection}/${slug}`}
                 target="_blank"
               >
+                <ExternalLink size={16} aria-hidden="true" />
                 预览页面
               </a>
             )
           }
         </div>
-      </header>
+      </StudioPageHeader>
       <div class="notice" data-notice role="status" aria-live="polite">
         <strong>正在读取</strong><small>请稍候…</small>
       </div>
@@ -295,7 +304,7 @@ const palette = await getThemePalette();
   }
   .editor-header p {
     margin: 0;
-    color: var(--paper-accent);
+    color: var(--studio-accent-strong);
     font-size: 0.72rem;
     font-weight: 700;
   }

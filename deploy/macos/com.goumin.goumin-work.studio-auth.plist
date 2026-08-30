@@ -18,6 +18,12 @@
     <string>production</string>
     <key>PATH</key>
     <string>/Users/goumin/.bun/bin:/Users/goumin/.local/bin:/usr/bin:/bin:/usr/sbin:/sbin</string>
+    <key>ALL_PROXY</key>
+    <string>http://127.0.0.1:7897</string>
+    <key>HTTP_PROXY</key>
+    <string>http://127.0.0.1:7897</string>
+    <key>HTTPS_PROXY</key>
+    <string>http://127.0.0.1:7897</string>
     <key>STUDIO_AUTH_HOST</key>
     <string>127.0.0.1</string>
     <key>STUDIO_AUTH_PORT</key>
@@ -30,6 +36,14 @@
     <string>/Users/goumin/.config/goumin-work/studio-basic-auth-password</string>
     <key>STUDIO_AUTH_SECRET_FILE</key>
     <string>/Users/goumin/.config/goumin-work/studio-auth-session-secret</string>
+    <key>STUDIO_GITHUB_CLIENT_ID_FILE</key>
+    <string>/Users/goumin/.config/goumin-work/studio-github-client-id</string>
+    <key>STUDIO_GITHUB_CLIENT_SECRET_FILE</key>
+    <string>/Users/goumin/.config/goumin-work/studio-github-client-secret</string>
+    <key>STUDIO_GITHUB_ALLOWED_USER_ID</key>
+    <string>66173922</string>
+    <key>STUDIO_GITHUB_CALLBACK_URL</key>
+    <string>https://studio.goumin.work/api/studio/auth/github/callback</string>
   </dict>
   <key>RunAtLoad</key>
   <true/>

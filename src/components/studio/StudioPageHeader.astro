@@ -1,0 +1,96 @@
+---
+interface Props {
+  eyebrow: string;
+  title: string;
+  description: string;
+}
+
+const { eyebrow, title, description } = Astro.props;
+const hasActions = Astro.slots.has('actions');
+---
+
+<header class="studio-page-header">
+  <div class="studio-page-heading">
+    <p>{eyebrow}</p>
+    <h1>{title}</h1>
+    <span>{description}</span>
+  </div>
+  {
+    hasActions && (
+      <div class="studio-page-actions">
+        <slot name="actions" />
+      </div>
+    )
+  }
+</header>
+
+<style>
+  .studio-page-header {
+    display: flex;
+    gap: 32px;
+    align-items: flex-end;
+    justify-content: space-between;
+    margin: 0 0 26px;
+    padding: 0 0 26px;
+    border-bottom: 1px solid var(--studio-border);
+  }
+
+  .studio-page-heading {
+    min-width: 0;
+  }
+
+  .studio-page-heading p {
+    margin: 0 0 9px;
+    color: var(--studio-accent-strong);
+    font: 700 0.68rem/1.2 var(--studio-font-meta);
+    letter-spacing: 0.13em;
+  }
+
+  .studio-page-heading h1 {
+    margin: 0;
+    color: var(--studio-text);
+    font: 550 clamp(2rem, 4vw, 2.8rem) / 1.08 var(--studio-font-heading);
+    letter-spacing: -0.035em;
+  }
+
+  .studio-page-heading span {
+    display: block;
+    max-width: 68ch;
+    margin-top: 10px;
+    color: var(--studio-text-secondary);
+    font-size: 0.86rem;
+    line-height: 1.7;
+  }
+
+  .studio-page-actions {
+    display: flex;
+    flex: 0 0 auto;
+    gap: 9px;
+    align-items: center;
+  }
+
+  .studio-page-actions :global(a),
+  .studio-page-actions :global(button),
+  .studio-page-actions :global(summary) {
+    font-family: var(--studio-font-ui);
+  }
+
+  @media (max-width: 760px) {
+    .studio-page-header {
+      gap: 20px;
+      align-items: flex-start;
+      flex-direction: column;
+      margin-bottom: 20px;
+      padding-bottom: 22px;
+    }
+
+    .studio-page-heading h1 {
+      font-size: clamp(1.9rem, 9vw, 2.45rem);
+    }
+
+    .studio-page-actions {
+      width: 100%;
+      flex-wrap: wrap;
+    }
+  }
+</style>

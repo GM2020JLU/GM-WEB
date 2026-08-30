@@ -16,7 +16,7 @@ export function setupStudioNavigation(document: Document, options: StudioNavigat
   if (navigation.dataset.ready === 'true') return;
   navigation.dataset.ready = 'true';
 
-  const mobileQuery = browserWindow.matchMedia('(max-width: 760px)');
+  const mobileQuery = browserWindow.matchMedia('(max-width: 920px)');
   const isMobile = options.isMobile ?? (() => mobileQuery.matches);
   const pageMain = document.querySelector<HTMLElement>('body.studio-with-navigation > main');
 

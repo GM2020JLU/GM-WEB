@@ -1,6 +1,7 @@
 ---
 import BaseHead from '../../components/BaseHead.astro';
 import StudioNavigation from '../../components/studio/StudioNavigation.astro';
+import StudioPageHeader from '../../components/studio/StudioPageHeader.astro';
 import { getThemePalette } from '../../data/site';
 const palette = await getThemePalette();
 ---
@@ -16,26 +17,19 @@ const palette = await getThemePalette();
   <body class="studio-with-navigation">
     <StudioNavigation />
     <main class="shell">
-      <nav class="topbar">
-        <a class="brand" href="/studio"><span>GM</span><strong>创作中心</strong></a><div>
-          <a href="/studio">内容</a><a href="/studio/import">导入</a><a href="/studio/organize"
-            >分类</a
-          >
-        </div>
-      </nav>
-      <header class="hero">
-        <div>
-          <p>MEDIA LIBRARY</p><h1>素材库</h1><span
-            >统一管理文章图片；上传前校验真实图片格式和大小。</span
-          >
-        </div><label class="upload" data-upload
+      <StudioPageHeader
+        eyebrow="MEDIA / LIBRARY"
+        title="素材库"
+        description="统一管理文章图片；上传前校验真实图片格式和大小。"
+      >
+        <label slot="actions" class="upload" data-upload
           ><input
             type="file"
             accept="image/jpeg,image/png,image/webp,image/gif,image/avif"
             data-file
           /><strong>上传图片</strong><small>JPG / PNG / WebP / GIF / AVIF，最大 5 MB</small></label
         >
-      </header>
+      </StudioPageHeader>
       <div class="notice" data-notice role="status">
         <strong>正在加载素材</strong><small>请稍候…</small>
       </div>
@@ -118,7 +112,7 @@ const palette = await getThemePalette();
   }
   .hero p {
     margin: 0;
-    color: var(--paper-accent);
+    color: var(--studio-accent-strong);
     font: 700 0.7rem var(--font-meta);
     letter-spacing: 0.14em;
   }
@@ -144,8 +138,12 @@ const palette = await getThemePalette();
     height: 1px;
     opacity: 0;
   }
+  .upload:has(input:focus-visible) {
+    outline: 3px solid var(--studio-focus-ring);
+    outline-offset: 3px;
+  }
   .upload small {
-    color: var(--paper-ink-faint);
+    color: var(--studio-text-meta);
   }
   .notice {
     display: flex;
@@ -165,7 +163,8 @@ const palette = await getThemePalette();
     border-color: color-mix(in srgb, #cb6464 48%, var(--paper-line) 52%);
   }
   .section-title h2 {
-    font: 400 2rem var(--font-page-heading);
+    font: 550 1.22rem/1.25 var(--studio-font-heading);
+    letter-spacing: -0.02em;
   }
   .section-title input {
     width: 260px;
@@ -196,7 +195,7 @@ const palette = await getThemePalette();
   }
   .asset-grid code {
     overflow: hidden;
-    color: var(--paper-ink-faint);
+    color: var(--studio-text-meta);
     font-size: 0.7rem;
     text-overflow: ellipsis;
     white-space: nowrap;

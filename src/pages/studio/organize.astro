@@ -3,6 +3,7 @@ import { readdir, readFile } from 'node:fs/promises';
 import { parse } from 'yaml';
 import BaseHead from '../../components/BaseHead.astro';
 import StudioNavigation from '../../components/studio/StudioNavigation.astro';
+import StudioPageHeader from '../../components/studio/StudioPageHeader.astro';
 import { getThemePalette } from '../../data/site';
 const palette = await getThemePalette();
 
@@ -46,17 +47,12 @@ const groups = await Promise.all(
   ><body class="studio-with-navigation">
     <StudioNavigation />
     <main class="shell">
-      <nav class="topbar">
-        <a class="brand" href="/studio"><span>GM</span><strong>创作中心</strong></a><div>
-          <a href="/studio">内容</a><a href="/studio/import">导入</a><a href="/studio/assets"
-            >素材</a
-          >
-        </div>
-      </nav><header>
-        <p>CONTENT ORGANIZATION</p><h1>分类、系列与标签</h1><span
-          >统一维护内容关系，避免同义词和重复标识。</span
-        >
-      </header><label class="taxonomy-search"
+      <StudioPageHeader
+        eyebrow="CONTENT / ORGANIZATION"
+        title="分类、系列与标签"
+        description="统一维护内容关系，避免同义词和重复标识。"
+      />
+      <label class="taxonomy-search"
         ><span>搜索组织项</span><input
           type="search"
           placeholder="搜索名称或说明"
@@ -187,7 +183,7 @@ const groups = await Promise.all(
   }
   header > p {
     margin: 0;
-    color: var(--paper-accent);
+    color: var(--studio-accent-strong);
     font: 700 0.7rem var(--font-meta);
     letter-spacing: 0.14em;
   }
@@ -228,7 +224,8 @@ const groups = await Promise.all(
   }
   .heading h2 {
     margin: 0;
-    font: 400 2rem var(--font-page-heading);
+    font: 550 1.22rem/1.25 var(--studio-font-heading);
+    letter-spacing: -0.02em;
   }
   .heading h2 small {
     color: var(--studio-text-meta);
@@ -274,7 +271,7 @@ const groups = await Promise.all(
   }
   .items span {
     margin-top: 5px;
-    color: var(--paper-accent);
+    color: var(--studio-accent-strong);
     font-size: 0.78rem;
   }
   @media (max-width: 600px) {

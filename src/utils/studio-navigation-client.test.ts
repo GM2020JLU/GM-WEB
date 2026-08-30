@@ -124,6 +124,7 @@ describe('Studio 移动导航', () => {
   test('从移动端切换到桌面端时恢复导航和正文可访问性', () => {
     const window = createPage();
     let mobile = true;
+    let requestedQuery = '';
     let viewportChange: EventListener | undefined;
     const mediaQuery = {
       get matches() {
@@ -133,8 +134,14 @@ describe('Studio 移动导航', () => {
         viewportChange = listener;
       },
     };
-    Object.defineProperty(window, 'matchMedia', { value: () => mediaQuery });
+    Object.defineProperty(window, 'matchMedia', {
+      value: (query: string) => {
+        requestedQuery = query;
+        return mediaQuery;
+      },
+    });
     setupStudioNavigation(window.document as unknown as Document);
+    expect(requestedQuery).toBe('(max-width: 920px)');
 
     const navigation = element(window, '[data-studio-navigation]');
     const toggle = element(window, '[data-studio-navigation-toggle]');

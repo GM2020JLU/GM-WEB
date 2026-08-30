@@ -1,37 +1,65 @@
 ---
-import { LogOut, Menu, Moon, Sun, X } from 'lucide-astro';
+import {
+  BarChart3,
+  ExternalLink,
+  Feather,
+  FileText,
+  FolderKanban,
+  Images,
+  LayoutDashboard,
+  Library,
+  LogOut,
+  Menu,
+  Moon,
+  PanelsTopLeft,
+  SlidersHorizontal,
+  Sun,
+  Tags,
+  Upload,
+  X,
+} from 'lucide-astro';
 
 const pathname = Astro.url.pathname;
 const showStudioLogout =
   import.meta.env.STUDIO_AUTH_ENABLED === 'true' && Astro.url.hostname === 'studio.goumin.work';
 const groups = [
   {
-    label: '内容',
+    label: '创作',
     items: [
-      { label: '总览', href: '/studio', match: (path: string) => path === '/studio' },
+      {
+        label: '总览',
+        href: '/studio',
+        icon: LayoutDashboard,
+        match: (path: string) => path === '/studio',
+      },
       {
         label: '数据概览',
         href: '/studio/analytics',
+        icon: BarChart3,
         match: (path: string) => path === '/studio/analytics',
       },
       {
         label: '博客文章',
         href: '/studio/content/blog',
+        icon: FileText,
         match: (path: string) => path.includes('/blog'),
       },
       {
         label: '项目案例',
         href: '/studio/content/projects',
+        icon: FolderKanban,
         match: (path: string) => path.includes('/projects'),
       },
       {
         label: '随记',
         href: '/studio/content/vibe',
+        icon: Feather,
         match: (path: string) => path.includes('/vibe'),
       },
       {
         label: '书影音',
         href: '/studio/content/media',
+        icon: Library,
         match: (path: string) => path.includes('/media'),
       },
     ],
@@ -42,18 +70,26 @@ const groups = [
       {
         label: '页面',
         href: '/studio/content/pages',
+        icon: PanelsTopLeft,
         match: (path: string) => path.includes('/about') || path.endsWith('/pages'),
       },
-      { label: '站点设置', href: '/studio/site', match: (path: string) => path === '/studio/site' },
+      {
+        label: '站点设置',
+        href: '/studio/site',
+        icon: SlidersHorizontal,
+        match: (path: string) => path === '/studio/site',
+      },
       {
         label: '内容组织',
         href: '/studio/organize',
+        icon: Tags,
         match: (path: string) =>
           path === '/studio/organize' || /\/(categories|series|tags)(?:\/|$)/.test(path),
       },
       {
         label: '素材库',
         href: '/studio/assets',
+        icon: Images,
         match: (path: string) => path === '/studio/assets',
       },
     ],
@@ -63,9 +99,10 @@ const groups = [
 
 <aside class="studio-navigation" aria-label="创作后台模块" data-studio-navigation>
   <div class="studio-nav-header">
-    <a class="studio-brand" href="/studio" data-astro-reload
-      ><span>GM</span><strong>创作中心</strong></a
-    >
+    <a class="studio-brand" href="/studio" data-astro-reload>
+      <span class="studio-brand-mark" aria-hidden="true">GM</span>
+      <span class="studio-brand-copy"><strong>GM Studio</strong><small>个人站工作台</small></span>
+    </a>
     <button
       class="studio-mobile-toggle"
       type="button"
@@ -98,44 +135,69 @@ const groups = [
         groups.map((group) => (
           <section>
             <p>{group.label}</p>
-            {group.items.map((item) => (
-              <a
-                href={item.href}
-                data-astro-reload
-                aria-current={item.match(pathname) ? 'page' : undefined}
-              >
-                {item.label}
-              </a>
-            ))}
+            {group.items.map((item) => {
+              const Icon = item.icon;
+              return (
+                <a
+                  href={item.href}
+                  data-astro-reload
+                  aria-current={item.match(pathname) ? 'page' : undefined}
+                >
+                  <Icon size={17} stroke-width={1.9} aria-hidden="true" />
+                  <span>{item.label}</span>
+                </a>
+              );
+            })}
           </section>
         ))
       }
     </nav>
+
     <div class="studio-nav-footer">
-      <a href="/studio/import" data-astro-reload>导入 Markdown</a>
-      <a href="/" target="_blank">查看网站 ↗</a>
-      <div class="studio-nav-tools">
-        <button
-          class="studio-nav-theme"
-          type="button"
-          data-theme-toggle
-          aria-label="切换明暗主题"
-          title="切换明暗主题"
+      <div class="studio-nav-shortcuts">
+        <a
+          href="/studio/import"
+          data-astro-reload
+          aria-current={pathname === '/studio/import' ? 'page' : undefined}
         >
-          <Moon class="theme-icon-moon" size={17} stroke-width={2} />
-          <Sun class="theme-icon-sun" size={17} stroke-width={2} />
-          <span class="sr-only">切换明暗主题</span>
-        </button>
-        {
-          showStudioLogout && (
-            <form class="studio-nav-logout-form" action="/api/studio/session/logout" method="post">
-              <button type="submit" aria-label="退出创作中心" title="退出创作中心">
-                <LogOut size={17} stroke-width={2} />
-                <span class="sr-only">退出创作中心</span>
-              </button>
-            </form>
-          )
-        }
+          <Upload size={17} stroke-width={1.9} aria-hidden="true" /><span>导入 Markdown</span>
+        </a>
+        <a href="/" target="_blank">
+          <ExternalLink size={17} stroke-width={1.9} aria-hidden="true" /><span>查看网站</span>
+        </a>
+      </div>
+
+      <div class="studio-identity">
+        <span class="studio-avatar" aria-hidden="true">G</span>
+        <span class="studio-identity-copy"><strong>GM2020JLU</strong><small>私人工作区</small></span
+        >
+        <div class="studio-nav-tools">
+          <button
+            class="studio-nav-theme"
+            type="button"
+            data-theme-toggle
+            aria-label="切换明暗主题"
+            title="切换明暗主题"
+          >
+            <Moon class="theme-icon-moon" size={16} stroke-width={2} />
+            <Sun class="theme-icon-sun" size={16} stroke-width={2} />
+            <span class="sr-only">切换明暗主题</span>
+          </button>
+          {
+            showStudioLogout && (
+              <form
+                class="studio-nav-logout-form"
+                action="/api/studio/session/logout"
+                method="post"
+              >
+                <button type="submit" aria-label="退出创作中心" title="退出创作中心">
+                  <LogOut size={16} stroke-width={2} />
+                  <span class="sr-only">退出创作中心</span>
+                </button>
+              </form>
+            )
+          }
+        </div>
       </div>
     </div>
   </div>
@@ -158,98 +220,216 @@ const groups = [
 <style>
   .studio-navigation {
     position: fixed;
+    z-index: 30;
     inset: 0 auto 0 0;
-    z-index: 20;
     display: flex;
+    width: var(--studio-navigation-width, 252px);
     flex-direction: column;
-    width: 228px;
-    padding: 22px 18px;
-    border-right: 1px solid var(--paper-line);
-    background: color-mix(in srgb, var(--paper-bg) 96%, var(--paper-accent) 4%);
-    color: var(--paper-ink);
-    font-family: var(--font-ui);
+    padding: 18px 14px 14px;
+    border-right: 1px solid var(--studio-border, var(--paper-line));
+    background:
+      linear-gradient(
+        180deg,
+        color-mix(in srgb, var(--paper-accent) 5%, transparent),
+        transparent 34%
+      ),
+      var(--studio-navigation-bg, var(--paper-surface));
+    color: var(--studio-text, var(--paper-ink));
+    font-family: var(--studio-font-ui, var(--font-ui-cjk));
   }
+
   .studio-nav-header {
     display: flex;
     align-items: center;
     justify-content: space-between;
   }
+
   .studio-brand {
     display: flex;
-    gap: 10px;
+    min-width: 0;
+    gap: 11px;
     align-items: center;
-    padding: 0 8px 22px;
+    padding: 4px 8px 21px;
     color: inherit;
     text-decoration: none;
   }
-  .studio-mobile-toggle {
+
+  .studio-brand-mark {
+    display: grid;
+    width: 37px;
+    height: 37px;
+    flex: 0 0 auto;
+    place-items: center;
+    border-radius: 11px;
+    background: var(--studio-accent-strong, var(--paper-accent));
+    box-shadow: 0 7px 18px color-mix(in srgb, var(--paper-accent) 24%, transparent);
+    color: var(--studio-on-accent, white);
+    font: 750 0.7rem/1 var(--studio-font-meta, var(--font-meta));
+    letter-spacing: 0.04em;
+  }
+
+  .studio-brand-copy,
+  .studio-identity-copy {
+    display: grid;
+    min-width: 0;
+    gap: 2px;
+  }
+
+  .studio-brand-copy strong {
+    font-size: 0.88rem;
+    letter-spacing: 0.01em;
+  }
+
+  .studio-brand-copy small,
+  .studio-identity-copy small {
+    color: var(--studio-text-meta, var(--paper-ink-faint));
+    font-size: 0.67rem;
+  }
+
+  .studio-mobile-toggle,
+  .studio-nav-panel-close {
     display: none;
   }
+
   .studio-nav-panel {
     display: flex;
     min-height: 0;
     flex: 1;
     flex-direction: column;
     overflow-y: auto;
+    scrollbar-width: thin;
   }
-  .studio-nav-panel-close {
-    display: none;
-  }
-  .studio-brand span {
-    display: grid;
-    width: 34px;
-    height: 34px;
-    place-items: center;
-    border-radius: 11px;
-    background: var(--paper-ink);
-    color: var(--paper-bg);
-    font: 700 0.7rem/1 var(--font-meta);
-  }
+
   nav {
     display: grid;
-    gap: 24px;
+    gap: 21px;
   }
-  section {
+
+  nav section {
     display: grid;
     gap: 3px;
   }
-  section p {
-    margin: 0 9px 7px;
-    color: var(--paper-ink-soft);
-    font: 700 0.67rem/1.3 var(--font-meta);
-    letter-spacing: 0.12em;
+
+  nav section > p {
+    margin: 0 10px 7px;
+    color: var(--studio-text-meta, var(--paper-ink-faint));
+    font: 700 0.63rem/1.3 var(--studio-font-meta, var(--font-meta));
+    letter-spacing: 0.14em;
   }
-  section a,
-  .studio-nav-footer a {
+
+  nav a,
+  .studio-nav-shortcuts a {
+    position: relative;
     display: flex;
-    min-height: 44px;
+    min-height: 40px;
+    gap: 11px;
     align-items: center;
-    padding: 9px 10px;
+    padding: 8px 10px;
+    border: 1px solid transparent;
     border-radius: 9px;
-    color: var(--paper-ink-soft);
-    font-size: 0.82rem;
+    color: var(--studio-text-secondary, var(--paper-ink-soft));
+    font-size: 0.8rem;
     text-decoration: none;
+    transition:
+      background 140ms ease,
+      border-color 140ms ease,
+      color 140ms ease,
+      transform 140ms ease;
   }
-  section a:hover,
-  section a[aria-current='page'] {
-    background: color-mix(in srgb, var(--paper-accent) 12%, transparent);
-    color: var(--paper-ink);
+
+  nav a::before,
+  .studio-nav-shortcuts a::before {
+    position: absolute;
+    inset: 9px auto 9px -5px;
+    width: 3px;
+    border-radius: 99px;
+    background: var(--studio-accent-strong, var(--paper-accent));
+    content: '';
+    opacity: 0;
+    transform: scaleY(0.5);
+    transition:
+      opacity 140ms ease,
+      transform 140ms ease;
   }
-  section a[aria-current='page'] {
-    box-shadow: inset 3px 0 var(--paper-accent);
-    font-weight: 700;
+
+  nav a:hover,
+  nav a[aria-current='page'],
+  .studio-nav-shortcuts a:hover,
+  .studio-nav-shortcuts a[aria-current='page'] {
+    border-color: color-mix(in srgb, var(--paper-accent) 15%, transparent);
+    background: var(--studio-accent-soft, var(--paper-accent-soft));
+    color: var(--studio-text, var(--paper-ink));
   }
+
+  nav a[aria-current='page'],
+  .studio-nav-shortcuts a[aria-current='page'] {
+    font-weight: 650;
+  }
+
+  nav a[aria-current='page']::before,
+  .studio-nav-shortcuts a[aria-current='page']::before {
+    opacity: 1;
+    transform: scaleY(1);
+  }
+
+  nav a :global(svg),
+  .studio-nav-shortcuts a :global(svg) {
+    flex: 0 0 auto;
+    color: var(--studio-text-meta, var(--paper-ink-faint));
+  }
+
+  nav a:hover :global(svg),
+  nav a[aria-current='page'] :global(svg),
+  .studio-nav-shortcuts a:hover :global(svg),
+  .studio-nav-shortcuts a[aria-current='page'] :global(svg) {
+    color: var(--studio-accent-strong, var(--paper-accent));
+  }
+
   .studio-nav-footer {
     display: grid;
-    gap: 3px;
+    gap: 12px;
     margin-top: auto;
-    padding-top: 18px;
-    border-top: 1px solid var(--paper-line);
+    padding-top: 17px;
+    border-top: 1px solid var(--studio-border, var(--paper-line));
+  }
+
+  .studio-nav-shortcuts {
+    display: grid;
+    gap: 3px;
+  }
+
+  .studio-identity {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr) auto;
+    gap: 9px;
+    align-items: center;
+    padding: 10px;
+    border: 1px solid var(--studio-border, var(--paper-line));
+    border-radius: 12px;
+    background: color-mix(in srgb, var(--studio-surface, var(--paper-bg)) 86%, transparent);
+  }
+
+  .studio-avatar {
+    display: grid;
+    width: 31px;
+    height: 31px;
+    place-items: center;
+    border-radius: 50%;
+    background: color-mix(in srgb, var(--paper-accent) 18%, var(--studio-surface) 82%);
+    color: var(--studio-accent-strong, var(--paper-accent));
+    font: 750 0.72rem/1 var(--studio-font-meta, var(--font-meta));
+  }
+
+  .studio-identity-copy strong {
+    overflow: hidden;
+    font-size: 0.72rem;
+    text-overflow: ellipsis;
+    white-space: nowrap;
   }
 
   .studio-nav-tools {
     display: flex;
-    gap: 8px;
+    gap: 4px;
     align-items: center;
   }
 
@@ -257,165 +437,169 @@ const groups = [
     margin: 0;
   }
 
-  .studio-nav-footer button {
+  .studio-nav-tools button {
     display: inline-grid;
-    width: 44px;
-    height: 44px;
+    width: 32px;
+    height: 32px;
     place-items: center;
     padding: 0;
-    border: 1px solid var(--paper-line-strong);
+    border: 0;
     border-radius: 8px;
-    background: var(--paper-control);
-    color: var(--paper-ink);
+    background: transparent;
+    color: var(--studio-text-meta, var(--paper-ink-faint));
     font: inherit;
     cursor: pointer;
+    transition:
+      background 140ms ease,
+      color 140ms ease;
   }
 
-  .studio-nav-footer button[data-theme-toggle] {
-    border-color: var(--paper-line);
-  }
-
-  .studio-nav-footer button[data-theme-toggle]:hover {
-    border-color: var(--paper-line-strong);
-    background: var(--paper-control-hover);
-    color: var(--paper-accent);
+  .studio-nav-tools button:hover {
+    background: var(--studio-accent-soft, var(--paper-accent-soft));
+    color: var(--studio-accent-strong, var(--paper-accent));
   }
 
   .studio-nav-logout-form button:hover {
-    border-color: color-mix(in srgb, #d24d4d 52%, var(--paper-line-strong));
-    background: color-mix(in srgb, #d24d4d 10%, var(--paper-control));
-    color: color-mix(in srgb, #d24d4d 75%, var(--paper-ink));
+    background: var(--studio-danger-bg, color-mix(in srgb, #d24d4d 10%, transparent));
+    color: var(--studio-danger, #d24d4d);
   }
+
   .studio-nav-backdrop {
     display: none;
   }
+
   :global(body.studio-with-navigation) {
-    padding-left: 228px;
-    background: var(--paper-bg) !important;
-    color: var(--paper-ink) !important;
+    padding-left: var(--studio-navigation-width, 252px);
   }
-  :global(body.studio-with-navigation > main) {
-    margin-inline: auto;
-  }
+
   :global(body.studio-with-navigation .topbar) {
     display: none;
   }
-  @media (max-width: 760px) {
+
+  @media (max-width: 920px) {
     .studio-navigation {
       position: sticky;
       inset: auto;
       top: 0;
-      z-index: 40;
+      z-index: 50;
       width: 100%;
-      height: auto;
-      padding: 10px 16px;
+      height: 64px;
+      padding: 10px 18px;
       border-right: 0;
-      border-bottom: 1px solid var(--paper-line);
+      border-bottom: 1px solid var(--studio-border, var(--paper-line));
+      background: color-mix(
+        in srgb,
+        var(--studio-navigation-bg, var(--paper-surface)) 92%,
+        transparent
+      );
+      backdrop-filter: blur(18px) saturate(1.15);
     }
+
     .studio-brand {
       padding: 0;
     }
-    .studio-brand span {
-      width: 30px;
-      height: 30px;
+
+    .studio-brand-mark {
+      width: 34px;
+      height: 34px;
     }
-    .studio-mobile-toggle {
+
+    .studio-mobile-toggle,
+    .studio-nav-panel-close {
       display: inline-grid;
-      width: 44px;
-      height: 44px;
+      width: 42px;
+      height: 42px;
       place-items: center;
       padding: 0;
-      border: 1px solid var(--paper-line);
-      border-radius: 8px;
-      background: var(--paper-control);
-      color: var(--paper-ink);
+      border: 1px solid var(--studio-border, var(--paper-line));
+      border-radius: 10px;
+      background: var(--studio-surface, var(--paper-bg));
+      color: var(--studio-text, var(--paper-ink));
       cursor: pointer;
     }
-    .studio-mobile-toggle:focus-visible {
-      outline: 2px solid var(--paper-accent);
-      outline-offset: 3px;
-    }
+
     .studio-close-icon {
       display: none;
     }
+
     .studio-navigation[data-open='true'] .studio-menu-icon {
       display: none;
     }
+
     .studio-navigation[data-open='true'] .studio-close-icon {
       display: block;
     }
+
     .studio-nav-panel {
       position: fixed;
       z-index: 2;
-      top: 65px;
+      top: 76px;
       right: 12px;
       bottom: 12px;
       display: flex;
-      width: min(320px, calc(100vw - 24px));
-      padding: 20px 16px 16px;
-      border: 1px solid var(--paper-line-strong);
-      border-radius: 12px;
-      background: var(--paper-bg);
-      box-shadow: var(--paper-shadow-lift);
+      width: min(342px, calc(100vw - 24px));
+      padding: 16px;
+      border: 1px solid var(--studio-border-strong, var(--paper-line-strong));
+      border-radius: 18px;
+      background: var(--studio-navigation-bg, var(--paper-surface));
+      box-shadow: var(--studio-shadow-float, var(--paper-shadow-lift));
       opacity: 0;
       overflow: auto;
       pointer-events: none;
-      transform: translateX(calc(100% + 24px));
+      transform: translateX(8px) scale(0.985);
+      transition:
+        opacity 180ms ease,
+        transform 240ms cubic-bezier(0.2, 0.8, 0.2, 1),
+        visibility 0s linear 240ms;
+      visibility: hidden;
     }
+
     .studio-nav-panel-close {
-      display: inline-grid;
-      width: 44px;
-      height: 44px;
       flex: 0 0 auto;
-      place-items: center;
       align-self: flex-end;
-      margin: -8px -4px 8px 0;
-      padding: 0;
-      border: 1px solid var(--paper-line);
-      border-radius: 8px;
-      background: var(--paper-control);
-      color: var(--paper-ink);
-      cursor: pointer;
+      margin: -4px -4px 11px 0;
     }
-    .studio-nav-panel-close:hover {
-      border-color: var(--paper-line-strong);
-      background: var(--paper-control-hover);
-    }
-    .studio-nav-panel-close:focus-visible {
-      outline: 2px solid var(--paper-accent);
-      outline-offset: 3px;
-    }
+
     .studio-navigation[data-open='true'] .studio-nav-panel {
       opacity: 1;
       pointer-events: auto;
       transform: translateX(0);
+      transition-delay: 0s;
+      visibility: visible;
     }
-    .studio-nav-panel nav {
-      display: grid;
-    }
-    .studio-nav-footer a {
-      display: block;
-    }
-    .studio-nav-footer {
-      display: grid;
-      margin-top: auto;
-      padding-top: 18px;
-      border-top: 1px solid var(--paper-line);
-    }
+
     .studio-nav-backdrop:not([hidden]) {
       position: fixed;
       z-index: 1;
-      inset: 65px 0 0;
+      inset: 64px 0 0;
       display: block;
       width: 100%;
       border: 0;
       background: color-mix(in srgb, #0a0e0d 54%, transparent);
+      backdrop-filter: blur(2px);
     }
+
     :global(body.studio-with-navigation) {
       padding-left: 0;
     }
+
     :global(html[data-studio-navigation-open='true']) {
       overflow: hidden;
+    }
+  }
+
+  @media (max-width: 420px) {
+    .studio-brand-copy small {
+      display: none;
+    }
+  }
+
+  @media (prefers-reduced-motion: reduce), (forced-colors: active) {
+    .studio-nav-panel,
+    nav a,
+    .studio-nav-shortcuts a,
+    .studio-nav-tools button {
+      transition: none;
     }
   }
 </style>

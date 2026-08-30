@@ -88,6 +88,7 @@ const statusLabels: Record<string, string> = {
     margin: 0;
   }
   body {
+    --studio-accent-strong: color-mix(in srgb, var(--paper-accent) 72%, var(--paper-ink) 28%);
     display: grid;
     grid-template-rows: auto 1fr;
     background: var(--paper-bg);
@@ -143,12 +144,12 @@ const statusLabels: Record<string, string> = {
   }
   .status-published {
     background: color-mix(in srgb, var(--paper-accent) 22%, transparent);
-    color: color-mix(in srgb, var(--paper-accent) 80%, var(--paper-ink) 20%);
+    color: var(--studio-accent-strong);
   }
   button[aria-pressed='true'],
   .edit {
-    border-color: var(--paper-accent);
-    background: var(--paper-accent);
+    border-color: var(--studio-accent-strong);
+    background: var(--studio-accent-strong);
     color: var(--paper-bg);
   }
   .stage {

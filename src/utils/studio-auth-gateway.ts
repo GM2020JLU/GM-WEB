@@ -1,4 +1,12 @@
 import { isIP } from 'node:net';
+import {
+  createStudioGithubOAuthTransaction,
+  exchangeStudioGithubOAuthCode,
+  STUDIO_GITHUB_OAUTH_COOKIE,
+  STUDIO_GITHUB_OAUTH_TTL_SECONDS,
+  type StudioGithubOAuthConfig,
+  verifyStudioGithubOAuthTransaction,
+} from './studio-github-oauth';
 
 const encoder = new TextEncoder();
 const decoder = new TextDecoder();
@@ -9,12 +17,19 @@ export const STUDIO_SESSION_TTL_SECONDS = 12 * 60 * 60;
 const LOGIN_PATH = '/studio/login';
 const SESSION_PATH = '/api/studio/session';
 const LOGOUT_PATH = '/api/studio/session/logout';
+const GITHUB_START_PATH = '/api/studio/auth/github/start';
+const GITHUB_CALLBACK_PATH = '/api/studio/auth/github/callback';
 const VERIFY_PATH = '/internal/studio-auth/verify';
 export const STUDIO_AUTH_MAX_REQUEST_BODY_SIZE = 8_192;
 const MAX_FAILURES = 5;
 const FAILURE_WINDOW_MS = 15 * 60 * 1_000;
+const OAUTH_RATE_WINDOW_MS = 15 * 60 * 1_000;
+const OAUTH_START_LIMIT = 30;
+const OAUTH_CALLBACK_LIMIT = 20;
+const MAX_RATE_LIMIT_KEYS = 1_024;
+const MAX_CONCURRENT_GITHUB_EXCHANGES = 4;
 
-type LoginError = 'credentials' | 'rate' | 'session';
+type LoginError = 'account' | 'credentials' | 'denied' | 'github' | 'rate' | 'session';
 
 type LoginAsset = {
   body: BodyInit;
@@ -30,6 +45,8 @@ type StudioGatewayOptions = {
   now?: () => number;
   randomBytes?: (length: number) => Uint8Array;
   loginAssets?: Readonly<Record<string, LoginAsset>>;
+  github?: StudioGithubOAuthConfig;
+  passwordLogin?: 'disabled' | 'loopback' | 'public';
 };
 
 type FailureState = {
@@ -37,13 +54,21 @@ type FailureState = {
   resetAt: number;
 };
 
+type OAuthRateState = {
+  callbacks: number;
+  resetAt: number;
+  starts: number;
+};
+
 function base64Url(bytes: Uint8Array) {
   return Buffer.from(bytes).toString('base64url');
 }
 
 function decodeBase64Url(value: string) {
+  if (!value || !/^[A-Za-z0-9_-]+$/.test(value)) return null;
   try {
-    return new Uint8Array(Buffer.from(value, 'base64url'));
+    const bytes = new Uint8Array(Buffer.from(value, 'base64url'));
+    return base64Url(bytes) === value.replace(/=+$/, '') ? bytes : null;
   } catch {
     return null;
   }
@@ -62,14 +87,18 @@ async function hmac(secret: string, value: string) {
 
 export async function createStudioSessionToken(input: {
   secret: string;
+  subject?: string;
   now?: number;
   ttlSeconds?: number;
   nonce?: Uint8Array;
 }) {
   const now = input.now ?? Date.now();
+  const issuedAt = Math.floor(now / 1_000);
   const ttlSeconds = input.ttlSeconds ?? STUDIO_SESSION_TTL_SECONDS;
   const nonce = input.nonce ?? crypto.getRandomValues(new Uint8Array(18));
-  const payload = `v1.${Math.floor(now / 1_000) + ttlSeconds}.${base64Url(nonce)}`;
+  const subject = input.subject ?? 'test';
+  if (!/^[A-Za-z0-9:_-]{1,128}$/.test(subject)) throw new Error('Invalid session subject.');
+  const payload = `v2.${issuedAt + ttlSeconds}.${issuedAt}.${base64Url(encoder.encode(subject))}.${base64Url(nonce)}`;
   return `${payload}.${base64Url(await hmac(input.secret, payload))}`;
 }
 
@@ -77,20 +106,39 @@ export async function verifyStudioSessionToken(input: {
   token: string | undefined;
   secret: string;
   now?: number;
+  allowedSubjects?: ReadonlySet<string>;
 }) {
   if (!input.token || input.token.length > 512) return false;
   const parts = input.token.split('.');
-  if (parts.length !== 4 || parts[0] !== 'v1') return false;
+  if (parts.length !== 6 || parts[0] !== 'v2') return false;
 
   const expiresAt = Number(parts[1]);
-  const nonce = decodeBase64Url(parts[2] ?? '');
-  const signature = decodeBase64Url(parts[3] ?? '');
-  if (!Number.isSafeInteger(expiresAt) || nonce?.length !== 18 || signature?.length !== 32) {
+  const issuedAt = Number(parts[2]);
+  const subjectBytes = decodeBase64Url(parts[3] ?? '');
+  const nonce = decodeBase64Url(parts[4] ?? '');
+  const signature = decodeBase64Url(parts[5] ?? '');
+  if (
+    !Number.isSafeInteger(expiresAt) ||
+    !Number.isSafeInteger(issuedAt) ||
+    !subjectBytes ||
+    subjectBytes.length > 128 ||
+    nonce?.length !== 18 ||
+    signature?.length !== 32
+  ) {
     return false;
   }
-  if (expiresAt <= Math.floor((input.now ?? Date.now()) / 1_000)) return false;
+  const currentTime = Math.floor((input.now ?? Date.now()) / 1_000);
+  if (expiresAt <= currentTime || issuedAt > currentTime + 60 || issuedAt >= expiresAt)
+    return false;
+  const subject = decoder.decode(subjectBytes);
+  if (
+    !/^[A-Za-z0-9:_-]{1,128}$/.test(subject) ||
+    (input.allowedSubjects && !input.allowedSubjects.has(subject))
+  ) {
+    return false;
+  }
 
-  const payload = parts.slice(0, 3).join('.');
+  const payload = parts.slice(0, 5).join('.');
   const key = await crypto.subtle.importKey(
     'raw',
     encoder.encode(input.secret),
@@ -98,7 +146,7 @@ export async function verifyStudioSessionToken(input: {
     false,
     ['verify'],
   );
-  return crypto.subtle.verify('HMAC', key, signature, encoder.encode(payload));
+  return crypto.subtle.verify('HMAC', key, new Uint8Array(signature), encoder.encode(payload));
 }
 
 export async function verifyStudioCredentials(input: {
@@ -153,7 +201,12 @@ function escapeHtml(value: string) {
 }
 
 function requestHost(request: Request) {
-  return (request.headers.get('host') || new URL(request.url).host).split(':')[0]!.toLowerCase();
+  const rawHost = request.headers.get('host') || new URL(request.url).host;
+  try {
+    return new URL(`http://${rawHost}`).hostname.toLowerCase().replace(/^\[|\]$/g, '');
+  } catch {
+    return '';
+  }
 }
 
 function isLoopbackHost(host: string) {
@@ -203,10 +256,9 @@ function securityHeaders(contentNonce?: string) {
     'Cache-Control': 'private, no-store',
     'CDN-Cache-Control': 'no-store',
     'Permissions-Policy': 'camera=(), microphone=(), geolocation=()',
-    // Keep form submissions same-origin without forcing their Origin header to
-    // `null`. The Fetch standard applies `no-referrer` to non-CORS form POSTs,
-    // which would make our exact-origin CSRF check reject a legitimate login.
-    'Referrer-Policy': 'same-origin',
+    // Send only the origin even on same-origin redirects, so an OAuth callback's
+    // one-time code and state never become a Referer path or query string.
+    'Referrer-Policy': 'strict-origin',
     'X-Content-Type-Options': 'nosniff',
     'X-Frame-Options': 'DENY',
     'X-Robots-Tag': 'noindex, nofollow, noarchive',
@@ -230,21 +282,63 @@ function loginErrorMessage(error: LoginError | null) {
   if (error === 'rate') return '尝试次数过多，请稍后再试。';
   if (error === 'session') return '登录状态已过期，请重新验证。';
   if (error === 'credentials') return '账号或密码不正确，请重试。';
+  if (error === 'account') return '该 GitHub 账号没有访问此工作台的权限。';
+  if (error === 'denied') return '你取消了 GitHub 授权，本次未登录。';
+  if (error === 'github') return 'GitHub 验证未完成，请稍后重试。';
   return null;
 }
 
 export function renderStudioLoginPage(input: {
   nextPath: string;
   error?: LoginError | null;
+  githubEnabled?: boolean;
+  passwordEnabled?: boolean;
   nonce: string;
   username?: string;
 }) {
-  const nextPath = escapeHtml(normalizeStudioNextPath(input.nextPath));
+  const normalizedNextPath = normalizeStudioNextPath(input.nextPath);
+  const nextPath = escapeHtml(normalizedNextPath);
   const username = escapeHtml(input.username ?? 'goumin');
   const errorMessage = loginErrorMessage(input.error ?? null);
+  const githubHref = escapeHtml(
+    `${GITHUB_START_PATH}?next=${encodeURIComponent(normalizedNextPath)}`,
+  );
+  const passwordFallbackOpen =
+    Boolean(input.passwordEnabled) &&
+    (!input.githubEnabled || input.error === 'credentials' || input.error === 'rate');
   const errorMarkup = errorMessage
     ? `<div class="login-alert" role="alert"><span aria-hidden="true">!</span><p>${escapeHtml(errorMessage)}</p></div>`
     : '';
+  const passwordFormMarkup = `<form method="post" action="${SESSION_PATH}" data-login-form>
+            <input type="hidden" name="next" value="${nextPath}">
+            <label class="field">
+              <span class="field-label">用户名</span>
+              <input name="username" value="${username}" autocomplete="username" autocapitalize="none" spellcheck="false" required maxlength="80">
+            </label>
+            <label class="field">
+              <span class="field-label">密码</span>
+              <span class="input-wrap">
+                <input class="password-input" type="password" name="password" autocomplete="current-password" required maxlength="512"${passwordFallbackOpen ? ' autofocus' : ''} data-password>
+                <button class="reveal" type="button" aria-label="显示密码" aria-pressed="false" data-password-toggle>显示</button>
+              </span>
+            </label>
+            <button class="submit" type="submit" data-submit><span>使用密码登录</span></button>
+          </form>`;
+  const githubButtonMarkup = `<a class="github-button" href="${githubHref}">
+            <svg aria-hidden="true" viewBox="0 0 24 24"><path fill="currentColor" d="M12 .7a11.5 11.5 0 0 0-3.64 22.4c.58.1.79-.25.79-.56v-2.23c-3.22.7-3.9-1.37-3.9-1.37-.52-1.34-1.28-1.7-1.28-1.7-1.05-.72.08-.7.08-.7 1.16.08 1.77 1.19 1.77 1.19 1.03 1.77 2.7 1.26 3.36.96.1-.75.4-1.26.73-1.55-2.57-.3-5.27-1.29-5.27-5.69 0-1.26.45-2.28 1.19-3.09-.12-.29-.52-1.47.11-3.05 0 0 .97-.31 3.16 1.18A10.9 10.9 0 0 1 12 6.1c.98 0 1.95.13 2.87.39 2.2-1.49 3.16-1.18 3.16-1.18.63 1.58.23 2.76.11 3.05.74.81 1.19 1.83 1.19 3.09 0 4.42-2.71 5.39-5.29 5.68.42.36.79 1.07.79 2.16v3.22c0 .31.21.67.8.56A11.5 11.5 0 0 0 12 .7Z"/></svg>
+            <span>使用 GitHub 继续</span>
+            <span class="button-arrow" aria-hidden="true">→</span>
+          </a>`;
+  const passwordFallbackMarkup = `<div class="auth-divider"><span>本机恢复</span></div>
+          <details class="password-fallback"${passwordFallbackOpen ? ' open' : ''}>
+            <summary>使用后台密码</summary>
+            <div class="password-panel">${passwordFormMarkup}</div>
+          </details>`;
+  const authenticationMarkup = input.githubEnabled
+    ? `${githubButtonMarkup}${input.passwordEnabled ? passwordFallbackMarkup : ''}`
+    : input.passwordEnabled
+      ? passwordFormMarkup
+      : '<div class="login-alert" role="alert"><span aria-hidden="true">!</span><p>登录服务暂未配置，请联系管理员。</p></div>';
 
   return `<!doctype html>
 <html lang="zh-CN" data-palette="blue-soft">
@@ -258,7 +352,7 @@ export function renderStudioLoginPage(input: {
     <style nonce="${input.nonce}">
       @font-face{font-family:"Maple Mono";src:url('/studio/login-assets/maple-mono.woff2') format('woff2');font-style:normal;font-weight:400 700;font-display:swap}
       @font-face{font-family:"Studio CN";src:url('/studio/login-assets/studio-cn.woff2') format('woff2');font-style:normal;font-weight:400;font-display:swap}
-      :root{--paper-bg:#fdfdf9;--paper-bg-deep:#f3f5ef;--paper-surface:#fffffc;--paper-surface-muted:#f7f8f3;--paper-line:rgba(31,35,40,.075);--paper-line-strong:rgba(31,35,40,.12);--paper-ink:#272d28;--paper-ink-soft:#667066;--paper-ink-faint:#90998f;--paper-control:rgba(246,248,245,.76);--paper-control-hover:rgba(238,243,237,.92);--paper-accent:#637da3;--paper-accent-soft:#edf2f8;--accent-dark:#405b80;--paper-rule:rgba(63,88,125,.045);--paper-shadow-lift:0 1px 2px rgba(31,35,40,.04),0 18px 48px rgba(31,35,40,.07);--danger:#b84b4b;--danger-bg:rgba(184,75,75,.08);--font-body:"Maple Mono","Studio CN","PingFang SC","Microsoft YaHei",ui-monospace,monospace;--font-page-heading:"Studio CN","Maple Mono","PingFang SC","Microsoft YaHei",sans-serif;color-scheme:light}
+      :root{--paper-bg:#fdfdf9;--paper-bg-deep:#f3f5ef;--paper-surface:#fffffc;--paper-surface-muted:#f7f8f3;--paper-line:rgba(31,35,40,.075);--paper-line-strong:rgba(31,35,40,.12);--paper-ink:#272d28;--paper-ink-soft:#667066;--paper-ink-faint:#6d776d;--paper-control:rgba(246,248,245,.76);--paper-control-hover:rgba(238,243,237,.92);--paper-accent:#637da3;--paper-accent-soft:#edf2f8;--accent-dark:#405b80;--paper-rule:rgba(63,88,125,.045);--paper-shadow-lift:0 1px 2px rgba(31,35,40,.04),0 18px 48px rgba(31,35,40,.07);--danger:#b84b4b;--danger-bg:rgba(184,75,75,.08);--font-body:"Maple Mono","Studio CN","PingFang SC","Microsoft YaHei",ui-monospace,monospace;--font-page-heading:"Studio CN","Maple Mono","PingFang SC","Microsoft YaHei",sans-serif;color-scheme:light}
       :root[data-theme='dark']{--paper-bg:#171b18;--paper-bg-deep:#111411;--paper-surface:#202620;--paper-surface-muted:#273026;--paper-line:rgba(217,229,213,.08);--paper-line-strong:rgba(217,229,213,.14);--paper-ink:#eaebe5;--paper-ink-soft:#b5beb1;--paper-ink-faint:#899487;--paper-control:rgba(42,51,43,.72);--paper-control-hover:rgba(52,64,53,.88);--paper-accent:#a8bddb;--paper-accent-soft:#29364a;--accent-dark:#d2e1f6;--paper-rule:rgba(204,222,246,.042);--paper-shadow-lift:0 1px 2px rgba(0,0,0,.16),0 18px 48px rgba(0,0,0,.2);--danger:#ef9999;--danger-bg:rgba(210,77,77,.13);color-scheme:dark}
       *{box-sizing:border-box}
       html{min-width:320px;background:var(--paper-bg)}
@@ -291,6 +385,23 @@ export function renderStudioLoginPage(input: {
       .login-alert{display:grid;grid-template-columns:24px 1fr;gap:10px;align-items:start;margin:0 0 20px;padding:11px 12px;border:1px solid color-mix(in srgb,var(--danger) 52%,var(--paper-line));border-radius:9px;background:var(--danger-bg);color:var(--danger)}
       .login-alert span{display:grid;width:21px;height:21px;place-items:center;border:1px solid currentColor;border-radius:50%;font-size:.7rem;font-weight:700}
       .login-alert p{margin:0;font-size:.78rem;line-height:1.5}
+      .github-button{display:grid;height:50px;grid-template-columns:22px 1fr 22px;align-items:center;gap:11px;padding:0 16px;border:1px solid var(--paper-ink);border-radius:10px;background:var(--paper-ink);box-shadow:0 8px 20px color-mix(in srgb,var(--paper-ink) 14%,transparent);color:var(--paper-bg);font-size:.82rem;font-weight:700;text-align:center;text-decoration:none;transition:transform 140ms ease,box-shadow 180ms ease,background 180ms ease}
+      .github-button svg{width:21px;height:21px}
+      .github-button .button-arrow{font-size:1rem;transition:transform 180ms ease}
+      .github-button:hover{box-shadow:0 11px 26px color-mix(in srgb,var(--paper-ink) 20%,transparent);transform:translateY(-1px)}
+      .github-button:hover .button-arrow{transform:translateX(3px)}
+      .github-button:active{box-shadow:none;transform:translateY(0) scale(.99)}
+      :root[data-theme='dark'] .github-button{border-color:#eef1eb;background:#eef1eb;color:#151915}
+      .auth-divider{display:grid;grid-template-columns:1fr auto 1fr;align-items:center;gap:11px;margin:22px 0 14px;color:var(--paper-ink-faint);font-size:.67rem}
+      .auth-divider::before,.auth-divider::after{height:1px;background:var(--paper-line-strong);content:''}
+      .password-fallback{border:1px solid transparent;border-radius:10px;transition:border-color 180ms ease,background 180ms ease}
+      .password-fallback[open]{border-color:var(--paper-line);background:var(--paper-surface-muted)}
+      .password-fallback summary{display:flex;min-height:42px;align-items:center;justify-content:center;gap:7px;border-radius:9px;color:var(--paper-ink-soft);font-size:.74rem;font-weight:600;list-style:none;cursor:pointer;transition:background 180ms ease,color 180ms ease}
+      .password-fallback summary::-webkit-details-marker{display:none}
+      .password-fallback summary::after{content:'+';font-size:.95rem;font-weight:400;transition:transform 180ms ease}
+      .password-fallback[open] summary::after{transform:rotate(45deg)}
+      .password-fallback summary:hover{background:var(--paper-control);color:var(--paper-accent)}
+      .password-panel{padding:6px 16px 17px}
       form{display:grid;gap:18px}
       .field{display:grid;gap:7px}
       .field-label{color:var(--paper-ink-soft);font-size:.74rem;font-weight:600}
@@ -307,7 +418,7 @@ export function renderStudioLoginPage(input: {
       .submit:hover{border-color:var(--paper-accent);background:var(--paper-accent)}
       .submit:active{transform:scale(.985)}
       .submit:disabled{cursor:wait;opacity:.7}
-      .security-note{display:flex;align-items:center;justify-content:center;gap:7px;margin:2px 0 0;color:var(--paper-ink-faint);font-size:.7rem}
+      .security-note{display:flex;align-items:center;justify-content:center;gap:7px;margin:18px 0 0;color:var(--paper-ink-faint);font-size:.68rem}
       .security-note svg{width:14px;height:14px;stroke:currentColor;fill:none;stroke-width:1.8}
       :focus-visible{outline:2px solid var(--paper-accent);outline-offset:3px}
       input:focus-visible{outline:0}
@@ -344,24 +455,10 @@ export function renderStudioLoginPage(input: {
         <section class="login-card" aria-labelledby="login-title">
           <p class="card-kicker">IDENTITY CHECK</p>
           <h2 id="login-title">登录创作中心</h2>
-          <p class="card-description">使用后台账号继续进入你的工作台。</p>
+          <p class="card-description">验证身份后，继续进入你的私人工作台。</p>
           ${errorMarkup}
-          <form method="post" action="${SESSION_PATH}" data-login-form>
-            <input type="hidden" name="next" value="${nextPath}">
-            <label class="field">
-              <span class="field-label">用户名</span>
-              <input name="username" value="${username}" autocomplete="username" autocapitalize="none" spellcheck="false" required maxlength="80">
-            </label>
-            <label class="field">
-              <span class="field-label">密码</span>
-              <span class="input-wrap">
-                <input class="password-input" type="password" name="password" autocomplete="current-password" required maxlength="512" autofocus data-password>
-                <button class="reveal" type="button" aria-label="显示密码" aria-pressed="false" data-password-toggle>显示</button>
-              </span>
-            </label>
-            <button class="submit" type="submit" data-submit><span>进入创作中心</span></button>
-            <p class="security-note"><svg aria-hidden="true" viewBox="0 0 24 24"><rect x="5" y="10" width="14" height="10" rx="2"/><path d="M8 10V7a4 4 0 0 1 8 0v3"/></svg>仅限授权访问 · 会话将在 12 小时后失效</p>
-          </form>
+          ${authenticationMarkup}
+          <p class="security-note"><svg aria-hidden="true" viewBox="0 0 24 24"><rect x="5" y="10" width="14" height="10" rx="2"/><path d="M8 10V7a4 4 0 0 1 8 0v3"/></svg>仅限授权访问 · 会话将在 12 小时后失效</p>
         </section>
       </main>
       <footer class="footer"><span class="status">STUDIO GATEWAY ONLINE</span><span>PRIVATE / NO INDEX</span></footer>
@@ -381,7 +478,14 @@ function redirect(location: string, headers = new Headers()) {
 
 function errorFromUrl(url: URL): LoginError | null {
   const error = url.searchParams.get('error');
-  return error === 'credentials' || error === 'rate' || error === 'session' ? error : null;
+  return error === 'account' ||
+    error === 'credentials' ||
+    error === 'denied' ||
+    error === 'github' ||
+    error === 'rate' ||
+    error === 'session'
+    ? error
+    : null;
 }
 
 function clientKey(request: Request) {
@@ -455,13 +559,73 @@ function unauthorizedVerificationResponse(request: Request, hasSessionCookie: bo
 
 export function createStudioAuthService(options: StudioGatewayOptions) {
   const publicHost = (options.publicHost ?? 'studio.goumin.work').toLowerCase();
+  const passwordLogin = options.passwordLogin ?? 'loopback';
   const now = options.now ?? Date.now;
   const randomBytes =
     options.randomBytes ?? ((length: number) => crypto.getRandomValues(new Uint8Array(length)));
   const sessionTtlSeconds = options.sessionTtlSeconds ?? STUDIO_SESSION_TTL_SECONDS;
   const failures = new Map<string, FailureState>();
+  const oauthAttempts = new Map<string, OAuthRateState>();
+  const consumedGithubStates = new Map<string, number>();
+  let activeGithubExchanges = 0;
 
-  const loginResponse = (url: URL) => {
+  const passwordLoginAllowed = (request: Request) =>
+    passwordLogin === 'public' ||
+    (passwordLogin === 'loopback' && isLoopbackHost(requestHost(request)));
+
+  const consumeOAuthAttempt = (request: Request, kind: 'callback' | 'start') => {
+    const key = clientKey(request);
+    const currentTime = now();
+    for (const [candidate, state] of oauthAttempts) {
+      if (state.resetAt <= currentTime) oauthAttempts.delete(candidate);
+    }
+
+    let state = oauthAttempts.get(key);
+    if (!state) {
+      if (oauthAttempts.size >= MAX_RATE_LIMIT_KEYS) {
+        return Math.ceil(OAUTH_RATE_WINDOW_MS / 1_000);
+      }
+      state = { callbacks: 0, resetAt: currentTime + OAUTH_RATE_WINDOW_MS, starts: 0 };
+      oauthAttempts.set(key, state);
+    }
+
+    const limit = kind === 'start' ? OAUTH_START_LIMIT : OAUTH_CALLBACK_LIMIT;
+    const attempts = kind === 'start' ? state.starts : state.callbacks;
+    if (attempts >= limit) {
+      return Math.max(1, Math.ceil((state.resetAt - currentTime) / 1_000));
+    }
+    if (kind === 'start') state.starts += 1;
+    else state.callbacks += 1;
+    return 0;
+  };
+
+  const setSessionCookie = (headers: Headers, token: string, maxAge: number) => {
+    headers.append(
+      'Set-Cookie',
+      `${STUDIO_SESSION_COOKIE}=${token}; Path=/; Max-Age=${maxAge}; HttpOnly; Secure; SameSite=Lax`,
+    );
+  };
+
+  const clearGithubOAuthCookie = (headers: Headers) => {
+    headers.append(
+      'Set-Cookie',
+      `${STUDIO_GITHUB_OAUTH_COOKIE}=; Path=/; Max-Age=0; HttpOnly; Secure; SameSite=Lax`,
+    );
+  };
+
+  const githubFailureResponse = (
+    error: Extract<LoginError, 'account' | 'denied' | 'github' | 'rate'>,
+    nextPath: string,
+    headers = securityHeaders(),
+  ) => {
+    clearGithubOAuthCookie(headers);
+    return redirect(
+      `${LOGIN_PATH}?error=${error}&next=${encodeURIComponent(normalizeStudioNextPath(nextPath))}`,
+      headers,
+    );
+  };
+
+  const loginResponse = (request: Request, url: URL) => {
     const contentNonce = nonce(randomBytes);
     const headers = securityHeaders(contentNonce);
     headers.set('Content-Type', 'text/html; charset=utf-8');
@@ -470,8 +634,10 @@ export function createStudioAuthService(options: StudioGatewayOptions) {
     return new Response(
       renderStudioLoginPage({
         error,
+        githubEnabled: Boolean(options.github) && !isLoopbackHost(requestHost(request)),
         nextPath: normalizeStudioNextPath(url.searchParams.get('next')),
         nonce: contentNonce,
+        passwordEnabled: passwordLoginAllowed(request),
       }),
       { headers, status: error === 'rate' ? 429 : 200 },
     );
@@ -491,7 +657,9 @@ export function createStudioAuthService(options: StudioGatewayOptions) {
         },
       });
     }
-    if (request.method === 'GET' && url.pathname === LOGIN_PATH) return loginResponse(url);
+    if (request.method === 'GET' && url.pathname === LOGIN_PATH) {
+      return loginResponse(request, url);
+    }
 
     if (request.method === 'GET' && url.pathname === '/internal/studio-auth/health') {
       return new Response(null, { status: 204 });
@@ -511,7 +679,118 @@ export function createStudioAuthService(options: StudioGatewayOptions) {
       });
     }
 
+    if (request.method === 'GET' && url.pathname === GITHUB_START_PATH) {
+      const nextPath = normalizeStudioNextPath(
+        url.searchParams.getAll('next').length === 1 ? url.searchParams.get('next') : null,
+      );
+      if (!options.github) return githubFailureResponse('github', nextPath);
+      const retryAfter = consumeOAuthAttempt(request, 'start');
+      if (retryAfter) {
+        const headers = securityHeaders();
+        headers.set('Retry-After', String(retryAfter));
+        return githubFailureResponse('rate', nextPath, headers);
+      }
+
+      try {
+        const transaction = await createStudioGithubOAuthTransaction({
+          callbackUrl: options.github.callbackUrl,
+          clientId: options.github.clientId,
+          nextPath,
+          now: now(),
+          randomBytes,
+          secret: options.sessionSecret,
+        });
+        const headers = securityHeaders();
+        headers.append(
+          'Set-Cookie',
+          `${STUDIO_GITHUB_OAUTH_COOKIE}=${transaction.cookieValue}; Path=/; Max-Age=${STUDIO_GITHUB_OAUTH_TTL_SECONDS}; HttpOnly; Secure; SameSite=Lax`,
+        );
+        return redirect(transaction.authorizeUrl, headers);
+      } catch {
+        return githubFailureResponse('github', nextPath);
+      }
+    }
+
+    if (request.method === 'GET' && url.pathname === GITHUB_CALLBACK_PATH) {
+      const fallbackNextPath = '/studio';
+      if (!options.github) return githubFailureResponse('github', fallbackNextPath);
+      const retryAfter = consumeOAuthAttempt(request, 'callback');
+      if (retryAfter) {
+        const headers = securityHeaders();
+        headers.set('Retry-After', String(retryAfter));
+        return githubFailureResponse('rate', fallbackNextPath, headers);
+      }
+      if (
+        ['code', 'error', 'state'].some((key) => url.searchParams.getAll(key).length > 1) ||
+        (url.searchParams.has('code') && url.searchParams.has('error'))
+      ) {
+        return githubFailureResponse('github', fallbackNextPath);
+      }
+
+      const transaction = await verifyStudioGithubOAuthTransaction({
+        cookieValue: parseCookies(request.headers.get('cookie')).get(STUDIO_GITHUB_OAUTH_COOKIE),
+        now: now(),
+        secret: options.sessionSecret,
+        state: url.searchParams.get('state'),
+      });
+      if (!transaction) return githubFailureResponse('github', fallbackNextPath);
+
+      const currentTime = now();
+      for (const [state, expiresAt] of consumedGithubStates) {
+        if (expiresAt <= currentTime) consumedGithubStates.delete(state);
+      }
+      if (consumedGithubStates.has(transaction.state)) {
+        return githubFailureResponse('github', transaction.nextPath);
+      }
+      if (consumedGithubStates.size >= 1_024) {
+        const headers = securityHeaders();
+        headers.set('Retry-After', '60');
+        return githubFailureResponse('rate', transaction.nextPath, headers);
+      }
+      consumedGithubStates.set(transaction.state, transaction.expiresAt * 1_000);
+
+      if (url.searchParams.has('error')) {
+        return githubFailureResponse('denied', transaction.nextPath);
+      }
+      const code = url.searchParams.get('code');
+      if (!code) return githubFailureResponse('github', transaction.nextPath);
+      if (activeGithubExchanges >= MAX_CONCURRENT_GITHUB_EXCHANGES) {
+        const headers = securityHeaders();
+        headers.set('Retry-After', '5');
+        return githubFailureResponse('rate', transaction.nextPath, headers);
+      }
+
+      activeGithubExchanges += 1;
+      try {
+        const identity = await exchangeStudioGithubOAuthCode({
+          code,
+          config: options.github,
+          verifier: transaction.verifier,
+        });
+        if (identity.id !== options.github.allowedUserId) {
+          return githubFailureResponse('account', transaction.nextPath);
+        }
+
+        const token = await createStudioSessionToken({
+          nonce: randomBytes(18),
+          now: currentTime,
+          secret: options.sessionSecret,
+          subject: `github:${identity.id}`,
+          ttlSeconds: sessionTtlSeconds,
+        });
+        const headers = securityHeaders();
+        clearGithubOAuthCookie(headers);
+        setSessionCookie(headers, token, sessionTtlSeconds);
+        return redirect(normalizeStudioNextPath(transaction.nextPath), headers);
+      } catch {
+        return githubFailureResponse('github', transaction.nextPath);
+      } finally {
+        activeGithubExchanges -= 1;
+      }
+    }
+
     if (request.method === 'POST' && url.pathname === SESSION_PATH) {
+      if (!passwordLoginAllowed(request)) return privateTextResponse('Not Found', 404);
       if (!isAllowedFormOrigin(request, publicHost)) return privateTextResponse('Forbidden', 403);
       if (
         request.headers.get('content-type')?.split(';')[0]?.trim().toLowerCase() !==
@@ -572,23 +851,20 @@ export function createStudioAuthService(options: StudioGatewayOptions) {
         nonce: randomBytes(18),
         now: currentTime,
         secret: options.sessionSecret,
+        subject: 'password:local',
         ttlSeconds: sessionTtlSeconds,
       });
       const headers = securityHeaders();
-      headers.append(
-        'Set-Cookie',
-        `${STUDIO_SESSION_COOKIE}=${token}; Path=/; Max-Age=${sessionTtlSeconds}; HttpOnly; Secure; SameSite=Strict`,
-      );
+      clearGithubOAuthCookie(headers);
+      setSessionCookie(headers, token, sessionTtlSeconds);
       return redirect(nextPath, headers);
     }
 
     if (request.method === 'POST' && url.pathname === LOGOUT_PATH) {
       if (!isAllowedFormOrigin(request, publicHost)) return privateTextResponse('Forbidden', 403);
       const headers = securityHeaders();
-      headers.append(
-        'Set-Cookie',
-        `${STUDIO_SESSION_COOKIE}=; Path=/; Max-Age=0; HttpOnly; Secure; SameSite=Strict`,
-      );
+      clearGithubOAuthCookie(headers);
+      setSessionCookie(headers, '', 0);
       return redirect(LOGIN_PATH, headers);
     }
 
@@ -597,7 +873,11 @@ export function createStudioAuthService(options: StudioGatewayOptions) {
     }
 
     const token = parseCookies(request.headers.get('cookie')).get(STUDIO_SESSION_COOKIE);
+    const allowedSubjects = new Set<string>();
+    if (options.github) allowedSubjects.add(`github:${options.github.allowedUserId}`);
+    if (passwordLoginAllowed(request)) allowedSubjects.add('password:local');
     const authenticated = await verifyStudioSessionToken({
+      allowedSubjects,
       now: now(),
       secret: options.sessionSecret,
       token,

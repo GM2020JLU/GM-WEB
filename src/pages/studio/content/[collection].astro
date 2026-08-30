@@ -2,6 +2,7 @@
 import { getCollection } from 'astro:content';
 import BaseHead from '../../../components/BaseHead.astro';
 import StudioNavigation from '../../../components/studio/StudioNavigation.astro';
+import StudioPageHeader from '../../../components/studio/StudioPageHeader.astro';
 import { getPublicationStatus } from '../../../utils/content-metrics';
 import { hasContentFiles } from '../../../utils/content-source';
 import { getThemePalette } from '../../../data/site';
@@ -77,23 +78,22 @@ const palette = await getThemePalette();
   <body class="studio-with-navigation">
     <StudioNavigation />
     <main class="module-shell">
-      <header>
-        <div><p>CONTENT MODULE</p><h1>{definition.label}</h1><span>{definition.note}</span></div>
-        <div class="actions">
-          {
-            collection !== 'pages' && (
+      <StudioPageHeader
+        eyebrow="CONTENT / MODULE"
+        title={definition.label}
+        description={definition.note}
+      >
+        {
+          canCreate && (
+            <div slot="actions" class="actions">
               <a href={`/studio/import?collection=${collection}`}>导入 MD</a>
-            )
-          }
-          {
-            canCreate && (
               <a class="primary" href={`/studio/edit/${sourceCollection}/new?new=1`}>
                 新建
               </a>
-            )
-          }
-        </div>
-      </header>
+            </div>
+          )
+        }
+      </StudioPageHeader>
       <section class="toolbar">
         <div role="group" aria-label="状态筛选">
           <button type="button" data-filter="all" aria-pressed="true">全部 {items.length}</button>
@@ -208,7 +208,7 @@ const palette = await getThemePalette();
   }
   header p {
     margin: 0;
-    color: var(--paper-accent);
+    color: var(--studio-accent-strong);
     font: 700 0.68rem var(--font-meta);
     letter-spacing: 0.14em;
   }
@@ -292,7 +292,7 @@ const palette = await getThemePalette();
   }
   .status.published {
     background: color-mix(in srgb, var(--paper-accent) 14%, transparent);
-    color: var(--paper-accent);
+    color: var(--studio-accent-strong);
   }
   .empty {
     padding: 70px 20px;

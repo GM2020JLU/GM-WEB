@@ -59,13 +59,6 @@ function getDayHref(day: HeatmapDay) {
 
   return day.posts[0]?.href;
 }
-
-function getSnakeStep(dayIndex: number) {
-  const weekIndex = Math.floor(dayIndex / 7);
-  const weekdayIndex = dayIndex % 7;
-
-  return weekIndex * 7 + (weekIndex % 2 === 0 ? weekdayIndex : 6 - weekdayIndex);
-}
 ---
 
 <article class="glass-card heatmap-card" data-heatmap-snake={hasSnake ? 'true' : undefined}>
@@ -115,15 +108,14 @@ function getSnakeStep(dayIndex: number) {
     <div class="heatmap-cells" style={`--week-count: ${heatmap.weeks};`}>
       {
         heatmap.days.map((day, dayIndex) => {
-          const snakeStep = getSnakeStep(dayIndex);
           const isSnakeTarget = dayIndex === latestActiveDayIndex;
-          const snakePathStep = hasSnake ? snakeStep : undefined;
+          const snakeCellIndex = hasSnake ? dayIndex : undefined;
 
           if (day.isFuture) {
             return (
               <span
                 class="heatmap-cell future-cell"
-                data-snake-step={snakePathStep}
+                data-snake-cell={snakeCellIndex}
                 aria-hidden="true"
               />
             );
@@ -141,7 +133,7 @@ function getSnakeStep(dayIndex: number) {
           return href ? (
             <a
               class="cell-link"
-              data-snake-step={snakePathStep}
+              data-snake-cell={snakeCellIndex}
               data-snake-target={isSnakeTarget ? 'true' : undefined}
               href={href}
               aria-label={getDayTitle(day)}
@@ -151,7 +143,7 @@ function getSnakeStep(dayIndex: number) {
           ) : (
             <span
               class="cell-link static-cell"
-              data-snake-step={snakePathStep}
+              data-snake-cell={snakeCellIndex}
               data-snake-target={isSnakeTarget ? 'true' : undefined}
               aria-label={getDayTitle(day)}
             >
@@ -175,6 +167,8 @@ function getSnakeStep(dayIndex: number) {
 </article>
 
 <script>
+  import { createRandomHeatmapWalk } from '../../utils/heatmap-snake-route';
+
   const SNAKE_PART_COUNT = 4;
   const SNAKE_PART_SCALES = [0.9, 0.769, 0.675, 0.619];
   const SNAKE_STEP_DURATION_MS = 82;
@@ -211,6 +205,7 @@ function getSnakeStep(dayIndex: number) {
       let startedAt = 0;
       let pausedElapsed = 0;
       let geometry: SnakeGeometry | null = null;
+      let currentWalk: number[] | null = null;
       let geometryDirty = true;
       let isVisible = false;
       let isTargetActive = false;
@@ -223,48 +218,38 @@ function getSnakeStep(dayIndex: number) {
         reducedMotionQuery.matches || forcedColorsQuery.matches;
 
       const measureGeometry = (): SnakeGeometry | null => {
-        const pathCells = Array.from(grid.querySelectorAll<HTMLElement>('[data-snake-step]')).sort(
-          (left, right) => Number(left.dataset.snakeStep) - Number(right.dataset.snakeStep),
+        const pathCells = Array.from(grid.querySelectorAll<HTMLElement>('[data-snake-cell]')).sort(
+          (left, right) => Number(left.dataset.snakeCell) - Number(right.dataset.snakeCell),
         );
 
         if (pathCells.length === 0) return null;
 
+        const rowCount = 7;
+        const columnCount = Math.ceil(pathCells.length / rowCount);
+        currentWalk ??= createRandomHeatmapWalk(columnCount, rowCount);
+
         const gridRect = grid.getBoundingClientRect();
         const cellRects = pathCells.map((cell) => cell.getBoundingClientRect());
-        const points = cellRects.map((rect) => ({
+        const cellPoints = cellRects.map((rect) => ({
           x: rect.left - gridRect.left + rect.width / 2,
           y: rect.top - gridRect.top + rect.height / 2,
         }));
-        const targetPointIndex = pathCells.findIndex((cell) => cell.dataset.snakeTarget === 'true');
+        const points = currentWalk.map((cellIndex) => cellPoints[cellIndex]);
+        const targetPointIndex = currentWalk.findIndex(
+          (cellIndex) => pathCells[cellIndex]?.dataset.snakeTarget === 'true',
+        );
         const firstPoint = points[0];
         const firstRect = cellRects[0];
         const gridStyle = window.getComputedStyle(grid);
-        const columnGap = Number.parseFloat(gridStyle.columnGap) || 0;
         const rowGap = Number.parseFloat(gridStyle.rowGap) || 0;
-        const columnPitch = firstRect.width + columnGap;
         const rowPitch = firstRect.height + rowGap;
-        const nextPoint = points[1];
-        const inward = nextPoint
-          ? { x: nextPoint.x - firstPoint.x, y: nextPoint.y - firstPoint.y }
-          : {
-              x: 0,
-              y: firstPoint.y <= gridRect.height / 2 ? rowPitch : -rowPitch,
-            };
-        const entryPoint = {
-          x: firstPoint.x - inward.x,
-          y: firstPoint.y - inward.y,
-        };
-        const bodyDirection = entryPoint.x <= gridRect.width / 2 ? 1 : -1;
+        const startsAtTop = currentWalk[0] % rowCount === 0;
+        const outward = { x: 0, y: startsAtTop ? -rowPitch : rowPitch };
         const entryPose = Array.from({ length: SNAKE_PART_COUNT }, (_, index) => ({
-          x: entryPoint.x + bodyDirection * columnPitch * (SNAKE_PART_COUNT - index - 1),
-          y: entryPoint.y,
+          x: firstPoint.x + outward.x * (SNAKE_PART_COUNT - index),
+          y: firstPoint.y + outward.y * (SNAKE_PART_COUNT - index),
         }));
         const lastPoint = points.at(-1)!;
-        const previousPoint = points.at(-2) ?? firstPoint;
-        const outward = {
-          x: lastPoint.x - previousPoint.x,
-          y: lastPoint.y - previousPoint.y,
-        };
         const exitPose = Array.from({ length: SNAKE_PART_COUNT }, (_, index) => ({
           x: lastPoint.x + outward.x * (index + 1),
           y: lastPoint.y + outward.y * (index + 1),
@@ -297,7 +282,14 @@ function getSnakeStep(dayIndex: number) {
         if (animationFrame !== null) {
           if (geometry) {
             const movementDuration = geometry.moveCount * SNAKE_STEP_DURATION_MS;
-            pausedElapsed = Math.max(0, performance.now() - startedAt) % movementDuration;
+            const elapsed = Math.max(0, performance.now() - startedAt);
+            if (elapsed >= movementDuration) {
+              currentWalk = null;
+              geometry = null;
+              pausedElapsed = 0;
+            } else {
+              pausedElapsed = elapsed;
+            }
           }
           window.cancelAnimationFrame(animationFrame);
         }
@@ -323,9 +315,23 @@ function getSnakeStep(dayIndex: number) {
           return;
         }
 
-        const elapsed = Math.max(0, now - startedAt);
+        let elapsed = Math.max(0, now - startedAt);
         const movementDuration = geometry.moveCount * SNAKE_STEP_DURATION_MS;
-        const movementProgress = (elapsed % movementDuration) / SNAKE_STEP_DURATION_MS;
+
+        if (elapsed >= movementDuration) {
+          currentWalk = null;
+          geometry = measureGeometry();
+          startedAt = now;
+          pausedElapsed = 0;
+          elapsed = 0;
+
+          if (!geometry) {
+            stopSnake();
+            return;
+          }
+        }
+
+        const movementProgress = elapsed / SNAKE_STEP_DURATION_MS;
         const step = Math.floor(movementProgress);
         const stepProgress = movementProgress - step;
         const headIndex = SNAKE_PART_COUNT - 1 + step;

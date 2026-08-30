@@ -123,6 +123,7 @@ describe('Studio 登录跳转', () => {
     expect(response.status).toBe(200);
     expect(response.headers.get('content-security-policy')).toContain("default-src 'none'");
     expect(response.headers.get('cache-control')).toBe('private, no-store');
+    expect(response.headers.get('referrer-policy')).toBe('same-origin');
     expect(html).toContain('回来继续创作。');
     expect(html).toContain('账号或密码不正确，请重试。');
     expect(html).toContain('data-theme-toggle');
@@ -194,6 +195,14 @@ describe('Studio 登录跳转', () => {
       }),
     );
     expect(missingOrigin.status).toBe(403);
+    const opaqueOrigin = await service(
+      request('/api/studio/session', {
+        body: new URLSearchParams({ password, username: 'goumin' }),
+        headers: { Origin: 'null' },
+        method: 'POST',
+      }),
+    );
+    expect(opaqueOrigin.status).toBe(403);
 
     for (let attempt = 0; attempt < 5; attempt++) {
       const failed = await service(

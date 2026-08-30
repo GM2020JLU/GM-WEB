@@ -203,7 +203,10 @@ function securityHeaders(contentNonce?: string) {
     'Cache-Control': 'private, no-store',
     'CDN-Cache-Control': 'no-store',
     'Permissions-Policy': 'camera=(), microphone=(), geolocation=()',
-    'Referrer-Policy': 'no-referrer',
+    // Keep form submissions same-origin without forcing their Origin header to
+    // `null`. The Fetch standard applies `no-referrer` to non-CORS form POSTs,
+    // which would make our exact-origin CSRF check reject a legitimate login.
+    'Referrer-Policy': 'same-origin',
     'X-Content-Type-Options': 'nosniff',
     'X-Frame-Options': 'DENY',
     'X-Robots-Tag': 'noindex, nofollow, noarchive',

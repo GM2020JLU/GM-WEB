@@ -21,11 +21,7 @@ const { home, profile, site } = await getSiteConfig();
     </Fragment>
 
     <Fragment slot="intro">
-      <IntroCard intro={home.intro} quote={home.quote} email={profile.email} role={profile.role} />
-    </Fragment>
-
-    <Fragment slot="featured">
-      <FeaturedCard />
+      <IntroCard intro={home.intro} quote={home.quote} email={profile.email} />
     </Fragment>
 
     <Fragment slot="latest">
@@ -40,6 +36,7 @@ const { home, profile, site } = await getSiteConfig();
     </Fragment>
 
     <Fragment slot="navigation">
+      <FeaturedCard />
       <NavigationCard items={home.navigation} />
     </Fragment>
 

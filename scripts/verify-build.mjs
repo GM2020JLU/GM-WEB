@@ -160,7 +160,7 @@ for (const marker of [
   'Bootloader',
   'K3 Pico-ITX 风扇控制与热管理调试',
   'href="/projects/k3-pico-itx-fan-control/"',
-  'SELECTED WORK',
+  '>精选</h2>',
   '查看项目案例',
   '邮件交流',
 ]) {

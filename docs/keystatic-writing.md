@@ -15,8 +15,21 @@ GitHub 登录。
 
 ## 线上写作
 
-生产环境使用 GitHub 模式。首次需要在本地以 GitHub 模式启动，然后在
-`/keystatic` 按官方引导创建 GitHub App：
+正式入口是 `https://studio.goumin.work/`，由 Mac 上的 Astro 服务以本地存储模式运行。
+整个主机先经过 Caddy Basic Auth：用户名为 `goumin`，强随机密码只保存在 Mac 用户专属
+的 `0600` 凭据文件，不写入仓库或环境文件。需要取回密码时在可信终端执行：
+
+```bash
+ssh mac 'cat ~/.config/goumin-work/studio-basic-auth-password'
+```
+
+Cloudflare Access 仍是推荐的上层身份边界；Caddy 验证作为兜底，确保 Access 尚未配置或
+误配置时，本地写入 API 也不会直接暴露。认证后，工作台提供内容新建、Markdown 导入、
+编辑、真实预览、素材、分类、批量操作、版本历史与发布状态。保存会写入 Mac 工作副本，
+本地发布流程完成校验、提交和推送后，由 Vercel 的 Git 集成部署公开站。
+
+需要切换到 GitHub 存储模式时，首次在本地以 GitHub 模式启动，然后在 `/keystatic`
+按官方引导创建 GitHub App：
 
 ```bash
 PUBLIC_KEYSTATIC_STORAGE_KIND=github bun run dev
@@ -35,10 +48,8 @@ Git：
 - `KEYSTATIC_SECRET`
 - `PUBLIC_KEYSTATIC_GITHUB_APP_SLUG`
 
-配置完成后，打开 `https://studio.goumin.work/`。工作台提供内容新建、Markdown 导入、
-编辑、真实预览、素材、分类、批量操作、版本历史与发布状态。只有对
-`GM2020JLU/GM-WEB` 有写权限的 GitHub 用户才能登录和保存。保存会更新 GitHub
-中的 Markdown/MDX 文件；Vercel 连接该仓库后会自动重新部署。
+GitHub 模式下，只有对 `GM2020JLU/GM-WEB` 有写权限的 GitHub 用户才能登录和保存。
+保存会更新仓库中的 Markdown/MDX 文件，并触发 Vercel 自动部署。
 
 ## 推荐发布流程
 

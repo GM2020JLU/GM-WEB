@@ -43,14 +43,16 @@ bun run check
 
 ## 部署
 
-Vercel 配置位于 `vercel.json`：
+Vercel 配置位于 `vercel.json`，项目已连接 GitHub 仓库，`main` 是生产分支。正常发布先
+通过门禁，再推送同一个已验证提交：
 
 ```bash
-vercel link --project gm-web --yes
-vercel deploy --prod --yes
+bun run check
+git push origin main
 ```
 
-生产部署前必须先通过 `bun run check`。
+Vercel CLI 用于首次 `vercel link --project gm-web --yes` 和部署状态诊断；不要在 Git push
+之外再执行 `vercel deploy --prod`，避免同一版本产生两次生产部署。
 
 ## 开源说明
 

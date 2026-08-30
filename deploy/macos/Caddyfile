@@ -39,6 +39,13 @@ http://:8081 {
 	bind 127.0.0.1
 	encode zstd gzip
 
+	# Cloudflare Access remains the preferred identity layer. This Caddy
+	# challenge is a defense-in-depth fallback so the local-write APIs are
+	# never publicly reachable without credentials.
+	basic_auth {
+		goumin $2a$14$94e4zht1vaBUC1B2iyfd6O43lQLdt1ry3tGjJjlyoQ8UqTP9yY.Qi
+	}
+
 	# The dedicated Access hostname opens the Studio directly. Keep the
 	# internal /studio route so links and API paths remain unchanged.
 	@studioRoot {

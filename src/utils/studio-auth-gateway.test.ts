@@ -190,6 +190,7 @@ describe('Studio 登录跳转', () => {
     expect(response.headers.get('content-security-policy')).toContain("default-src 'none'");
     expect(response.headers.get('cache-control')).toBe('private, no-store');
     expect(response.headers.get('referrer-policy')).toBe('strict-origin');
+    expect(response.headers.get('x-frame-options')).toBe('DENY');
     expect(html).toContain('回来继续创作。');
     expect(html).toContain('账号或密码不正确，请重试。');
     expect(html).toContain('data-theme-toggle');

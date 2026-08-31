@@ -11,8 +11,6 @@ tags:
 updatedDate: 2026-08-26T15:23:15+08:00
 ---
 
-# K3 Pico-ITX 风扇策略与配置指南
-
 ## 📌 工作原理与重要提示
 
 K3 Pico-ITX 默认由 Linux 根据 CPU 温度自动调节风扇，控制链如下：

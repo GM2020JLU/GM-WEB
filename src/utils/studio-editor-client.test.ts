@@ -1,7 +1,7 @@
 import { describe, expect, test } from 'bun:test';
 import { Window } from 'happy-dom';
 import { STUDIO_DEPLOYMENT_STORAGE_KEY } from './studio-deployment';
-import { setupStudioEditor } from './studio-editor-client';
+import { diffStudioLines, setupStudioEditor } from './studio-editor-client';
 
 const page = `
   <form data-editor-form>
@@ -12,21 +12,24 @@ const page = `
     <label data-for="media"><input data-creator></label>
     <label data-for="vibe,media"><select data-content-type><option value="text">文字</option></select></label>
     <label data-for="media"><select data-progress><option value="planned">计划</option></select></label>
-    <label data-for="blog,projects,vibe,media,about"><input data-tags></label>
-    <label data-for="blog,projects,about"><input data-categories></label>
-    <label data-for="blog,projects,about"><input data-series></label>
+    <label data-for="blog,projects,vibe,media,about"><input data-tags><span data-taxonomy-suggestions="tags"></span></label>
+    <label data-for="blog,projects,about"><input data-categories><span data-taxonomy-suggestions="categories"></span></label>
+    <label data-for="blog,projects,about"><input data-series><span data-taxonomy-suggestions="series"></span></label>
+    <datalist data-taxonomy-list="tags"></datalist><datalist data-taxonomy-list="categories"></datalist><datalist data-taxonomy-list="series"></datalist>
     <label data-for="blog,projects,vibe,media,about"><input data-scheduled-at></label>
     <textarea data-extras>{}</textarea>
     <section data-body-panel><textarea data-body></textarea><article data-preview></article></section>
-    <span data-word-count></span><span data-current-status></span>
+    <span data-word-count></span><span data-preview-version></span><span data-current-status></span>
     <div class="view-switch"><button type="button" data-view="edit">编辑</button></div>
     <aside data-view="unrelated"></aside>
-    <button type="button" data-action="draft">保存草稿</button>
+    <button type="button" data-action="save" data-save-label>保存更改</button>
     <button type="button" data-action="publish">发布</button>
   </form>
   <div data-notice><strong></strong><small></small></div>
   <section data-deployment-tracker hidden><strong data-deployment-title></strong><small data-deployment-detail></small><span data-deployment-progress></span><a data-deployment-link hidden></a></section>
-  <button data-history></button><button data-delete></button><dialog data-history-dialog></dialog><div data-history-list></div>`;
+  <button data-history></button><button data-delete></button><button data-open-asset-picker></button>
+  <dialog data-history-dialog></dialog><div data-history-list></div><section data-history-diff hidden></section>
+  <dialog data-asset-dialog><input data-asset-alt><input data-asset-search><input type="file" data-asset-upload><p data-asset-notice></p><div data-asset-picker-grid></div></dialog>`;
 
 function element(window: Window, selector: string) {
   return window.document.querySelector(selector) as any;
@@ -37,6 +40,14 @@ async function settle() {
 }
 
 describe('Studio 编辑与发布交互', () => {
+  test('行级差异区分新增、删除和未变内容', () => {
+    expect(diffStudioLines('alpha\nbeta', 'alpha\ngamma')).toEqual([
+      { kind: 'same', value: 'alpha' },
+      { kind: 'added', value: 'gamma' },
+      { kind: 'removed', value: 'beta' },
+    ]);
+  });
+
   test('标题自动生成网址，并持续反馈直到网站上线', async () => {
     const window = new Window({ url: 'https://goumin.work/studio/edit/blog/new?new=1' });
     window.document.body.innerHTML = page;
@@ -85,7 +96,7 @@ describe('Studio 编辑与发布交互', () => {
       collection: 'blog',
       initialSlug: 'new',
       isNew: true,
-      fetch: fetch as typeof globalThis.fetch,
+      fetch: fetch as unknown as typeof globalThis.fetch,
       pollDelay: 1,
       setTimeout: ((callback: TimerHandler) => {
         deferred.push(callback);
@@ -177,15 +188,476 @@ describe('Studio 编辑与发布交互', () => {
     await settle();
 
     element(window, '[data-body]').value = '# 第一次修改';
-    element(window, '[data-action="draft"]').click();
+    element(window, '[data-action="save"]').click();
     await settle();
     element(window, '[data-body]').value = '# 第二次修改';
-    element(window, '[data-action="draft"]').click();
+    element(window, '[data-action="save"]').click();
     await settle();
 
     expect(writes).toHaveLength(2);
     expect(writes[0].expectedSha).toBe('a'.repeat(40));
     expect(writes[1].expectedSha).toBe('b'.repeat(40));
+  });
+
+  test('已发布内容的快捷保存保持发布状态，过期恢复稿使用最新 SHA', async () => {
+    const window = new Window({ url: 'https://goumin.work/studio/edit/blog/existing' });
+    window.document.body.innerHTML = page;
+    Object.defineProperty(window, 'confirm', { value: () => true });
+    window.localStorage.setItem(
+      'gm-studio-recovery:blog:existing',
+      JSON.stringify({
+        expectedSha: 'a'.repeat(40),
+        values: { body: '# 本地编辑', status: 'draft', title: '已发布文章' },
+        version: 2,
+      }),
+    );
+    let submitted: Record<string, any> | undefined;
+    const fetch = async (_input: RequestInfo | URL, init?: RequestInit) => {
+      if (init?.method === 'PUT') {
+        submitted = JSON.parse(String(init.body));
+        return Response.json({
+          ok: true,
+          slug: 'existing',
+          sha: 'c'.repeat(40),
+          status: 'published',
+          deploymentPending: false,
+        });
+      }
+      return Response.json({
+        document: {
+          body: '# 服务器新版',
+          sha: 'b'.repeat(40),
+          slug: 'existing',
+          metadata: {
+            title: '已发布文章',
+            description: '这是一段满足发布要求的文章摘要。',
+            date: '2026-08-26T09:00:00+08:00',
+            publicationStatus: 'published',
+            draft: false,
+          },
+        },
+      });
+    };
+
+    setupStudioEditor(window.document as unknown as Document, {
+      collection: 'blog',
+      initialSlug: 'existing',
+      isNew: false,
+      fetch: fetch as typeof globalThis.fetch,
+    });
+    await settle();
+
+    expect(element(window, '[data-body]').value).toBe('# 本地编辑');
+    expect(element(window, '[data-current-status]').textContent).toBe('已发布');
+    window.document.dispatchEvent(
+      new window.KeyboardEvent('keydown', { ctrlKey: true, key: 's', bubbles: true }),
+    );
+    await settle();
+
+    expect(submitted?.action).toBe('save');
+    expect(submitted?.expectedSha).toBe('b'.repeat(40));
+    expect(submitted?.metadata.publicationStatus).toBe('published');
+    expect(submitted?.metadata.draft).toBe(false);
+  });
+
+  test('legacy 恢复稿中仅摘要、日期、标签或高级字段变化也会提示并完整恢复', async () => {
+    const cases = [
+      { key: 'description', value: '恢复稿中的新摘要' },
+      { key: 'date', value: '2026-08-29T14:30:00+08:00' },
+      { key: 'tags', value: ['Astro', 'Studio'] },
+      { key: 'legacyOnly', value: { enabled: true } },
+    ] as const;
+    for (const changed of cases) {
+      const window = new Window({ url: 'https://goumin.work/studio/edit/blog/existing' });
+      window.document.body.innerHTML = page;
+      let confirmations = 0;
+      Object.defineProperty(window, 'confirm', {
+        value: () => {
+          confirmations++;
+          return true;
+        },
+      });
+      const serverMetadata: Record<string, unknown> = {
+        title: '原文',
+        description: '服务器摘要',
+        date: '2026-08-26T09:00:00+08:00',
+        publicationStatus: 'draft',
+        draft: true,
+        tags: ['Astro'],
+        legacyOnly: { enabled: false },
+      };
+      const legacyMetadata = { ...serverMetadata, [changed.key]: changed.value };
+      window.localStorage.setItem(
+        'gm-studio-recovery:blog:existing',
+        JSON.stringify({
+          body: '# 正文',
+          expectedSha: 'a'.repeat(40),
+          metadata: legacyMetadata,
+          slug: 'existing',
+        }),
+      );
+      setupStudioEditor(window.document as unknown as Document, {
+        collection: 'blog',
+        initialSlug: 'existing',
+        isNew: false,
+        fetch: (async () =>
+          Response.json({
+            document: {
+              body: '# 正文',
+              sha: 'a'.repeat(40),
+              slug: 'existing',
+              metadata: serverMetadata,
+            },
+          })) as unknown as typeof globalThis.fetch,
+      });
+      await settle();
+
+      expect(confirmations).toBe(1);
+      if (changed.key === 'description') {
+        expect(element(window, '[data-description]').value).toBe(changed.value);
+      } else if (changed.key === 'date') {
+        expect(element(window, '[data-date]').value).toBe('2026-08-29T14:30');
+      } else if (changed.key === 'tags') {
+        expect(element(window, '[data-tags]').value).toBe('Astro，Studio');
+      } else {
+        expect(JSON.parse(element(window, '[data-extras]').value).legacyOnly).toEqual(
+          changed.value,
+        );
+      }
+    }
+  });
+
+  test('过期 legacy 恢复稿迁移后使用最新 SHA 且保持服务器发布状态', async () => {
+    const window = new Window({ url: 'https://goumin.work/studio/edit/blog/existing' });
+    window.document.body.innerHTML = page;
+    Object.defineProperty(window, 'confirm', { value: () => true });
+    window.localStorage.setItem(
+      'gm-studio-recovery:blog:existing',
+      JSON.stringify({
+        body: '# legacy 本地修改',
+        expectedSha: 'a'.repeat(40),
+        metadata: {
+          title: '已发布文章',
+          description: '这是一段满足发布要求的文章摘要。',
+          date: '2026-08-26T09:00:00+08:00',
+          publicationStatus: 'draft',
+          draft: true,
+          tags: [],
+        },
+        slug: 'existing',
+      }),
+    );
+    let submitted: Record<string, any> | undefined;
+    const fetch = async (_input: RequestInfo | URL, init?: RequestInit) => {
+      if (init?.method === 'PUT') {
+        submitted = JSON.parse(String(init.body));
+        return Response.json({
+          slug: 'existing',
+          sha: 'c'.repeat(40),
+          status: 'published',
+          deploymentPending: false,
+        });
+      }
+      return Response.json({
+        document: {
+          body: '# 服务器新版',
+          sha: 'b'.repeat(40),
+          slug: 'existing',
+          metadata: {
+            title: '已发布文章',
+            description: '这是一段满足发布要求的文章摘要。',
+            date: '2026-08-26T09:00:00+08:00',
+            publicationStatus: 'published',
+            draft: false,
+            tags: [],
+          },
+        },
+      });
+    };
+    setupStudioEditor(window.document as unknown as Document, {
+      collection: 'blog',
+      initialSlug: 'existing',
+      isNew: false,
+      fetch: fetch as typeof globalThis.fetch,
+    });
+    await settle();
+
+    expect(element(window, '[data-body]').value).toBe('# legacy 本地修改');
+    expect(element(window, '[data-current-status]').textContent).toBe('已发布');
+    element(window, '[data-action="save"]').click();
+    await settle();
+    expect(submitted?.expectedSha).toBe('b'.repeat(40));
+    expect(submitted?.metadata.publicationStatus).toBe('published');
+  });
+
+  test('加载失败时不展示空编辑表单，可原地重试', async () => {
+    const window = new Window({ url: 'https://goumin.work/studio/edit/blog/existing' });
+    window.document.body.innerHTML = page;
+    let attempts = 0;
+    const fetch = async () => {
+      attempts++;
+      if (attempts === 1) return Response.json({ error: '临时无法读取' }, { status: 503 });
+      return Response.json({
+        document: {
+          body: '# 正文',
+          sha: 'a'.repeat(40),
+          slug: 'existing',
+          metadata: { title: '已恢复', publicationStatus: 'draft' },
+        },
+      });
+    };
+
+    setupStudioEditor(window.document as unknown as Document, {
+      collection: 'blog',
+      initialSlug: 'existing',
+      isNew: false,
+      fetch: fetch as unknown as typeof globalThis.fetch,
+    });
+    await settle();
+    expect(element(window, '[data-editor-form]').hidden).toBe(true);
+    expect(element(window, '[data-notice] button').textContent).toBe('重新读取');
+
+    element(window, '[data-notice] button').click();
+    await settle();
+    expect(element(window, '[data-editor-form]').hidden).toBe(false);
+    expect(element(window, '[data-title]').value).toBe('已恢复');
+  });
+
+  test('各内容类型的高级字段经过结构化编辑器后仍原样保留', async () => {
+    const cases = [
+      {
+        collection: 'projects',
+        advanced: {
+          authors: [{ name: 'GM', url: 'https://goumin.work' }],
+          links: [{ label: 'GitHub', url: 'https://github.com/GM2020JLU' }],
+        },
+      },
+      {
+        collection: 'vibe',
+        advanced: { images: ['@assets/images/content/vibe.png'] },
+      },
+      {
+        collection: 'media',
+        advanced: {
+          cover: '@assets/images/content/book.png',
+          externalUrl: 'https://example.com/book',
+        },
+      },
+    ];
+
+    for (const current of cases) {
+      const window = new Window({
+        url: `https://goumin.work/studio/edit/${current.collection}/existing`,
+      });
+      window.document.body.innerHTML = page;
+      let submitted: Record<string, any> | undefined;
+      const fetch = async (_input: RequestInfo | URL, init?: RequestInit) => {
+        if (init?.method === 'PUT') {
+          submitted = JSON.parse(String(init.body));
+          return Response.json({
+            ok: true,
+            slug: 'existing',
+            sha: 'b'.repeat(40),
+            status: 'draft',
+            deploymentPending: false,
+          });
+        }
+        return Response.json({
+          document: {
+            body: '# 正文',
+            sha: 'a'.repeat(40),
+            slug: 'existing',
+            metadata: {
+              ...current.advanced,
+              title: '高级字段测试',
+              publicationStatus: 'draft',
+              draft: true,
+            },
+          },
+        });
+      };
+      setupStudioEditor(window.document as unknown as Document, {
+        collection: current.collection,
+        initialSlug: 'existing',
+        isNew: false,
+        fetch: fetch as typeof globalThis.fetch,
+      });
+      await settle();
+      element(window, '[data-action="save"]').click();
+      await settle();
+
+      for (const [key, value] of Object.entries(current.advanced)) {
+        expect(submitted?.metadata[key]).toEqual(value);
+      }
+    }
+  });
+
+  test('可点选已有分类并从素材库插入带 alt 的 Markdown', async () => {
+    const window = new Window({ url: 'https://goumin.work/studio/edit/blog/existing' });
+    window.document.body.innerHTML = page;
+    const fetch = async (input: RequestInfo | URL) => {
+      if (String(input) === '/api/studio/assets') {
+        return Response.json({
+          assets: [
+            {
+              name: 'cover.png',
+              path: 'src/assets/images/content/cover.png',
+              size: 1024,
+              url: 'https://example.com/cover.png',
+            },
+          ],
+        });
+      }
+      return Response.json({
+        document: {
+          body: '# 正文',
+          sha: 'a'.repeat(40),
+          slug: 'existing',
+          metadata: { title: '文章', publicationStatus: 'draft' },
+        },
+        taxonomies: {
+          categories: ['站点日志'],
+          series: ['Astro 实战'],
+          tags: ['Astro'],
+        },
+      });
+    };
+    setupStudioEditor(window.document as unknown as Document, {
+      collection: 'blog',
+      initialSlug: 'existing',
+      isNew: false,
+      fetch: fetch as typeof globalThis.fetch,
+    });
+    await settle();
+
+    expect(element(window, '[data-taxonomy-list="tags"] option').value).toBe('Astro');
+    element(window, '[data-taxonomy-suggestions="tags"] button').click();
+    expect(element(window, '[data-tags]').value).toBe('Astro');
+
+    element(window, '[data-open-asset-picker]').click();
+    await settle();
+    element(window, '[data-asset-alt]').value = '站点封面';
+    element(window, '[data-asset-picker-grid] button').click();
+    expect(element(window, '[data-body]').value).toContain(
+      '![站点封面](@assets/images/content/cover.png)',
+    );
+    expect(element(window, '[data-preview-version]').textContent).toContain('未保存版本');
+  });
+
+  test('封面、阅读侧栏和评论配置通过结构化控件往返', async () => {
+    const window = new Window({ url: 'https://goumin.work/studio/edit/blog/existing' });
+    window.document.body.innerHTML = page;
+    element(window, '[data-editor-form]').insertAdjacentHTML(
+      'beforeend',
+      `<label data-for="blog,projects,about"><input data-hero-image></label>
+       <label data-for="blog,projects,about"><input data-hero-image-alt></label>
+       <div data-for="blog,projects,about">
+         <input type="checkbox" data-show-hero-image><input type="checkbox" data-comments>
+         <input type="checkbox" data-sidebar-enable><input type="checkbox" data-sidebar-toc>
+         <input type="checkbox" data-sidebar-related>
+       </div>`,
+    );
+    let submitted: Record<string, any> | undefined;
+    const fetch = async (_input: RequestInfo | URL, init?: RequestInit) => {
+      if (init?.method === 'PUT') {
+        submitted = JSON.parse(String(init.body));
+        return Response.json({
+          ok: true,
+          slug: 'existing',
+          sha: 'b'.repeat(40),
+          status: 'draft',
+          deploymentPending: false,
+        });
+      }
+      return Response.json({
+        document: {
+          body: '# 正文',
+          sha: 'a'.repeat(40),
+          slug: 'existing',
+          metadata: {
+            title: '结构化字段',
+            publicationStatus: 'draft',
+            heroImage: '@assets/images/content/hero.png',
+            heroImageAlt: '一台小型计算机',
+            showHeroImage: false,
+            comments: false,
+            sidebar: { enable: true, toc: false, relatedPosts: true },
+          },
+        },
+      });
+    };
+    setupStudioEditor(window.document as unknown as Document, {
+      collection: 'blog',
+      initialSlug: 'existing',
+      isNew: false,
+      fetch: fetch as typeof globalThis.fetch,
+    });
+    await settle();
+
+    expect(element(window, '[data-hero-image]').value).toBe('@assets/images/content/hero.png');
+    expect(element(window, '[data-show-hero-image]').checked).toBe(false);
+    expect(element(window, '[data-sidebar-toc]').checked).toBe(false);
+    element(window, '[data-action="save"]').click();
+    await settle();
+
+    expect(submitted?.metadata).toMatchObject({
+      heroImage: '@assets/images/content/hero.png',
+      heroImageAlt: '一台小型计算机',
+      showHeroImage: false,
+      comments: false,
+      sidebar: { enable: true, toc: false, relatedPosts: true },
+    });
+  });
+
+  test('版本历史可预览与当前未保存内容的行级差异', async () => {
+    const window = new Window({ url: 'https://goumin.work/studio/edit/blog/existing' });
+    window.document.body.innerHTML = page;
+    const revision = 'd'.repeat(40);
+    const fetch = async (input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url.includes('/api/studio/history') && url.includes('?ref=')) {
+        return Response.json({
+          document: { body: '# 历史标题\n\n旧段落', metadata: {}, slug: 'existing' },
+        });
+      }
+      if (url.includes('/api/studio/history')) {
+        return Response.json({
+          history: [
+            {
+              author: 'GM',
+              date: '2026-08-30T10:00:00+08:00',
+              message: 'Update article',
+              sha: revision,
+            },
+          ],
+        });
+      }
+      return Response.json({
+        document: {
+          body: '# 当前标题\n\n新段落',
+          sha: 'a'.repeat(40),
+          slug: 'existing',
+          metadata: { title: '文章', publicationStatus: 'draft' },
+        },
+      });
+    };
+    setupStudioEditor(window.document as unknown as Document, {
+      collection: 'blog',
+      initialSlug: 'existing',
+      isNew: false,
+      fetch: fetch as typeof globalThis.fetch,
+    });
+    await settle();
+
+    element(window, '[data-history]').click();
+    await settle();
+    element(window, '[data-history-list] button').click();
+    await settle();
+
+    expect(element(window, '[data-history-diff]').hidden).toBe(false);
+    expect(element(window, '[data-history-diff]').textContent).toContain(revision.slice(0, 7));
+    expect(window.document.querySelector('[data-history-diff] .diff-added')).not.toBeNull();
+    expect(window.document.querySelector('[data-history-diff] .diff-removed')).not.toBeNull();
   });
 
   test('新建内容写入成功但响应中断时确认原文件，不会重试生成副本', async () => {
@@ -237,7 +709,7 @@ describe('Studio 编辑与发布交互', () => {
     element(window, '[data-title]').value = '测试文章';
     element(window, '[data-title]').dispatchEvent(new window.Event('input', { bubbles: true }));
     element(window, '[data-body]').value = '# 正文';
-    element(window, '[data-action="draft"]').click();
+    element(window, '[data-action="save"]').click();
     await settle();
 
     expect(createRequests).toBe(1);
@@ -294,7 +766,7 @@ describe('Studio 编辑与发布交互', () => {
     expect(recovered).toContain('未保存正文');
     expect(recovered).toContain('"extras":"{"');
 
-    element(window, '[data-action="draft"]').click();
+    element(window, '[data-action="save"]').click();
     await settle();
     expect(writes).toBe(0);
     expect(element(window, '[data-editor-form]').inert).toBe(false);

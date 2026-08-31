@@ -6,6 +6,7 @@ import {
   studioApiError,
   studioDeploymentMetadata,
   studioJson,
+  studioUsesLocalDeployment,
   verifyStudioOrigin,
 } from '../../../utils/studio-api';
 import { readStudioFile, writeStudioFile } from '../../../utils/studio-storage';
@@ -134,11 +135,15 @@ export const PUT: APIRoute = async ({ cookies, request, url }) => {
       expectedSha: next.expectedSha,
       content: stringify(root),
       message: 'Update site settings',
+      deployment: studioUsesLocalDeployment
+        ? { deploy: true, reason: 'Update site settings' }
+        : undefined,
     });
     const deployment = await studioDeploymentMetadata({
       token,
       commitSha: written.commitSha,
       deploy: true,
+      localDeploymentId: written.localDeploymentId,
       reason: 'Update site settings',
     });
     return studioJson({

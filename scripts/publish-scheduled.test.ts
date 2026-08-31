@@ -18,7 +18,7 @@ draft: true
 tags: [${options.tag}]
 ${options.image ? `heroImage: '${options.image}'\nheroImageAlt: 内容封面\n` : ''}---
 
-# ${options.title}
+## ${options.title}
 
 这是可以正常发布的正文内容。
 `;
@@ -109,6 +109,28 @@ describe('定时发布批次', () => {
         expect(source).toContain('draft: false');
         expect(source).not.toContain('scheduledAt:');
       }
+    } finally {
+      await rm(root, { recursive: true, force: true });
+    }
+  });
+
+  test('部署入队失败时回滚为 ready，下次调度可重试', async () => {
+    const root = await createRepository();
+    const path = join(root, 'src/content/blog/retry.md');
+    const source = article({
+      title: '可重试的定时文章',
+      tag: '已登记',
+      image: '@assets/images/content/cover.png',
+    });
+    try {
+      await writeFile(path, source, 'utf8');
+      await expect(
+        publishScheduledContent(root, now, async () => {
+          throw new Error('模拟队列磁盘写入失败');
+        }),
+      ).rejects.toThrow('模拟队列磁盘写入失败');
+      expect(await readFile(path, 'utf8')).toBe(source);
+      expect(await publishScheduledContent(root, now)).toHaveLength(1);
     } finally {
       await rm(root, { recursive: true, force: true });
     }

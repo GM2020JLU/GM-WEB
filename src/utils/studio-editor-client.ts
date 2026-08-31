@@ -1,4 +1,5 @@
 import { renderMarkdownPreview } from './markdown-preview';
+import { studioAssetReference } from './studio-assets';
 import {
   deploymentCopy,
   readPendingDeployment,
@@ -26,7 +27,58 @@ type DocumentPayload = {
   };
   error?: string;
   loginUrl?: string;
+  taxonomies?: Partial<Record<'categories' | 'series' | 'tags', string[]>>;
 };
+
+type StudioEditorAsset = {
+  name: string;
+  path: string;
+  size: number;
+  url: string;
+};
+
+export type StudioLineDiff = { kind: 'added' | 'removed' | 'same'; value: string };
+
+export function diffStudioLines(before: string, after: string, limit = 500): StudioLineDiff[] {
+  const beforeLines = before.split('\n').slice(0, limit);
+  const afterLines = after.split('\n').slice(0, limit);
+  const rows = beforeLines.length + 1;
+  const columns = afterLines.length + 1;
+  const table = Array.from({ length: rows }, () => new Uint16Array(columns));
+  for (let left = beforeLines.length - 1; left >= 0; left--) {
+    for (let right = afterLines.length - 1; right >= 0; right--) {
+      table[left][right] =
+        beforeLines[left] === afterLines[right]
+          ? table[left + 1][right + 1] + 1
+          : Math.max(table[left + 1][right], table[left][right + 1]);
+    }
+  }
+  const result: StudioLineDiff[] = [];
+  let left = 0;
+  let right = 0;
+  while (left < beforeLines.length || right < afterLines.length) {
+    if (
+      left < beforeLines.length &&
+      right < afterLines.length &&
+      beforeLines[left] === afterLines[right]
+    ) {
+      result.push({ kind: 'same', value: beforeLines[left] });
+      left++;
+      right++;
+    } else if (
+      right < afterLines.length &&
+      (left >= beforeLines.length || table[left][right + 1] >= table[left + 1][right])
+    ) {
+      result.push({ kind: 'added', value: afterLines[right++] });
+    } else {
+      result.push({ kind: 'removed', value: beforeLines[left++] });
+    }
+  }
+  if (before.split('\n').length > limit || after.split('\n').length > limit) {
+    result.push({ kind: 'same', value: `… 差异预览仅显示前 ${limit} 行` });
+  }
+  return result;
+}
 
 type EditorRecoveryDraft = {
   expectedSha?: string;
@@ -67,6 +119,15 @@ const knownKeys = new Set([
   'categories',
   'series',
   'scheduledAt',
+  'heroImage',
+  'heroImageAlt',
+  'showHeroImage',
+  'comments',
+  'sidebar',
+  'align',
+  'size',
+  'rating',
+  'review',
 ]);
 
 function element<T extends Element>(document: Document, selector: string) {
@@ -88,10 +149,14 @@ function listValue(value: unknown) {
 }
 
 function parseList(value: string) {
-  return value
-    .split(/[,，]/)
-    .map((item) => item.trim())
-    .filter(Boolean);
+  return [
+    ...new Set(
+      value
+        .split(/[,，]/)
+        .map((item) => item.trim())
+        .filter(Boolean),
+    ),
+  ];
 }
 
 export function setupStudioEditor(document: Document, options: StudioEditorOptions) {
@@ -105,6 +170,17 @@ export function setupStudioEditor(document: Document, options: StudioEditorOptio
   const creator = element<HTMLInputElement>(document, '[data-creator]');
   const contentType = element<HTMLSelectElement>(document, '[data-content-type]');
   const progress = element<HTMLSelectElement>(document, '[data-progress]');
+  const heroImage = document.querySelector<HTMLInputElement>('[data-hero-image]');
+  const heroImageAlt = document.querySelector<HTMLInputElement>('[data-hero-image-alt]');
+  const showHeroImage = document.querySelector<HTMLInputElement>('[data-show-hero-image]');
+  const comments = document.querySelector<HTMLInputElement>('[data-comments]');
+  const sidebarEnable = document.querySelector<HTMLInputElement>('[data-sidebar-enable]');
+  const sidebarToc = document.querySelector<HTMLInputElement>('[data-sidebar-toc]');
+  const sidebarRelated = document.querySelector<HTMLInputElement>('[data-sidebar-related]');
+  const align = document.querySelector<HTMLSelectElement>('[data-align]');
+  const size = document.querySelector<HTMLSelectElement>('[data-size]');
+  const rating = document.querySelector<HTMLInputElement>('[data-rating]');
+  const review = document.querySelector<HTMLInputElement>('[data-review]');
   const tags = element<HTMLInputElement>(document, '[data-tags]');
   const categories = element<HTMLInputElement>(document, '[data-categories]');
   const series = element<HTMLInputElement>(document, '[data-series]');
@@ -114,6 +190,7 @@ export function setupStudioEditor(document: Document, options: StudioEditorOptio
   const preview = element<HTMLElement>(document, '[data-preview]');
   const notice = element<HTMLElement>(document, '[data-notice]');
   const wordCount = element<HTMLElement>(document, '[data-word-count]');
+  const previewVersion = document.querySelector<HTMLElement>('[data-preview-version]');
   const saveButtons = [...document.querySelectorAll<HTMLButtonElement>('[data-action]')];
   const historyList = element<HTMLElement>(document, '[data-history-list]');
   const historyDialog = element<HTMLDialogElement>(document, '[data-history-dialog]');
@@ -123,6 +200,31 @@ export function setupStudioEditor(document: Document, options: StudioEditorOptio
   const deploymentProgress = element<HTMLElement>(document, '[data-deployment-progress]');
   const deploymentLink = element<HTMLAnchorElement>(document, '[data-deployment-link]');
   const currentStatus = element<HTMLElement>(document, '[data-current-status]');
+  const saveLabel = document.querySelector<HTMLButtonElement>('[data-save-label]');
+  const publishButton = document.querySelector<HTMLButtonElement>('[data-action="publish"]');
+  const readyButton = document.querySelector<HTMLButtonElement>('[data-action="ready"]');
+  const scheduleButton = document.querySelector<HTMLButtonElement>('[data-action="schedule"]');
+  const unpublishButton = document.querySelector<HTMLButtonElement>('[data-action="unpublish"]');
+  const taxonomyInputs = { categories, series, tags } as const;
+  const taxonomySuggestions = Object.fromEntries(
+    (['categories', 'series', 'tags'] as const).map((key) => [
+      key,
+      document.querySelector<HTMLElement>(`[data-taxonomy-suggestions="${key}"]`),
+    ]),
+  ) as Record<'categories' | 'series' | 'tags', HTMLElement | null>;
+  const taxonomyLists = Object.fromEntries(
+    (['categories', 'series', 'tags'] as const).map((key) => [
+      key,
+      document.querySelector<HTMLDataListElement>(`[data-taxonomy-list="${key}"]`),
+    ]),
+  ) as Record<'categories' | 'series' | 'tags', HTMLDataListElement | null>;
+  const assetDialog = document.querySelector<HTMLDialogElement>('[data-asset-dialog]');
+  const assetGrid = document.querySelector<HTMLElement>('[data-asset-picker-grid]');
+  const assetNotice = document.querySelector<HTMLElement>('[data-asset-notice]');
+  const assetAlt = document.querySelector<HTMLInputElement>('[data-asset-alt]');
+  const assetSearch = document.querySelector<HTMLInputElement>('[data-asset-search]');
+  const assetUpload = document.querySelector<HTMLInputElement>('[data-asset-upload]');
+  const historyDiff = document.querySelector<HTMLElement>('[data-history-diff]');
   const knownFieldContainers = [...document.querySelectorAll<HTMLElement>('[data-for]')];
   let originalSlug = options.initialSlug;
   let currentSha: string | undefined;
@@ -141,6 +243,7 @@ export function setupStudioEditor(document: Document, options: StudioEditorOptio
   let recoveryRevision = 0;
   let deploymentPollFailures = 0;
   let focusBeforeBusy: HTMLElement | null = null;
+  let editorAssets: StudioEditorAsset[] = [];
 
   const apiUrl = () =>
     `/api/studio/content/${encodeURIComponent(options.collection)}/${encodeURIComponent(originalSlug)}`;
@@ -153,6 +256,15 @@ export function setupStudioEditor(document: Document, options: StudioEditorOptio
     notice.querySelector('strong')!.textContent = heading;
     notice.querySelector('small')!.textContent = detail;
     notice.setAttribute('role', kind === 'error' ? 'alert' : 'status');
+  };
+
+  const appendNoticeAction = (label: string, action: () => void) => {
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.textContent = label;
+    button.addEventListener('click', action, { once: true });
+    notice.append(button);
+    return button;
   };
 
   const renderDeployment = (state: StudioDeploymentState, pending: PendingStudioDeployment) => {
@@ -231,6 +343,62 @@ export function setupStudioEditor(document: Document, options: StudioEditorOptio
     ].includes(options.collection);
   };
 
+  const updateStatusActions = () => {
+    const value = status.value;
+    currentStatus.textContent =
+      value === 'published' ? '已发布' : value === 'ready' ? '待发布' : '草稿';
+    currentStatus.dataset.status = value;
+    if (saveLabel) {
+      saveLabel.textContent =
+        value === 'published' ? '保存并更新线上版本' : value === 'ready' ? '保存更改' : '保存草稿';
+    }
+    if (publishButton) publishButton.hidden = value === 'published';
+    if (readyButton) readyButton.hidden = value !== 'draft';
+    if (scheduleButton) scheduleButton.hidden = value === 'published';
+    if (unpublishButton) unpublishButton.hidden = value !== 'published';
+  };
+
+  const populateTaxonomyOptions = (values: DocumentPayload['taxonomies'] = {}) => {
+    (['categories', 'series', 'tags'] as const).forEach((key) => {
+      const available = values?.[key] ?? [];
+      const list = taxonomyLists[key];
+      if (list) {
+        list.replaceChildren(
+          ...available.map((value) => {
+            const option = document.createElement('option');
+            option.value = value;
+            return option;
+          }),
+        );
+      }
+      const renderSuggestions = () => {
+        const container = taxonomySuggestions[key];
+        if (!container) return;
+        const selected = new Set(parseList(taxonomyInputs[key].value));
+        container.replaceChildren(
+          ...available
+            .filter((value) => !selected.has(value))
+            .slice(0, 8)
+            .map((value) => {
+              const chip = document.createElement('button');
+              chip.type = 'button';
+              chip.textContent = `+ ${value}`;
+              chip.addEventListener('click', () => {
+                taxonomyInputs[key].value = [...selected, value].join('，');
+                taxonomyInputs[key].dispatchEvent(
+                  new browserWindow.Event('input', { bubbles: true }),
+                );
+                taxonomyInputs[key].focus();
+              });
+              return chip;
+            }),
+        );
+      };
+      taxonomyInputs[key].addEventListener('input', renderSuggestions);
+      renderSuggestions();
+    });
+  };
+
   const populate = (
     metadata: Record<string, unknown>,
     source: string,
@@ -245,8 +413,7 @@ export function setupStudioEditor(document: Document, options: StudioEditorOptio
     date.value = typeof metadata.date === 'string' ? metadata.date.slice(0, 16) : '';
     status.value =
       typeof metadata.publicationStatus === 'string' ? metadata.publicationStatus : 'draft';
-    currentStatus.textContent =
-      status.value === 'published' ? '已发布' : status.value === 'ready' ? '待发布' : '草稿';
+    updateStatusActions();
     scheduledAt.value =
       typeof metadata.scheduledAt === 'string' ? metadata.scheduledAt.slice(0, 16) : '';
     creator.value = typeof metadata.creator === 'string' ? metadata.creator : '';
@@ -255,6 +422,24 @@ export function setupStudioEditor(document: Document, options: StudioEditorOptio
     tags.value = listValue(metadata.tags);
     categories.value = listValue(metadata.categories);
     series.value = listValue(metadata.series);
+    if (heroImage)
+      heroImage.value = typeof metadata.heroImage === 'string' ? metadata.heroImage : '';
+    if (heroImageAlt) {
+      heroImageAlt.value = typeof metadata.heroImageAlt === 'string' ? metadata.heroImageAlt : '';
+    }
+    if (showHeroImage) showHeroImage.checked = metadata.showHeroImage !== false;
+    if (comments) comments.checked = metadata.comments !== false;
+    const sidebar =
+      metadata.sidebar && typeof metadata.sidebar === 'object' && !Array.isArray(metadata.sidebar)
+        ? (metadata.sidebar as Record<string, unknown>)
+        : {};
+    if (sidebarEnable) sidebarEnable.checked = sidebar.enable !== false;
+    if (sidebarToc) sidebarToc.checked = sidebar.toc !== false;
+    if (sidebarRelated) sidebarRelated.checked = sidebar.relatedPosts !== false;
+    if (align) align.value = typeof metadata.align === 'string' ? metadata.align : 'left';
+    if (size) size.value = typeof metadata.size === 'string' ? metadata.size : 'md';
+    if (rating) rating.value = typeof metadata.rating === 'number' ? String(metadata.rating) : '';
+    if (review) review.checked = metadata.review === true;
     body.value = source;
     extras.value = JSON.stringify(
       Object.fromEntries(Object.entries(metadata).filter(([key]) => !knownKeys.has(key))),
@@ -263,9 +448,12 @@ export function setupStudioEditor(document: Document, options: StudioEditorOptio
     );
     renderPreview();
     initialSnapshot = snapshot();
+    updateDirtyState();
   };
 
   const collect = () => {
+    const visible = (control: Element | null) =>
+      Boolean(control && !control.closest<HTMLElement>('[data-for]')?.hidden);
     let extraMetadata: Record<string, unknown> = {};
     if (extras.value.trim()) {
       const parsed = JSON.parse(extras.value) as unknown;
@@ -299,6 +487,23 @@ export function setupStudioEditor(document: Document, options: StudioEditorOptio
       metadata.categories = parseList(categories.value);
     if (!series.closest<HTMLElement>('[data-for]')?.hidden)
       metadata.series = parseList(series.value);
+    if (visible(heroImage) && heroImage?.value.trim()) metadata.heroImage = heroImage.value.trim();
+    if (visible(heroImageAlt) && heroImageAlt?.value.trim()) {
+      metadata.heroImageAlt = heroImageAlt.value.trim();
+    }
+    if (visible(showHeroImage)) metadata.showHeroImage = showHeroImage?.checked ?? true;
+    if (visible(comments)) metadata.comments = comments?.checked ?? true;
+    if (visible(sidebarEnable)) {
+      metadata.sidebar = {
+        enable: sidebarEnable?.checked ?? true,
+        toc: sidebarToc?.checked ?? true,
+        relatedPosts: sidebarRelated?.checked ?? true,
+      };
+    }
+    if (visible(align) && align) metadata.align = align.value;
+    if (visible(size) && size) metadata.size = size.value;
+    if (visible(rating) && rating?.value) metadata.rating = Number(rating.value);
+    if (visible(review)) metadata.review = review?.checked ?? false;
     return {
       body: body.value,
       expectedSha: currentSha,
@@ -316,6 +521,17 @@ export function setupStudioEditor(document: Document, options: StudioEditorOptio
     date: date.value,
     description: description.value,
     extras: extras.value,
+    heroImage: heroImage?.value ?? '',
+    heroImageAlt: heroImageAlt?.value ?? '',
+    showHeroImage: String(showHeroImage?.checked ?? true),
+    comments: String(comments?.checked ?? true),
+    sidebarEnable: String(sidebarEnable?.checked ?? true),
+    sidebarToc: String(sidebarToc?.checked ?? true),
+    sidebarRelated: String(sidebarRelated?.checked ?? true),
+    align: align?.value ?? '',
+    size: size?.value ?? '',
+    rating: rating?.value ?? '',
+    review: String(review?.checked ?? false),
     progress: progress.value,
     scheduledAt: scheduledAt.value,
     series: series.value,
@@ -325,32 +541,119 @@ export function setupStudioEditor(document: Document, options: StudioEditorOptio
     title: title.value,
   });
 
+  const migrateLegacyRecovery = (draft: LegacyEditorRecoveryDraft): EditorRecoveryDraft => {
+    const metadata =
+      draft.metadata && typeof draft.metadata === 'object' && !Array.isArray(draft.metadata)
+        ? draft.metadata
+        : {};
+    const sidebar =
+      metadata.sidebar && typeof metadata.sidebar === 'object' && !Array.isArray(metadata.sidebar)
+        ? (metadata.sidebar as Record<string, unknown>)
+        : {};
+    const publicationStatus = ['draft', 'ready', 'published'].includes(
+      String(metadata.publicationStatus),
+    )
+      ? String(metadata.publicationStatus)
+      : metadata.draft === false
+        ? 'published'
+        : 'draft';
+    return {
+      expectedSha: draft.expectedSha,
+      version: 2,
+      values: {
+        align: typeof metadata.align === 'string' ? metadata.align : 'left',
+        body: typeof draft.body === 'string' ? draft.body : '',
+        categories: listValue(metadata.categories),
+        comments: String(metadata.comments !== false),
+        contentType:
+          typeof metadata.type === 'string'
+            ? metadata.type
+            : options.collection === 'media'
+              ? 'book'
+              : 'text',
+        creator: typeof metadata.creator === 'string' ? metadata.creator : '',
+        date: typeof metadata.date === 'string' ? metadata.date.slice(0, 16) : '',
+        description: typeof metadata.description === 'string' ? metadata.description : '',
+        extras: JSON.stringify(
+          Object.fromEntries(Object.entries(metadata).filter(([key]) => !knownKeys.has(key))),
+          null,
+          2,
+        ),
+        heroImage: typeof metadata.heroImage === 'string' ? metadata.heroImage : '',
+        heroImageAlt: typeof metadata.heroImageAlt === 'string' ? metadata.heroImageAlt : '',
+        progress: typeof metadata.status === 'string' ? metadata.status : 'planned',
+        rating: typeof metadata.rating === 'number' ? String(metadata.rating) : '',
+        review: String(metadata.review === true),
+        scheduledAt:
+          typeof metadata.scheduledAt === 'string' ? metadata.scheduledAt.slice(0, 16) : '',
+        series: listValue(metadata.series),
+        showHeroImage: String(metadata.showHeroImage !== false),
+        sidebarEnable: String(sidebar.enable !== false),
+        sidebarRelated: String(sidebar.relatedPosts !== false),
+        sidebarToc: String(sidebar.toc !== false),
+        size: typeof metadata.size === 'string' ? metadata.size : 'md',
+        slug: typeof draft.slug === 'string' ? draft.slug : originalSlug,
+        status: publicationStatus,
+        tags: listValue(metadata.tags),
+        title: typeof metadata.title === 'string' ? metadata.title : '',
+      },
+    };
+  };
+
   const snapshot = () => JSON.stringify(recoveryValues());
 
+  const updateDirtyState = () => {
+    const dirty = Boolean(initialSnapshot && snapshot() !== initialSnapshot);
+    form.dataset.dirty = String(dirty);
+    if (previewVersion) {
+      previewVersion.textContent = dirty ? '编辑器预览 · 未保存版本' : '编辑器预览 · 已保存版本';
+    }
+  };
+
   const applyRecoveryValues = (values: Record<string, string>) => {
-    const controls: Record<string, HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement> = {
+    const controls: Record<
+      string,
+      HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement | null
+    > = {
+      align,
       body,
       categories,
+      comments,
       contentType,
       creator,
       date,
       description,
       extras,
+      heroImage,
+      heroImageAlt,
       progress,
+      rating,
+      review,
       scheduledAt,
       series,
+      showHeroImage,
+      sidebarEnable,
+      sidebarRelated,
+      sidebarToc,
+      size,
       slug,
       status,
       tags,
       title,
     };
     Object.entries(values).forEach(([key, value]) => {
-      if (controls[key] && typeof value === 'string') controls[key].value = value;
+      const control = controls[key];
+      if (!control || typeof value !== 'string') return;
+      if (control instanceof browserWindow.HTMLInputElement && control.type === 'checkbox') {
+        control.checked = value === 'true';
+      } else {
+        control.value = value;
+      }
     });
     slugPreview.textContent = slug.value || '保存时自动生成';
-    currentStatus.textContent =
-      status.value === 'published' ? '已发布' : status.value === 'ready' ? '待发布' : '草稿';
+    updateStatusActions();
     renderPreview();
+    updateDirtyState();
   };
 
   const persistRecovery = () => {
@@ -380,14 +683,87 @@ export function setupStudioEditor(document: Document, options: StudioEditorOptio
       ? renderMarkdownPreview(body.value)
       : '<p class="empty-preview">正文预览会显示在这里。</p>';
     wordCount.textContent = `${body.value.replace(/\s+/g, '').length.toLocaleString('zh-CN')} 字符`;
+    updateDirtyState();
   }
+
+  const showAssetNotice = (message: string, error = false) => {
+    if (!assetNotice) return;
+    assetNotice.textContent = message;
+    assetNotice.className = `asset-picker-notice${error ? ' error' : ''}`;
+    assetNotice.setAttribute('role', error ? 'alert' : 'status');
+  };
+
+  const insertAssetReference = (reference: string) => {
+    if (!assetAlt?.value.trim()) {
+      showAssetNotice('请先填写替代文本，让图片对读屏用户也有意义。', true);
+      assetAlt?.focus();
+      return;
+    }
+    const safeAlt = assetAlt.value.trim().replaceAll(']', '\\]');
+    const markdown = `![${safeAlt}](${reference})`;
+    const start = body.selectionStart ?? body.value.length;
+    const end = body.selectionEnd ?? start;
+    const prefix = start > 0 && body.value[start - 1] !== '\n' ? '\n\n' : '';
+    const suffix = end < body.value.length && body.value[end] !== '\n' ? '\n\n' : '\n';
+    body.setRangeText(`${prefix}${markdown}${suffix}`, start, end, 'end');
+    body.dispatchEvent(new browserWindow.Event('input', { bubbles: true }));
+    assetDialog?.close();
+    body.focus();
+  };
+
+  const renderEditorAssets = () => {
+    if (!assetGrid) return;
+    const query = assetSearch?.value.trim().toLocaleLowerCase('zh-CN') ?? '';
+    const visible = editorAssets.filter((asset) =>
+      asset.name.toLocaleLowerCase('zh-CN').includes(query),
+    );
+    assetGrid.replaceChildren(
+      ...visible.map((asset) => {
+        const card = document.createElement('article');
+        const image = document.createElement('img');
+        const name = document.createElement('strong');
+        const choose = document.createElement('button');
+        image.src = asset.url;
+        image.alt = '';
+        image.loading = 'lazy';
+        name.textContent = asset.name;
+        choose.type = 'button';
+        choose.textContent = '插入正文';
+        choose.addEventListener('click', () =>
+          insertAssetReference(studioAssetReference(asset.path)),
+        );
+        card.append(image, name, choose);
+        return card;
+      }),
+    );
+    if (!visible.length)
+      showAssetNotice(editorAssets.length ? '没有匹配的素材。' : '还没有素材，可以直接上传。');
+  };
+
+  const loadEditorAssets = async () => {
+    if (!assetGrid) return;
+    showAssetNotice('正在读取素材…');
+    try {
+      const response = await request('/api/studio/assets');
+      const result = await payload(response);
+      if (!response.ok || !Array.isArray(result.assets)) {
+        throw new Error(result.error || '素材加载失败。');
+      }
+      editorAssets = result.assets as StudioEditorAsset[];
+      renderEditorAssets();
+      if (editorAssets.length) showAssetNotice(`已读取 ${editorAssets.length} 张图片。`);
+    } catch (error) {
+      showAssetNotice(error instanceof Error ? error.message : '素材加载失败。', true);
+    }
+  };
 
   const load = async () => {
     ready = false;
+    form.hidden = true;
     setBusy(true);
     showNotice('正在读取内容', '从当前内容源加载最新版本。');
     try {
-      const response = await request(`${apiUrl()}${options.isNew ? '?new=1' : ''}`);
+      const response = await request(`${apiUrl()}${isNew ? '?new=1' : ''}`);
       const result = await payload(response);
       if (!response.ok || !result.document) {
         if (result.loginUrl) {
@@ -407,40 +783,40 @@ export function setupStudioEditor(document: Document, options: StudioEditorOptio
         result.document.slug,
         result.document.sha,
       );
+      populateTaxonomyOptions(result.taxonomies);
       ready = true;
+      form.hidden = false;
       const serverSnapshot = initialSnapshot;
+      const serverSha = currentSha;
       const recovered = storage.getItem(recoveryKey);
       if (recovered) {
         try {
           const parsed = JSON.parse(recovered) as unknown;
           const draft = isEditorRecoveryDraft(parsed)
             ? parsed
-            : (parsed as LegacyEditorRecoveryDraft);
-          const recoveredSnapshot = isEditorRecoveryDraft(draft)
-            ? JSON.stringify(draft.values)
-            : JSON.stringify({
-                ...recoveryValues(),
-                body: draft.body,
-                slug: draft.slug,
-                title: String(draft.metadata?.title ?? ''),
-              });
-          if (
-            recoveredSnapshot !== serverSnapshot &&
-            browserWindow.confirm('发现尚未提交的本地编辑，是否恢复？')
-          ) {
-            if (isEditorRecoveryDraft(draft)) {
-              applyRecoveryValues(draft.values);
-              if (typeof draft.expectedSha === 'string') currentSha = draft.expectedSha;
-            } else {
-              populate(
-                draft.metadata,
-                draft.body,
-                draft.slug,
-                typeof draft.expectedSha === 'string' ? draft.expectedSha : currentSha,
-              );
-            }
+            : migrateLegacyRecovery(parsed as LegacyEditorRecoveryDraft);
+          const recoveredSnapshot = JSON.stringify(draft.values);
+          const staleRecovery = Boolean(
+            draft.expectedSha && serverSha && draft.expectedSha !== serverSha,
+          );
+          const recoveryPrompt = staleRecovery
+            ? '服务器版本已在本地编辑后发生变化。是否将本地编辑覆盖到最新版本上？发布状态会保持服务器最新值。'
+            : '发现尚未提交的本地编辑，是否恢复？';
+          if (recoveredSnapshot !== serverSnapshot && browserWindow.confirm(recoveryPrompt)) {
+            const recoveredValues = staleRecovery
+              ? Object.fromEntries(Object.entries(draft.values).filter(([key]) => key !== 'status'))
+              : draft.values;
+            applyRecoveryValues(recoveredValues);
+            currentSha = serverSha;
             initialSnapshot = serverSnapshot;
-            showNotice('已恢复本地编辑', '请检查内容后保存到仓库。', 'success');
+            updateDirtyState();
+            showNotice(
+              '已恢复本地编辑',
+              staleRecovery
+                ? '已基于服务器最新版本恢复；请先检查差异，再保存。'
+                : '请检查内容后保存到仓库。',
+              'success',
+            );
             return;
           }
           storage.removeItem(recoveryKey);
@@ -450,11 +826,12 @@ export function setupStudioEditor(document: Document, options: StudioEditorOptio
       }
       showNotice(
         options.isNew ? '新内容已就绪' : '已载入最新版本',
-        '修改后选择保存草稿或发布。',
+        '普通保存会保持当前发布状态。',
         'success',
       );
     } catch (error) {
       showNotice('无法加载内容', error instanceof Error ? error.message : '请刷新重试。', 'error');
+      appendNoticeAction('重新读取', () => void load());
     } finally {
       setBusy(false);
     }
@@ -488,6 +865,16 @@ export function setupStudioEditor(document: Document, options: StudioEditorOptio
         body: JSON.stringify({ ...submitted, action }),
       });
       const result = await payload(response);
+      if (response.status === 409) {
+        persistRecovery();
+        showNotice(
+          '内容已在其他位置更新',
+          '你的编辑已保留在本机。请读取最新版本，再确认是否恢复本地编辑。',
+          'error',
+        );
+        appendNoticeAction('读取最新版本', () => void load());
+        return;
+      }
       if (!response.ok) throw new Error(result.error || '保存失败。');
       if (typeof result.sha !== 'string') throw new Error('服务器未返回最新内容版本。');
       storage.removeItem(recoveryKey);
@@ -498,9 +885,9 @@ export function setupStudioEditor(document: Document, options: StudioEditorOptio
       slug.value = result.slug;
       slugPreview.textContent = result.slug;
       status.value = result.status;
-      currentStatus.textContent =
-        result.status === 'published' ? '已发布' : result.status === 'ready' ? '待发布' : '草稿';
+      updateStatusActions();
       initialSnapshot = snapshot();
+      updateDirtyState();
       browserWindow.history.replaceState(
         {},
         '',
@@ -514,9 +901,11 @@ export function setupStudioEditor(document: Document, options: StudioEditorOptio
       showNotice(
         action === 'schedule'
           ? '定时发布已安排'
-          : result.status === 'published'
+          : action === 'publish'
             ? '发布已提交'
-            : '保存成功',
+            : result.status === 'published'
+              ? '线上版本更新已提交'
+              : '保存成功',
         message,
         'success',
       );
@@ -545,13 +934,18 @@ export function setupStudioEditor(document: Document, options: StudioEditorOptio
               ...submitted.metadata,
               ...(action
                 ? {
-                    draft: action !== 'publish',
+                    draft:
+                      action === 'save'
+                        ? submitted.metadata.publicationStatus !== 'published'
+                        : action !== 'publish',
                     publicationStatus:
                       action === 'publish'
                         ? 'published'
                         : action === 'ready' || action === 'schedule'
                           ? 'ready'
-                          : 'draft',
+                          : action === 'save'
+                            ? submitted.metadata.publicationStatus
+                            : 'draft',
                   }
                 : {}),
             }).every(([key, value]) =>
@@ -595,13 +989,16 @@ export function setupStudioEditor(document: Document, options: StudioEditorOptio
 
   form.addEventListener('submit', (event) => {
     event.preventDefault();
-    void save('draft');
+    void save('save');
   });
   saveButtons.forEach((button) => {
     button.addEventListener('click', () => void save(button.dataset.action));
   });
   body.addEventListener('input', renderPreview);
-  form.addEventListener('input', scheduleRecovery);
+  form.addEventListener('input', () => {
+    updateDirtyState();
+    scheduleRecovery();
+  });
   form.addEventListener('change', scheduleRecovery);
   title.addEventListener('input', () => {
     if (!isNew) return;
@@ -614,7 +1011,7 @@ export function setupStudioEditor(document: Document, options: StudioEditorOptio
   document.addEventListener('keydown', (event) => {
     if ((event.ctrlKey || event.metaKey) && event.key.toLocaleLowerCase('en-US') === 's') {
       event.preventDefault();
-      void save('draft');
+      void save('save');
     }
   });
   const viewButtons = [...document.querySelectorAll<HTMLElement>('.view-switch [data-view]')];
@@ -637,6 +1034,37 @@ export function setupStudioEditor(document: Document, options: StudioEditorOptio
     });
   });
 
+  document.querySelector('[data-open-asset-picker]')?.addEventListener('click', () => {
+    assetDialog?.showModal();
+    void loadEditorAssets();
+  });
+  assetSearch?.addEventListener('input', renderEditorAssets);
+  assetUpload?.addEventListener('change', async () => {
+    const file = assetUpload.files?.[0];
+    if (!file) return;
+    if (file.size > 5 * 1024 * 1024) {
+      assetUpload.value = '';
+      showAssetNotice('单张图片不能超过 5 MB。', true);
+      return;
+    }
+    const upload = new browserWindow.FormData();
+    upload.append('file', file);
+    assetUpload.disabled = true;
+    showAssetNotice('正在验证并上传图片…');
+    try {
+      const response = await request('/api/studio/assets', { method: 'POST', body: upload });
+      const result = await payload(response);
+      if (!response.ok) throw new Error(result.error || '图片上传失败。');
+      await loadEditorAssets();
+      showAssetNotice('上传成功，可以从下方选择插入。');
+    } catch (error) {
+      showAssetNotice(error instanceof Error ? error.message : '图片上传失败。', true);
+    } finally {
+      assetUpload.disabled = false;
+      assetUpload.value = '';
+    }
+  });
+
   document.querySelector('[data-history]')?.addEventListener('click', async () => {
     historyDialog.showModal();
     historyList.textContent = '正在读取历史记录…';
@@ -650,9 +1078,48 @@ export function setupStudioEditor(document: Document, options: StudioEditorOptio
               const item = document.createElement('article');
               const heading = document.createElement('strong');
               const meta = document.createElement('small');
+              const actions = document.createElement('div');
+              const compare = document.createElement('button');
               const restore = document.createElement('button');
               heading.textContent = entry.message.split('\n')[0];
               meta.textContent = `${entry.author} · ${new Date(entry.date).toLocaleString('zh-CN')}`;
+              compare.type = 'button';
+              compare.textContent = '查看差异';
+              compare.addEventListener('click', async () => {
+                if (!historyDiff) return;
+                historyDiff.hidden = false;
+                historyDiff.textContent = '正在计算与当前编辑内容的差异…';
+                try {
+                  const historical = await request(
+                    `${historyUrl()}?ref=${encodeURIComponent(entry.sha)}`,
+                  );
+                  const historicalPayload = await payload(historical);
+                  if (!historical.ok || !historicalPayload.document) {
+                    throw new Error(historicalPayload.error || '无法读取该版本。');
+                  }
+                  const diff = diffStudioLines(historicalPayload.document.body, body.value);
+                  const title = document.createElement('strong');
+                  const note = document.createElement('small');
+                  const code = document.createElement('pre');
+                  title.textContent = `与 ${entry.sha.slice(0, 7)} 的差异`;
+                  note.textContent = '“+”是当前编辑新增，“−”是历史版本中已移除。';
+                  code.append(
+                    ...diff.map((line) => {
+                      const row = document.createElement('span');
+                      row.className = `diff-${line.kind}`;
+                      row.textContent = `${
+                        line.kind === 'added' ? '+' : line.kind === 'removed' ? '−' : ' '
+                      } ${line.value}\n`;
+                      return row;
+                    }),
+                  );
+                  historyDiff.replaceChildren(title, note, code);
+                  historyDiff.scrollIntoView?.({ block: 'nearest' });
+                } catch (error) {
+                  historyDiff.textContent =
+                    error instanceof Error ? error.message : '无法生成差异预览。';
+                }
+              });
               restore.type = 'button';
               restore.textContent = '恢复此版本';
               restore.addEventListener('click', async () => {
@@ -682,7 +1149,8 @@ export function setupStudioEditor(document: Document, options: StudioEditorOptio
                 }
                 browserWindow.location.reload();
               });
-              item.append(heading, meta, restore);
+              actions.append(compare, restore);
+              item.append(heading, meta, actions);
               return item;
             })
           : [document.createTextNode('暂无可用的本地备份；保存下一次变更后会自动生成。')]),

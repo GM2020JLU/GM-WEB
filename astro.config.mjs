@@ -13,6 +13,7 @@ import { parse } from 'smol-toml';
 import tailwindcss from '@tailwindcss/vite';
 
 import navfolioConfig from './navfolio.config';
+import { isPublicPageRoute } from './scripts/lib/public-routes.mjs';
 import { getAstroPluginConfig } from './src/plugins/config';
 
 /**
@@ -81,7 +82,15 @@ export default defineConfig({
     remarkPlugins: astroPluginConfig.remarkPlugins,
     rehypePlugins: astroPluginConfig.rehypePlugins,
   },
-  integrations: [...astroPluginConfig.integrations, react(), keystatic(), mdx(), sitemap()],
+  integrations: [
+    ...astroPluginConfig.integrations,
+    react(),
+    keystatic(),
+    mdx(),
+    sitemap({
+      filter: (page) => isPublicPageRoute(page, { basePath: resolvedBase }),
+    }),
+  ],
 
   vite: {
     plugins: [tailwindcss()],

@@ -1,5 +1,5 @@
 import { existsSync } from 'node:fs';
-import { readFile, readdir, writeFile } from 'node:fs/promises';
+import { readFile, readdir, rename, rm, writeFile } from 'node:fs/promises';
 import { basename, dirname, join, resolve } from 'node:path';
 import { auditDocuments, parseDocument as parseAuditDocument } from './lib/content-audit.mjs';
 import {
@@ -21,6 +21,7 @@ type PlannedPublication = {
   collection: StudioCollection;
   content: string;
   path: string;
+  previousContent: string;
   slug: string;
 };
 
@@ -94,6 +95,7 @@ async function planScheduledPublications(repositoryRoot: string, now: Date) {
           'published',
         ),
         path,
+        previousContent: source,
         slug,
       });
     }
@@ -102,7 +104,28 @@ async function planScheduledPublications(repositoryRoot: string, now: Date) {
   return planned;
 }
 
-export async function publishScheduledContent(repositoryRoot = process.cwd(), now = new Date()) {
+async function writePlannedContent(
+  repositoryRoot: string,
+  planned: PlannedPublication[],
+  content: (item: PlannedPublication) => string,
+) {
+  for (const item of planned) {
+    const target = join(repositoryRoot, item.path);
+    const temporary = `${target}.${process.pid}.${Date.now()}.tmp`;
+    try {
+      await writeFile(temporary, content(item), { encoding: 'utf8', flag: 'wx', mode: 0o644 });
+      await rename(temporary, target);
+    } finally {
+      await rm(temporary, { force: true });
+    }
+  }
+}
+
+export async function publishScheduledContent(
+  repositoryRoot = process.cwd(),
+  now = new Date(),
+  afterWrite?: (planned: PlannedPublication[]) => Promise<void>,
+) {
   const planned = await planScheduledPublications(repositoryRoot, now);
   if (!planned.length) return [];
 
@@ -124,8 +147,14 @@ export async function publishScheduledContent(repositoryRoot = process.cwd(), no
     throw new Error(`定时发布预检失败，未修改任何文件：\n${detail}`);
   }
 
-  for (const item of planned) {
-    await writeFile(join(repositoryRoot, item.path), item.content, 'utf8');
+  try {
+    await writePlannedContent(repositoryRoot, planned, (item) => item.content);
+    await afterWrite?.(planned);
+  } catch (error) {
+    // A scheduled item must never become published without a durable deployment
+    // request. Restore the ready documents so the next launchd run can retry.
+    await writePlannedContent(repositoryRoot, planned, (item) => item.previousContent);
+    throw error;
   }
   return planned;
 }

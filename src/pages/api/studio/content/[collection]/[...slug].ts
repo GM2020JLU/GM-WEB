@@ -24,6 +24,7 @@ import {
   studioApiError,
   studioDeploymentMetadata,
   studioJson,
+  studioUsesLocalDeployment,
   verifyStudioOrigin,
 } from '../../../../../utils/studio-api';
 import {
@@ -66,6 +67,18 @@ export function studioContentNeedsDeployment(
   return taxonomy || currentStatus === 'published' || targetStatus === 'published';
 }
 
+export function resolveStudioContentStatus(
+  action: 'save' | 'draft' | 'ready' | 'publish' | 'unpublish' | 'schedule' | undefined,
+  currentStatus: StudioPublicationStatus | undefined,
+  metadataStatus: StudioPublicationStatus,
+): StudioPublicationStatus {
+  if (action === 'save') return currentStatus ?? metadataStatus;
+  if (action === 'publish') return 'published';
+  if (action === 'ready' || action === 'schedule') return 'ready';
+  if (action === 'draft' || action === 'unpublish') return 'draft';
+  return metadataStatus;
+}
+
 function publicationStatus(metadata: Record<string, unknown>): StudioPublicationStatus {
   return ['draft', 'ready', 'published'].includes(String(metadata.publicationStatus))
     ? (metadata.publicationStatus as StudioPublicationStatus)
@@ -88,6 +101,16 @@ export const GET: APIRoute = async ({ params, cookies, url }) => {
   try {
     const { collection, slug } = routeParams(params);
     const token = requireStudioToken(cookies);
+    const taxonomyOptions = isTaxonomyCollection(collection)
+      ? Promise.resolve(undefined)
+      : getStudioTaxonomies(token).then((taxonomies) =>
+          Object.fromEntries(
+            Object.entries(taxonomies).map(([key, values]) => [
+              key,
+              [...values].sort((left, right) => left.localeCompare(right, 'zh-CN')),
+            ]),
+          ),
+        );
     if (url.searchParams.get('new') === '1') {
       return studioJson({
         document: {
@@ -98,11 +121,15 @@ export const GET: APIRoute = async ({ params, cookies, url }) => {
           slug,
         },
         isNew: true,
+        taxonomies: await taxonomyOptions,
       });
     }
     const path = studioContentPath(collection, slug);
-    const file = await readStudioFile(path, token);
-    return studioJson({ document: parseStudioDocument(collection, slug, file.content, file.sha) });
+    const [file, taxonomies] = await Promise.all([readStudioFile(path, token), taxonomyOptions]);
+    return studioJson({
+      document: parseStudioDocument(collection, slug, file.content, file.sha),
+      taxonomies,
+    });
   } catch (error) {
     return studioApiError(error);
   }
@@ -148,17 +175,11 @@ export const PUT: APIRoute = async ({ params, cookies, request, url }) => {
         if (status !== 404 && code !== 'ENOENT') throw error;
       }
     }
-    const actionStatus: Record<string, StudioPublicationStatus> = {
-      draft: 'draft',
-      ready: 'ready',
-      publish: 'published',
-      unpublish: 'draft',
-      schedule: 'ready',
-    };
-    const requestedStatus = payload.action
-      ? actionStatus[payload.action]
-      : (payload.metadata.publicationStatus as StudioPublicationStatus | undefined);
-    const targetStatus = requestedStatus ?? publicationStatus(payload.metadata);
+    const targetStatus = resolveStudioContentStatus(
+      payload.action,
+      currentStatus,
+      publicationStatus(payload.metadata),
+    );
     const validateReferences =
       targetStatus !== 'draft' && !isTaxonomyCollection(collection)
         ? async () => {
@@ -182,6 +203,12 @@ export const PUT: APIRoute = async ({ params, cookies, request, url }) => {
     );
     const verb =
       targetStatus === 'published' ? 'Publish' : targetStatus === 'ready' ? 'Mark ready' : 'Save';
+    const deploymentRequired = studioContentNeedsDeployment(
+      isTaxonomyCollection(collection),
+      currentStatus,
+      targetStatus,
+    );
+    const deploymentReason = `${verb} ${collection}: ${slug}`;
     const writeResult = await writeStudioFile({
       beforeWrite: validateReferences,
       token,
@@ -189,17 +216,17 @@ export const PUT: APIRoute = async ({ params, cookies, request, url }) => {
       previousPath: current && currentPath !== nextPath ? currentPath : undefined,
       expectedSha: isNew ? null : payload.expectedSha,
       content,
-      message: `${verb} ${collection}: ${slug}`,
+      message: deploymentReason,
+      deployment: studioUsesLocalDeployment
+        ? { deploy: deploymentRequired, reason: deploymentReason }
+        : undefined,
     });
     const deployment = await studioDeploymentMetadata({
       token,
       commitSha: writeResult.commitSha,
-      deploy: studioContentNeedsDeployment(
-        isTaxonomyCollection(collection),
-        currentStatus,
-        targetStatus,
-      ),
-      reason: `${verb} ${collection}: ${slug}`,
+      deploy: deploymentRequired,
+      localDeploymentId: writeResult.localDeploymentId,
+      reason: deploymentReason,
     });
     return studioJson({
       ok: true,
@@ -236,7 +263,15 @@ export const DELETE: APIRoute = async ({ params, cookies, request, url }) => {
     const file = await readStudioFile(path, token);
     if (file.sha !== expectedSha) throw new StudioConflictError();
     const document = parseStudioDocument(collection, slug, file.content, file.sha);
+    const deploymentRequired = studioContentNeedsDeployment(
+      isTaxonomyCollection(collection),
+      publicationStatus(document.metadata),
+    );
+    const deploymentReason = `Delete ${collection}: ${slug}`;
     const deleted = await deleteStudioFile(path, expectedSha, token, {
+      deployment: studioUsesLocalDeployment
+        ? { deploy: deploymentRequired, reason: deploymentReason }
+        : undefined,
       beforeDelete: isTaxonomyCollection(collection)
         ? async () => {
             const references = await findStudioTaxonomyReferences(
@@ -257,11 +292,9 @@ export const DELETE: APIRoute = async ({ params, cookies, request, url }) => {
     const deployment = await studioDeploymentMetadata({
       token,
       commitSha: deleted.commitSha,
-      deploy: studioContentNeedsDeployment(
-        isTaxonomyCollection(collection),
-        publicationStatus(document.metadata),
-      ),
-      reason: `Delete ${collection}: ${slug}`,
+      deploy: deploymentRequired,
+      localDeploymentId: deleted.localDeploymentId,
+      reason: deploymentReason,
     });
     return studioJson({ ok: true, ...deployment });
   } catch (error) {

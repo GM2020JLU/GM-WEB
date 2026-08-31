@@ -15,6 +15,13 @@
   ],
   "headers": [
     {
+      "source": "/.well-known/navfolio-build.json",
+      "headers": [
+        { "key": "Cache-Control", "value": "public, no-store, max-age=0" },
+        { "key": "CDN-Cache-Control", "value": "no-store" }
+      ]
+    },
+    {
       "source": "/keystatic",
       "headers": [
         { "key": "Cache-Control", "value": "private, no-store" },

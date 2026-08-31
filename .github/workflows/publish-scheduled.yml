@@ -1,8 +1,8 @@
 name: Publish scheduled content
 
 on:
-  schedule:
-    - cron: '*/15 * * * *'
+  # The Mac launchd scheduler is authoritative and reads local Studio drafts.
+  # Keep this as a deliberate disaster-recovery action to avoid two writers racing.
   workflow_dispatch:
 
 permissions:

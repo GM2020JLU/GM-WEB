@@ -2,11 +2,18 @@ import { existsSync, readFileSync, readdirSync, statSync } from 'node:fs';
 import { extname, join } from 'node:path';
 
 import { getBuildOutputDirectory } from './build-output.mjs';
+import {
+  htmlFileToRoute,
+  isPublicHtmlFile,
+  isPublicPageRoute,
+  normalizeRoutePath,
+} from './lib/public-routes.mjs';
 
 const root = process.cwd();
 const dist = getBuildOutputDirectory(root);
 const vercelOutput = join(root, '.vercel', 'output');
 const vercelStatic = join(vercelOutput, 'static');
+const isDocsBuild = process.env.NAVFOLIO_CONTENT_SOURCE === 'docs';
 const errors = [];
 
 function fail(message) {
@@ -60,17 +67,20 @@ function parseJsonLd(html, relative) {
   return values;
 }
 
+function getLinkedStylesheets(html) {
+  return [
+    ...html.matchAll(/<link\b[^>]*\brel="stylesheet"[^>]*\bhref="([^"]+\.css(?:[?#][^"]*)?)"/giu),
+  ]
+    .map((match) => resolvePublicPath(match[1]))
+    .filter((file) => file && existsSync(file));
+}
+
 const requiredFiles = [
   'index.html',
   '404.html',
   'about/index.html',
   'blog/index.html',
   'projects/index.html',
-  'projects/k3-pico-itx-fan-control/index.html',
-  'projects/personal-site/index.html',
-  'tags/device-tree/index.html',
-  'tags/linux/index.html',
-  'tags/thermal/index.html',
   'media/index.html',
   'vibe/index.html',
   'studio/index.html',
@@ -85,26 +95,65 @@ const requiredFiles = [
   'studio/content/media/index.html',
   'studio/content/pages/index.html',
   'preview/about/index.html',
-  'preview/projects/personal-site/index.html',
-  'preview/render/projects/personal-site/index.html',
-  'preview/vibe/2026-08-23-new-site/index.html',
-  'preview/render/vibe/2026-08-23-new-site/index.html',
   'rss.xml',
   'robots.txt',
   'sitemap-index.xml',
   'pagefind/pagefind.js',
+  'pagefind/navfolio-public-pages.json',
   'favicon.svg',
   'manifest.json',
   'og-card.png',
   'avatar/goumin-avatar-352.webp',
   '.well-known/security.txt',
+  '.well-known/navfolio-build.json',
+  ...(!isDocsBuild
+    ? [
+        'projects/k3-pico-itx-fan-control/index.html',
+        'projects/personal-site/index.html',
+        'tags/device-tree/index.html',
+        'tags/linux/index.html',
+        'tags/thermal/index.html',
+        'preview/projects/personal-site/index.html',
+        'preview/render/projects/personal-site/index.html',
+        'preview/vibe/2026-08-23-new-site/index.html',
+        'preview/render/vibe/2026-08-23-new-site/index.html',
+      ]
+    : []),
 ];
 
 for (const file of requiredFiles) {
   if (!existsSync(join(dist, file))) fail(`缺少构建产物：${file}`);
 }
 
+if (existsSync(join(vercelOutput, 'config.json'))) {
+  for (const privateBundle of ['functions', '_functions']) {
+    if (existsSync(join(vercelOutput, privateBundle))) {
+      fail(`Vercel 公共产物仍包含私有函数目录：${privateBundle}`);
+    }
+  }
+  for (const privateRoute of ['studio', 'preview', 'keystatic', 'api']) {
+    if (existsSync(join(vercelStatic, privateRoute))) {
+      fail(`Vercel 公共产物仍包含私有路由：${privateRoute}`);
+    }
+  }
+  const vercelConfigSource = readFileSync(join(vercelOutput, 'config.json'), 'utf8');
+  if (vercelConfigSource.includes('"dest": "_render"')) {
+    fail('Vercel 公共产物仍引用 _render 函数');
+  }
+  const leakedAssets = walk(join(vercelStatic, '_astro')).filter((file) =>
+    /(?:keystatic|studio|react-dom|studio-slug|pinyin)/iu.test(file),
+  );
+  if (leakedAssets.length) {
+    fail(
+      `Vercel 公共产物仍包含后台 chunk：${leakedAssets
+        .map((file) => file.slice(vercelStatic.length + 1))
+        .join(', ')}`,
+    );
+  }
+}
+
 const htmlFiles = walk(dist, (file) => file.endsWith('.html'));
+const publicHtmlFiles = htmlFiles.filter((file) => isPublicHtmlFile(file, dist));
 const upstreamMarkers = [
   'dodolalorc',
   'hello@navfolio.site',
@@ -132,9 +181,11 @@ for (const file of htmlFiles) {
   if (!html.includes('application/ld+json')) fail(`${relative} 缺少结构化数据`);
   parseJsonLd(html, relative);
 
-  for (const marker of upstreamMarkers) {
-    if (html.toLowerCase().includes(marker.toLowerCase())) {
-      fail(`${relative} 泄漏了模板标识：${marker}`);
+  if (!isDocsBuild) {
+    for (const marker of upstreamMarkers) {
+      if (html.toLowerCase().includes(marker.toLowerCase())) {
+        fail(`${relative} 泄漏了模板标识：${marker}`);
+      }
     }
   }
 
@@ -142,45 +193,107 @@ for (const file of htmlFiles) {
     if (html.includes(marker)) fail(`${relative} 残留英文界面文案：${marker}`);
   }
 
+  // The docs fixture intentionally contains Markdown examples with extra H1s;
+  // the production content source remains subject to the strict document rule.
+  if (!isDocsBuild && isPublicHtmlFile(file, dist)) {
+    const h1Count = [...html.matchAll(/<h1(?:\s[^>]*)?>/giu)].length;
+    if (h1Count !== 1) fail(`${relative} 应恰好包含一个 H1，当前为 ${h1Count} 个`);
+    if (!html.includes('class="skip-link"') || !html.includes('href="#main-content"')) {
+      fail(`${relative} 缺少可用的跳到主要内容链接`);
+    }
+    if (!/<main\b(?=[^>]*\bid="main-content")(?=[^>]*\btabindex="-1")[^>]*>/iu.test(html)) {
+      fail(`${relative} 的 main 缺少静态 skip-link 目标或可聚焦属性`);
+    }
+  }
+
   if (html.includes('href="/resume"')) fail(`${relative} 仍包含已移除的简历入口`);
 
-  for (const match of html.matchAll(/(?:href|src)="(\/[^"]*)"/g)) {
-    const target = resolvePublicPath(match[1]);
-    if (target && !existsSync(target)) fail(`${relative} 存在断链：${match[1]}`);
+  // Upstream docs reference optional demo assets/routes that are absent from the
+  // personal-site fixture. Production output must still be fully closed.
+  if (!isDocsBuild) {
+    for (const match of html.matchAll(/(?:href|src)="(\/[^"]*)"/g)) {
+      const target = resolvePublicPath(match[1]);
+      if (target && !existsSync(target)) fail(`${relative} 存在断链：${match[1]}`);
+    }
   }
 }
 
 const home = readFileSync(join(dist, 'index.html'), 'utf8');
-for (const marker of [
-  'Gou Min',
-  '嵌入式系统工程师',
-  '文章',
-  '项目',
-  '随记',
-  'Bootloader',
-  'K3 Pico-ITX 风扇控制与热管理调试',
-  'href="/projects/k3-pico-itx-fan-control/"',
-  '>精选</h2>',
-  '查看项目案例',
-  '邮件交流',
-]) {
-  if (!home.includes(marker)) fail(`首页缺少关键内容：${marker}`);
+if (!isDocsBuild) {
+  for (const marker of [
+    'Gou Min',
+    '嵌入式系统工程师',
+    '文章',
+    '项目',
+    '随记',
+    'Bootloader',
+    'K3 Pico-ITX 风扇控制与热管理调试',
+    'href="/projects/k3-pico-itx-fan-control/"',
+    '>精选</h2>',
+    '查看项目案例',
+    '邮件交流',
+  ]) {
+    if (!home.includes(marker)) fail(`首页缺少关键内容：${marker}`);
+  }
+  if (home.includes('data-navfolio-full-font-warmup')) fail('首页仍在预取完整中文字体');
+  if (home.includes('href="/media"')) fail('首页仍展示空的书影音入口');
+  if (home.includes('href="/resume"') || existsSync(join(dist, 'resume/index.html'))) {
+    fail('前台仍包含已移除的简历入口或路由');
+  }
+  if (!home.includes('https://goumin.work/og-card.png')) fail('首页未使用自定义 OG 图');
+  if (!home.includes('https://goumin.work/avatar/goumin-avatar-352.webp')) {
+    fail('首页未使用本地优化头像');
+  }
+  if (home.includes('avatars.githubusercontent.com')) fail('首页仍依赖 GitHub 头像');
 }
-if (home.includes('data-navfolio-full-font-warmup')) fail('首页仍在预取完整中文字体');
-if (home.includes('href="/media"')) fail('首页仍展示空的书影音入口');
-if (home.includes('href="/resume"') || existsSync(join(dist, 'resume/index.html'))) {
-  fail('前台仍包含已移除的简历入口或路由');
-}
-if (!home.includes('https://goumin.work/og-card.png')) fail('首页未使用自定义 OG 图');
-if (!home.includes('https://goumin.work/avatar/goumin-avatar-352.webp')) {
-  fail('首页未使用本地优化头像');
-}
-if (home.includes('avatars.githubusercontent.com')) fail('首页仍依赖 GitHub 头像');
 if (home.includes('keystatic-page') || home.includes('react-dom')) {
   fail('公开首页意外加载了 Keystatic/React 后台资源');
 }
+if (
+  !/<nav\b[^>]*class="mobile-menu-panel"[^>]*aria-hidden="true"[^>]*\bhidden\b[^>]*\binert\b/iu.test(
+    home,
+  )
+) {
+  fail('移动导航关闭时未从可访问性树和键盘顺序中移除');
+}
+if (
+  !/<div\b[^>]*class="site-search-layer"[^>]*aria-hidden="true"[^>]*\bhidden\b[^>]*\binert\b/iu.test(
+    home,
+  )
+) {
+  fail('站内搜索关闭时未从可访问性树和键盘顺序中移除');
+}
+if (!/<input\b[^>]*type="search"[^>]*aria-label="[^"]+"/iu.test(home)) {
+  fail('站内搜索输入框缺少可访问名称');
+}
+if (
+  !/<p\b[^>]*class="site-search-status"[^>]*role="status"[^>]*aria-live="polite"[^>]*aria-atomic="true"/iu.test(
+    home,
+  )
+) {
+  fail('站内搜索状态未通过 polite live region 播报');
+}
+if (!/<a\b[^>]*class="nav-link active"[^>]*aria-current="page"/iu.test(home)) {
+  fail('顶部导航未向读屏软件声明当前页');
+}
+const dashboardCardOrder = [
+  'intro-card',
+  'doing-card',
+  'profile-card',
+  'heatmap-card',
+  'nav-card',
+  'connect-card',
+].map((className) => home.indexOf(className));
+if (
+  dashboardCardOrder.some((index) => index < 0) ||
+  dashboardCardOrder.some(
+    (index, position) => position > 0 && index <= dashboardCardOrder[position - 1],
+  )
+) {
+  fail('首页卡片 DOM 顺序与移动端视觉顺序不一致');
+}
 if (existsSync(join(dist, 'blog/casdcv/index.html'))) fail('草稿文章意外出现在公开路由');
-if (process.env.NAVFOLIO_CONTENT_SOURCE !== 'docs') {
+if (!isDocsBuild) {
   for (const demoRoute of [
     'media/books/to-live/index.html',
     'media/films/the-truman-show/index.html',
@@ -214,6 +327,22 @@ for (const marker of [
   if (!studio.includes(marker)) fail(`内容工作台缺少：${marker}`);
 }
 if (!studio.includes('noindex,nofollow,noarchive')) fail('内容工作台缺少 noindex');
+
+const studioCss = getLinkedStylesheets(studio)
+  .map((file) => readFileSync(file, 'utf8'))
+  .join('\n');
+if (!studioCss.includes('.studio-with-navigation')) {
+  fail('Studio 页面未加载专用主题样式');
+}
+
+const publicStylesheets = new Set(
+  publicHtmlFiles.flatMap((file) => getLinkedStylesheets(readFileSync(file, 'utf8'))),
+);
+for (const file of publicStylesheets) {
+  if (readFileSync(file, 'utf8').includes('.studio-with-navigation')) {
+    fail(`公开页面意外加载 Studio 主题样式：${file.slice(dist.length + 1)}`);
+  }
+}
 
 const markdownImport = readFileSync(join(dist, 'studio/import/index.html'), 'utf8');
 for (const marker of [
@@ -285,78 +414,129 @@ if (!markdownImportScripts.length) {
   }
 }
 
-const project = readFileSync(join(dist, 'projects/personal-site/index.html'), 'utf8');
-for (const marker of ['项目概览', '我的角色', '项目周期', '关键成果', '独立产品设计']) {
-  if (!project.includes(marker)) fail(`项目案例缺少证据内容：${marker}`);
-}
+if (!isDocsBuild) {
+  const project = readFileSync(join(dist, 'projects/personal-site/index.html'), 'utf8');
+  for (const marker of ['项目概览', '我的角色', '项目周期', '关键成果', '独立产品设计']) {
+    if (!project.includes(marker)) fail(`项目案例缺少证据内容：${marker}`);
+  }
 
-const embeddedProject = readFileSync(
-  join(dist, 'projects/k3-pico-itx-fan-control/index.html'),
-  'utf8',
-);
-for (const marker of [
-  '技术分析与文档整理',
-  '问题背景',
-  '关键取舍',
-  '恢复自动温控',
-  'https://goumin.work/blog/spacemit-k3-pico-itx-fan/',
-]) {
-  if (!embeddedProject.includes(marker)) fail(`K3 工程案例缺少证据内容：${marker}`);
-}
-if (
-  !embeddedProject.includes(
-    '<link rel="canonical" href="https://goumin.work/projects/k3-pico-itx-fan-control/"',
-  )
-) {
-  fail('K3 工程案例 canonical 不正确');
-}
-const embeddedGraph = parseJsonLd(embeddedProject, 'projects/k3-pico-itx-fan-control/index.html')
-  .flatMap((value) => value['@graph'] ?? [])
-  .find((value) => value['@type'] === 'CreativeWork');
-if (
-  !embeddedGraph ||
-  embeddedGraph.headline !== 'K3 Pico-ITX 风扇控制与热管理调试' ||
-  embeddedGraph.url !== 'https://goumin.work/projects/k3-pico-itx-fan-control/'
-) {
-  fail('K3 工程案例缺少匹配页面内容的 CreativeWork 结构化数据');
-}
+  const embeddedProject = readFileSync(
+    join(dist, 'projects/k3-pico-itx-fan-control/index.html'),
+    'utf8',
+  );
+  for (const marker of [
+    '技术分析与文档整理',
+    '问题背景',
+    '关键取舍',
+    '恢复自动温控',
+    'https://goumin.work/blog/spacemit-k3-pico-itx-fan/',
+  ]) {
+    if (!embeddedProject.includes(marker)) fail(`K3 工程案例缺少证据内容：${marker}`);
+  }
+  if (
+    !embeddedProject.includes(
+      '<link rel="canonical" href="https://goumin.work/projects/k3-pico-itx-fan-control/"',
+    )
+  ) {
+    fail('K3 工程案例 canonical 不正确');
+  }
+  const embeddedGraph = parseJsonLd(embeddedProject, 'projects/k3-pico-itx-fan-control/index.html')
+    .flatMap((value) => value['@graph'] ?? [])
+    .find((value) => value['@type'] === 'CreativeWork');
+  if (
+    !embeddedGraph ||
+    embeddedGraph.headline !== 'K3 Pico-ITX 风扇控制与热管理调试' ||
+    embeddedGraph.url !== 'https://goumin.work/projects/k3-pico-itx-fan-control/'
+  ) {
+    fail('K3 工程案例缺少匹配页面内容的 CreativeWork 结构化数据');
+  }
 
-const embeddedArticle = readFileSync(
-  join(dist, 'blog/spacemit-k3-pico-itx-fan/index.html'),
-  'utf8',
-);
-const articleGraph = parseJsonLd(embeddedArticle, 'blog/spacemit-k3-pico-itx-fan/index.html')
-  .flatMap((value) => value['@graph'] ?? [])
-  .find((value) => value['@type'] === 'BlogPosting');
-if (
-  !articleGraph ||
-  articleGraph.headline !== 'K3 Pico-ITX 风扇策略与配置指南' ||
-  !articleGraph.keywords?.includes('Linux')
-) {
-  fail('K3 技术文章缺少匹配页面内容的 BlogPosting 结构化数据');
-}
-if (!project.includes('问题与目标') || !project.includes('核心取舍')) {
-  fail('项目案例缺少问题与决策过程');
-}
+  const embeddedArticle = readFileSync(
+    join(dist, 'blog/spacemit-k3-pico-itx-fan/index.html'),
+    'utf8',
+  );
+  const articleGraph = parseJsonLd(embeddedArticle, 'blog/spacemit-k3-pico-itx-fan/index.html')
+    .flatMap((value) => value['@graph'] ?? [])
+    .find((value) => value['@type'] === 'BlogPosting');
+  if (
+    !articleGraph ||
+    articleGraph.headline !== 'K3 Pico-ITX 风扇策略与配置指南' ||
+    !articleGraph.keywords?.includes('Linux')
+  ) {
+    fail('K3 技术文章缺少匹配页面内容的 BlogPosting 结构化数据');
+  }
+  if (!project.includes('问题与目标') || !project.includes('核心取舍')) {
+    fail('项目案例缺少问题与决策过程');
+  }
 
-const preview = readFileSync(join(dist, 'preview/projects/personal-site/index.html'), 'utf8');
-for (const marker of [
-  '页面预览',
-  '桌面',
-  '平板',
-  '手机',
-  '/preview/render/projects/personal-site',
-  '/studio/edit/projects/personal-site',
-]) {
-  if (!preview.includes(marker)) fail(`预览工作台缺少：${marker}`);
+  const preview = readFileSync(join(dist, 'preview/projects/personal-site/index.html'), 'utf8');
+  for (const marker of [
+    '页面预览',
+    '桌面',
+    '平板',
+    '手机',
+    '/preview/render/projects/personal-site',
+    '/studio/edit/projects/personal-site',
+  ]) {
+    if (!preview.includes(marker)) fail(`预览工作台缺少：${marker}`);
+  }
 }
 
 const manifest = JSON.parse(readFileSync(join(dist, 'manifest.json'), 'utf8'));
-if (manifest.name !== 'Gou Min 的个人站') fail('Web App Manifest 名称不正确');
+if (!isDocsBuild && manifest.name !== 'Gou Min 的个人站') fail('Web App Manifest 名称不正确');
 if (manifest.lang !== 'zh-CN') fail('Web App Manifest 未声明 zh-CN');
 
 const sitemapIndex = readFileSync(join(dist, 'sitemap-index.xml'), 'utf8');
-if (!sitemapIndex.includes('https://goumin.work/')) fail('Sitemap 未指向生产域名');
+if (!isDocsBuild && !sitemapIndex.includes('https://goumin.work/')) {
+  fail('Sitemap 未指向生产域名');
+}
+const sitemapFiles = walk(dist, (file) => /\/sitemap-\d+\.xml$/u.test(file));
+const sitemapRoutes = new Set();
+for (const file of sitemapFiles) {
+  const xml = readFileSync(file, 'utf8');
+  for (const match of xml.matchAll(/<loc>([^<]+)<\/loc>/gu)) {
+    const route = normalizeRoutePath(match[1]);
+    if (!route || !isPublicPageRoute(route)) {
+      fail(`Sitemap 包含非公开路由：${match[1]}`);
+      continue;
+    }
+    sitemapRoutes.add(route);
+  }
+}
+const expectedPublicRoutes = new Set(
+  publicHtmlFiles.map((file) => normalizeRoutePath(htmlFileToRoute(file, dist))).filter(Boolean),
+);
+for (const route of expectedPublicRoutes) {
+  if (!sitemapRoutes.has(route)) fail(`Sitemap 缺少公开路由：${route}`);
+}
+for (const route of sitemapRoutes) {
+  if (!expectedPublicRoutes.has(route)) fail(`Sitemap 路由没有对应的公开 HTML 页面：${route}`);
+}
+
+const pagefindManifest = JSON.parse(
+  readFileSync(join(dist, 'pagefind/navfolio-public-pages.json'), 'utf8'),
+);
+const pagefindRoutes = new Set(
+  (Array.isArray(pagefindManifest.routes) ? pagefindManifest.routes : [])
+    .map((route) => normalizeRoutePath(route))
+    .filter(Boolean),
+);
+for (const route of pagefindRoutes) {
+  if (!isPublicPageRoute(route) || !expectedPublicRoutes.has(route)) {
+    fail(`Pagefind 允许表包含非公开或不存在的路由：${route}`);
+  }
+}
+for (const route of expectedPublicRoutes) {
+  if (!pagefindRoutes.has(route)) fail(`Pagefind 允许表缺少公开路由：${route}`);
+}
+if (
+  typeof pagefindManifest.pageCount !== 'number' ||
+  pagefindManifest.pageCount !== expectedPublicRoutes.size
+) {
+  fail(
+    `Pagefind 实际索引页数与公开路由不一致：${pagefindManifest.pageCount} != ${expectedPublicRoutes.size}`,
+  );
+}
 
 const rss = readFileSync(join(dist, 'rss.xml'), 'utf8');
 if (!rss.includes('<rss') || !rss.includes('<channel>')) fail('RSS 产物格式不正确');
@@ -368,8 +548,8 @@ for (const route of ['/keystatic/', '/api/keystatic/', '/studio', '/preview/']) 
 
 const vercelRequiredFiles = [
   'config.json',
-  'functions/_render.func/.vc-config.json',
   'static/index.html',
+  'static/.well-known/navfolio-build.json',
   'static/pagefind/pagefind.js',
   'static/robots.txt',
 ];
@@ -380,19 +560,18 @@ for (const file of vercelRequiredFiles) {
 if (existsSync(join(vercelOutput, 'config.json'))) {
   const vercelConfigPath = join(vercelOutput, 'config.json');
   const vercelConfig = readFileSync(vercelConfigPath, 'utf8');
-  for (const route of [
-    '/keystatic',
-    '/api/keystatic',
-    '/api/studio/import',
-    '/api/studio/content',
-    '/api/studio/assets',
-    '/studio/edit',
-  ]) {
-    if (!vercelConfig.includes(route)) fail(`Vercel 未配置后台动态路由：${route}`);
-  }
-
   const parsedVercelConfig = JSON.parse(vercelConfig);
-  const privateDenyRoute = parsedVercelConfig.routes?.[0];
+  const outputRoutes = Array.isArray(parsedVercelConfig.routes) ? parsedVercelConfig.routes : [];
+  const privateDenyRoute = outputRoutes.find(
+    (route) => route?.status === 404 && route?.dest === '/404.html',
+  );
+  const privateDenyIndex = outputRoutes.indexOf(privateDenyRoute);
+  const studioExactIndex = outputRoutes.findIndex(
+    (route) => route?.src === '^/studio/?$' && route?.status === 307,
+  );
+  const studioNestedIndex = outputRoutes.findIndex(
+    (route) => route?.src === '^/studio/(.*)$' && route?.status === 307,
+  );
   if (
     privateDenyRoute?.status !== 404 ||
     privateDenyRoute?.dest !== '/404.html' ||
@@ -401,6 +580,15 @@ if (existsSync(join(vercelOutput, 'config.json'))) {
     !privateDenyRoute?.src?.includes('preview')
   ) {
     fail('Vercel 公开部署未在文件和函数路由之前封锁后台。');
+  }
+  if (
+    studioExactIndex < 0 ||
+    studioNestedIndex < 0 ||
+    privateDenyIndex < 0 ||
+    studioExactIndex > privateDenyIndex ||
+    studioNestedIndex > privateDenyIndex
+  ) {
+    fail('Vercel /studio 跳转必须优先于私有路由拒绝规则。');
   }
 }
 
@@ -447,5 +635,7 @@ if (errors.length > 0) {
 }
 
 console.log(
-  `构建验证通过：${htmlFiles.length} 个 HTML 页面，${requiredFiles.length} 个必要产物，站内链接全部有效。`,
+  `构建验证通过：${htmlFiles.length} 个 HTML 页面，${requiredFiles.length} 个必要产物，${
+    isDocsBuild ? '文档夹具结构与公开边界有效' : '站内链接全部有效'
+  }。`,
 );

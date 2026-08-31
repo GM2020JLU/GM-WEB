@@ -2,6 +2,7 @@ import { readFileSync, readdirSync, writeFileSync } from 'node:fs';
 import { extname, join } from 'node:path';
 
 import { getBuildOutputDirectory } from './build-output.mjs';
+import { ensureMainContentTarget, isPublicHtmlFile } from './lib/public-routes.mjs';
 
 const dist = getBuildOutputDirectory();
 const replacements = new Map([['aria-label="Close image preview"', 'aria-label="关闭图片预览"']]);
@@ -23,10 +24,14 @@ for (const file of collectHtmlFiles(dist)) {
     localized = localized.replaceAll(source, target);
   }
 
+  if (isPublicHtmlFile(file, dist)) {
+    localized = ensureMainContentTarget(localized);
+  }
+
   if (localized !== original) {
     writeFileSync(file, localized);
     changedFiles += 1;
   }
 }
 
-console.log(`已完成构建产物中文化兼容处理（${changedFiles} 个页面）。`);
+console.log(`已完成公开构建产物本地化与无障碍兼容处理（${changedFiles} 个页面）。`);

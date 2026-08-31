@@ -59,6 +59,7 @@ const items = definitions
       status,
       revision: typeof data.updatedDate === 'string' ? data.updatedDate : '',
       date: data.updatedDate ?? data.date ?? data.completedAt,
+      scheduledAt: data.scheduledAt,
       issues: getContentHealth({ collection, id: entry.id, data, body: entry.body ?? '' }),
       publicUrl,
       editorUrl: `/studio/edit/${collection}/${isAbout ? 'about' : entry.id}`,
@@ -140,6 +141,40 @@ const dashboardMetrics = [
     href: '/studio?status=issues',
   },
 ];
+const latestDraft = items.find((item) => item.status === 'draft');
+const readyItems = items.filter((item) => item.status === 'ready');
+const scheduledItems = readyItems.filter(
+  (item) => item.scheduledAt && !Number.isNaN(new Date(item.scheduledAt).valueOf()),
+);
+const issueItems = items.filter((item) => item.issues.length > 0);
+const actionItems = [
+  latestDraft && {
+    label: '继续写作',
+    title: latestDraft.title,
+    note: '打开最近编辑的草稿',
+    href: latestDraft.editorUrl,
+  },
+  readyItems.length && {
+    label: '待发布',
+    title: `${readyItems.length} 条内容已就绪`,
+    note: '检查后即可提交上线',
+    href: '/studio?status=ready',
+  },
+  scheduledItems.length && {
+    label: '定时任务',
+    title: `${scheduledItems.length} 条已安排`,
+    note: `最近：${new Date(scheduledItems[0].scheduledAt).toLocaleString('zh-CN', {
+      timeZone: 'Asia/Shanghai',
+    })}`,
+    href: scheduledItems[0].editorUrl,
+  },
+  issueItems.length && {
+    label: '发布前检查',
+    title: `${issueItems.length} 条需要完善`,
+    note: '补齐摘要、日期、分类或图片说明',
+    href: '/studio?status=issues',
+  },
+].filter(Boolean) as Array<{ href: string; label: string; note: string; title: string }>;
 ---
 
 <!doctype html>
@@ -176,14 +211,44 @@ const dashboardMetrics = [
       <section class="deployment" data-deployment data-runtime-sha={deployedSha} aria-live="polite">
         <div>
           <span class="deploy-dot"></span><span class="deploy-copy"
-            ><strong data-deployment-title>网站运行正常</strong><small data-deployment-detail
-              >当前版本 {deployedSha.slice(0, 7)}</small
+            ><strong data-deployment-title>正在检查运行状态</strong><small data-deployment-detail
+              >正在核对生产版本与发布服务…</small
             ></span
           >
         </div>
         <div class="deploy-track" hidden data-deployment-track>
           <span data-deployment-progress></span>
         </div><a data-deployment-link hidden target="_blank">打开线上页面</a>
+      </section>
+
+      <section
+        class="platform-health"
+        data-platform-health
+        aria-label="发布平台健康状态"
+        aria-busy="true"
+      >
+        {
+          [
+            ['production', '生产站点'],
+            ['worker', '发布 Worker'],
+            ['scheduler', '定时发布'],
+            ['backup', '离机备份'],
+          ].map(([key, label]) => (
+            <article data-platform-health-item={key} data-status="unknown">
+              <span class="health-dot" aria-hidden="true" />
+              <div>
+                <>
+                  <strong>{label}</strong>
+                  <small data-health-detail>正在检查…</small>
+                  <time data-health-time />
+                </>
+              </div>
+              <a data-health-link hidden target="_blank">
+                查看
+              </a>
+            </article>
+          ))
+        }
       </section>
 
       <section class="dashboard-metrics" aria-label="内容摘要">
@@ -198,6 +263,36 @@ const dashboardMetrics = [
             </a>
           ))
         }
+      </section>
+
+      <section class="next-actions" aria-labelledby="next-actions-title">
+        <div class="next-actions-heading">
+          <div><p>NEXT ACTIONS</p><h2 id="next-actions-title">现在做什么</h2></div><span
+            >根据当前内容状态生成</span
+          >
+        </div>
+        <div class="next-actions-grid">
+          {
+            actionItems.length ? (
+              actionItems.map((item) => (
+                <a href={item.href}>
+                  <>
+                    <span>{item.label}</span>
+                    <strong>{item.title}</strong>
+                    <small>{item.note}</small>
+                  </>
+                </a>
+              ))
+            ) : (
+              <div class="next-actions-clear">
+                <>
+                  <strong>内容状态良好</strong>
+                  <small>暂无草稿、待发布或待完善项。</small>
+                </>
+              </div>
+            )
+          }
+        </div>
       </section>
 
       <section class="modules" aria-labelledby="modules-title">
@@ -825,6 +920,69 @@ const dashboardMetrics = [
     font: 0.66rem/1.35 var(--studio-font-meta);
   }
 
+  .platform-health {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 8px;
+    margin: -8px 0 24px;
+  }
+
+  .platform-health article {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr) auto;
+    gap: 8px;
+    align-items: start;
+    min-height: 82px;
+    padding: 11px 12px;
+    border: 1px solid var(--studio-border);
+    border-radius: 10px;
+    background: var(--studio-surface);
+  }
+
+  .platform-health article > div {
+    display: grid;
+    gap: 2px;
+    min-width: 0;
+  }
+
+  .health-dot {
+    width: 8px;
+    height: 8px;
+    margin-top: 5px;
+    border-radius: 50%;
+    background: var(--studio-text-meta);
+  }
+
+  .platform-health article[data-status='healthy'] .health-dot {
+    background: var(--studio-success);
+  }
+
+  .platform-health article[data-status='warning'] .health-dot {
+    background: #d29b2d;
+  }
+
+  .platform-health article[data-status='error'] .health-dot {
+    background: var(--studio-danger);
+  }
+
+  .platform-health strong {
+    font-size: 0.74rem;
+  }
+
+  .platform-health small,
+  .platform-health time,
+  .platform-health a {
+    overflow: hidden;
+    color: var(--studio-text-meta);
+    font-size: 0.64rem;
+    line-height: 1.4;
+    text-overflow: ellipsis;
+  }
+
+  .platform-health a {
+    color: var(--studio-accent-strong);
+  }
+
   .dashboard-metrics {
     display: grid;
     grid-template-columns: repeat(4, minmax(0, 1fr));
@@ -877,6 +1035,75 @@ const dashboardMetrics = [
     color: var(--studio-text);
     font: 600 1.75rem/1 var(--studio-font-heading);
     font-variant-numeric: tabular-nums;
+  }
+
+  .next-actions {
+    margin-bottom: 30px;
+  }
+
+  .next-actions-heading {
+    display: flex;
+    align-items: flex-end;
+    justify-content: space-between;
+    gap: 20px;
+    margin-bottom: 12px;
+  }
+
+  .next-actions-heading p {
+    margin: 0 0 5px;
+    color: var(--studio-accent-strong);
+    font: 700 0.63rem/1.2 var(--studio-font-meta);
+    letter-spacing: 0.12em;
+  }
+
+  .next-actions-heading h2 {
+    margin: 0;
+    font: 550 1.22rem/1.25 var(--studio-font-heading);
+    letter-spacing: -0.02em;
+  }
+
+  .next-actions-heading > span {
+    color: var(--studio-text-meta);
+    font-size: 0.7rem;
+  }
+
+  .next-actions-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+    gap: 10px;
+  }
+
+  .next-actions-grid > a,
+  .next-actions-clear {
+    display: grid;
+    gap: 6px;
+    min-height: 112px;
+    padding: 15px 16px;
+    border: 1px solid var(--studio-border);
+    border-radius: var(--studio-radius-panel);
+    background: color-mix(in srgb, var(--studio-surface) 96%, var(--paper-accent) 4%);
+  }
+
+  .next-actions-grid > a:hover {
+    border-color: color-mix(in srgb, var(--paper-accent) 44%, var(--studio-border) 56%);
+    transform: translateY(-1px);
+  }
+
+  .next-actions-grid span {
+    color: var(--studio-accent-strong);
+    font: 700 0.64rem/1.3 var(--studio-font-meta);
+    letter-spacing: 0.08em;
+  }
+
+  .next-actions-grid strong {
+    align-self: end;
+    font-size: 0.86rem;
+  }
+
+  .next-actions-grid small {
+    color: var(--studio-text-meta);
+    font-size: 0.7rem;
+    line-height: 1.45;
   }
 
   .modules {
@@ -1030,12 +1257,18 @@ const dashboardMetrics = [
       grid-template-columns: repeat(2, minmax(0, 1fr));
     }
 
+    .platform-health {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
     .modules-heading,
+    .next-actions-heading,
     .content-section-heading {
       align-items: flex-start;
     }
 
     .modules-heading > span,
+    .next-actions-heading > span,
     .content-section-heading > span {
       display: none;
     }
@@ -1061,6 +1294,10 @@ const dashboardMetrics = [
     .dashboard-metrics a {
       min-height: 104px;
       padding: 13px 14px;
+    }
+
+    .platform-health {
+      grid-template-columns: 1fr;
     }
 
     .controls {

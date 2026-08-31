@@ -298,7 +298,7 @@ const slugSchema = z
   .regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/, '网址别名只能使用小写英文、数字和中划线。');
 
 export const studioWriteSchema = z.object({
-  action: z.enum(['draft', 'ready', 'publish', 'unpublish', 'schedule']).optional(),
+  action: z.enum(['save', 'draft', 'ready', 'publish', 'unpublish', 'schedule']).optional(),
   body: z.string().max(2 * 1024 * 1024, '正文不能超过 2 MB。'),
   expectedSha: z
     .string()

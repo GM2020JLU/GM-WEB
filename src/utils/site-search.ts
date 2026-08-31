@@ -1,4 +1,4 @@
-type PagefindResult = {
+export type PagefindResult = {
   id: string;
   data: () => Promise<{
     url: string;
@@ -9,7 +9,7 @@ type PagefindResult = {
   }>;
 };
 
-type PagefindModule = {
+export type PagefindModule = {
   init?: () => Promise<void>;
   options?: (options: { baseUrl?: string }) => Promise<void> | void;
   search: (query: string) => Promise<{ results: PagefindResult[] }>;
@@ -31,8 +31,10 @@ const pagefindPath = `${baseUrl.replace(/\/$/, '')}/pagefind/pagefind.js`.replac
 );
 
 let pagefindPromise: Promise<PagefindModule> | null = null;
-let lastFocusedElement: HTMLElement | null = null;
 const searchLayers = new WeakMap<HTMLElement, HTMLElement>();
+const searchAnimationFrames = new WeakMap<HTMLElement, number>();
+const searchHideTimers = new WeakMap<HTMLElement, number>();
+const publicResultRoots = ['/about', '/blog', '/media', '/projects', '/tags', '/vibe'];
 
 function getSearchSurface(root: HTMLElement) {
   return searchLayers.get(root) ?? root;
@@ -43,7 +45,7 @@ function querySearchSurface<T extends Element>(root: HTMLElement, selector: stri
 }
 
 function normalizeResultUrl(url: string) {
-  if (/^https?:\/\//.test(url)) return url;
+  if (/^[a-z][a-z\d+.-]*:/iu.test(url) || url.startsWith('//')) return url;
   const normalizedBase = baseUrl.replace(/\/$/, '');
 
   if (!normalizedBase || normalizedBase === '/') return url;
@@ -53,19 +55,46 @@ function normalizeResultUrl(url: string) {
   return `${normalizedBase}/${url}`;
 }
 
-function getResultPath(url: string) {
+function resolveSameOriginResultUrl(url: string) {
   try {
-    const path = new URL(normalizeResultUrl(url), window.location.origin).pathname;
-    const normalizedBase = baseUrl.replace(/\/$/, '');
-
-    if (normalizedBase && normalizedBase !== '/' && path.startsWith(`${normalizedBase}/`)) {
-      return path.slice(normalizedBase.length) || '/';
-    }
-
-    return path;
+    const resolved = new URL(normalizeResultUrl(url), window.location.origin);
+    if (!['http:', 'https:'].includes(resolved.protocol)) return null;
+    if (resolved.origin !== window.location.origin) return null;
+    return resolved;
   } catch {
-    return normalizeResultUrl(url);
+    return null;
   }
+}
+
+function getResultPath(url: string) {
+  const resolved = resolveSameOriginResultUrl(url);
+  if (!resolved) return '';
+
+  const path = resolved.pathname;
+  const normalizedBase = baseUrl.replace(/\/$/, '');
+
+  if (normalizedBase && normalizedBase !== '/') {
+    if (path === normalizedBase) return '/';
+    if (path.startsWith(`${normalizedBase}/`)) return path.slice(normalizedBase.length) || '/';
+    return '';
+  }
+
+  return path;
+}
+
+function getResultHref(url: string) {
+  const resolved = resolveSameOriginResultUrl(url);
+  if (!resolved) return '#';
+  return `${resolved.pathname}${resolved.search}${resolved.hash}`;
+}
+
+function isPublicResultUrl(url: string) {
+  const resultPath = getResultPath(url);
+  if (!resultPath) return false;
+  const path = resultPath.replace(/\/$/, '') || '/';
+  return (
+    path === '/' || publicResultRoots.some((root) => path === root || path.startsWith(`${root}/`))
+  );
 }
 
 function getResultKind(root: HTMLElement, url: string) {
@@ -116,7 +145,41 @@ function setExpanded(root: HTMLElement, expanded: boolean) {
   const layer =
     searchLayers.get(root) ?? root.querySelector<HTMLElement>('[data-site-search-layer]');
 
-  layer?.setAttribute('data-search-open', String(expanded));
+  if (layer) {
+    const animationFrame = searchAnimationFrames.get(layer);
+    const hideTimer = searchHideTimers.get(layer);
+    if (animationFrame) window.cancelAnimationFrame(animationFrame);
+    if (hideTimer) window.clearTimeout(hideTimer);
+
+    layer.inert = !expanded;
+    layer.setAttribute('aria-hidden', String(!expanded));
+
+    if (expanded) {
+      layer.hidden = false;
+      layer.dataset.searchOpen = 'false';
+      searchAnimationFrames.set(
+        layer,
+        window.requestAnimationFrame(() => {
+          searchAnimationFrames.set(
+            layer,
+            window.requestAnimationFrame(() => {
+              if (root.dataset.searchOpen === 'true') layer.dataset.searchOpen = 'true';
+              searchAnimationFrames.delete(layer);
+            }),
+          );
+        }),
+      );
+    } else {
+      layer.dataset.searchOpen = 'false';
+      searchHideTimers.set(
+        layer,
+        window.setTimeout(() => {
+          if (root.dataset.searchOpen !== 'true') layer.hidden = true;
+          searchHideTimers.delete(layer);
+        }, 180),
+      );
+    }
+  }
   root
     .querySelector<HTMLButtonElement>('[data-site-search-trigger]')
     ?.setAttribute('aria-expanded', String(expanded));
@@ -161,7 +224,7 @@ function renderResults(root: HTMLElement, results: Awaited<ReturnType<PagefindRe
     const matchLabel = document.createElement('span');
     const excerpt = document.createElement('span');
 
-    link.href = normalizeResultUrl(result.url);
+    link.href = getResultHref(result.url);
     title.className = 'site-search-result-title';
     title.textContent = getResultTitle(result);
     meta.className = 'site-search-result-meta';
@@ -188,7 +251,11 @@ function debounce<T extends (...args: any[]) => void>(callback: T, delay: number
   };
 }
 
-export function initSiteSearch() {
+type InitSiteSearchOptions = {
+  loadSearchIndex?: () => Promise<PagefindModule>;
+};
+
+export function initSiteSearch({ loadSearchIndex = loadPagefind }: InitSiteSearchOptions = {}) {
   for (const root of document.querySelectorAll<HTMLElement>('[data-site-search-root]')) {
     if (root.dataset.siteSearchReady === 'true') continue;
     root.dataset.siteSearchReady = 'true';
@@ -211,20 +278,42 @@ export function initSiteSearch() {
     searchLayers.set(root, layer);
     document.body.append(layer);
 
-    const close = () => {
+    let lastFocusedElement: HTMLElement | null = null;
+    let searchRequestSequence = 0;
+    let activeSearchController: AbortController | null = null;
+
+    const invalidateActiveSearch = () => {
+      searchRequestSequence += 1;
+      activeSearchController?.abort();
+      activeSearchController = null;
+    };
+
+    const close = (restoreFocus = true) => {
+      if (root.dataset.searchOpen !== 'true') return;
+      invalidateActiveSearch();
       setExpanded(root, false);
       input.value = '';
       renderResults(root, []);
       setStatus(root, root.dataset.searchIdleLabel || 'Start typing to search.');
-      lastFocusedElement?.focus?.();
+      if (restoreFocus) {
+        const focusTarget = lastFocusedElement?.isConnected ? lastFocusedElement : trigger;
+        focusTarget.focus();
+      }
+      lastFocusedElement = null;
     };
 
     const open = () => {
+      if (root.dataset.searchOpen === 'true') {
+        input.focus();
+        return;
+      }
       lastFocusedElement =
-        document.activeElement instanceof HTMLElement ? document.activeElement : null;
+        document.activeElement instanceof HTMLElement && document.activeElement !== document.body
+          ? document.activeElement
+          : trigger;
       setExpanded(root, true);
       window.setTimeout(() => input.focus(), 30);
-      void loadPagefind().catch(() => {
+      void loadSearchIndex().catch(() => {
         setStatus(
           root,
           root.dataset.searchUnavailableLabel || 'Search index is not available yet.',
@@ -235,21 +324,38 @@ export function initSiteSearch() {
     const runSearchNow = async () => {
       const query = input.value.trim();
 
+      invalidateActiveSearch();
+
       if (!query) {
         renderResults(root, []);
         setStatus(root, root.dataset.searchIdleLabel || 'Start typing to search.');
         return;
       }
 
+      const requestSequence = searchRequestSequence;
+      const controller = new AbortController();
+      activeSearchController = controller;
+      const isCurrentRequest = () =>
+        !controller.signal.aborted && requestSequence === searchRequestSequence;
+
       setStatus(root, root.dataset.searchLoadingLabel || 'Searching...');
 
       try {
-        const pagefind = await loadPagefind();
+        const pagefind = await loadSearchIndex();
+        if (!isCurrentRequest()) return;
         const search = await pagefind.search(query);
-        const resultData = await Promise.all(
-          search.results.slice(0, maxResults).map((result) => result.data()),
-        );
+        if (!isCurrentRequest()) return;
+        const resultData = (
+          await Promise.all(
+            search.results
+              .slice(0, Math.max(maxResults * 3, maxResults))
+              .map((result) => result.data()),
+          )
+        )
+          .filter((result) => isPublicResultUrl(result.url))
+          .slice(0, maxResults);
 
+        if (!isCurrentRequest()) return;
         renderResults(root, resultData);
         setStatus(
           root,
@@ -258,17 +364,21 @@ export function initSiteSearch() {
             : root.dataset.searchEmptyLabel || 'No notes found.',
         );
       } catch {
+        if (!isCurrentRequest()) return;
         renderResults(root, []);
         setStatus(
           root,
           root.dataset.searchUnavailableLabel || 'Search index is not available yet.',
         );
+      } finally {
+        if (isCurrentRequest()) activeSearchController = null;
       }
     };
     const runSearch = debounce(runSearchNow, 120);
 
     trigger.addEventListener('click', open);
     root.addEventListener('site-search:open', open);
+    root.addEventListener('site-search:close', () => close());
     input.addEventListener('input', runSearch);
     input.addEventListener('keydown', (event) => {
       if (event.key !== 'Enter') return;
@@ -278,28 +388,33 @@ export function initSiteSearch() {
     });
 
     for (const button of closeButtons) {
-      button.addEventListener('click', close);
+      button.addEventListener('click', () => close());
     }
 
     layer.addEventListener('click', (event) => {
       if ((event.target as Element).matches('[data-site-search-backdrop]')) close();
-      if ((event.target as Element).closest('[data-site-search-results] a')) close();
-    });
-
-    document.addEventListener('keydown', (event) => {
-      if (root.dataset.searchOpen !== 'true') return;
-      if (event.key === 'Escape') close();
-      trapFocus(event, dialog);
+      if ((event.target as Element).closest('[data-site-search-results] a')) close(false);
     });
   }
 }
 
-document.addEventListener('keydown', (event) => {
-  const isModK = (event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 'k';
-  if (!isModK) return;
-
+function handleDocumentKeydown(event: KeyboardEvent) {
   const root = document.querySelector<HTMLElement>('[data-site-search-root]');
   if (!root) return;
+
+  if (root.dataset.searchOpen === 'true') {
+    if (event.key === 'Escape') {
+      event.preventDefault();
+      root.dispatchEvent(new CustomEvent('site-search:close'));
+      return;
+    }
+
+    const dialog = querySearchSurface<HTMLElement>(root, '[data-site-search-dialog]');
+    if (dialog) trapFocus(event, dialog);
+  }
+
+  const isModK = (event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 'k';
+  if (!isModK) return;
 
   event.preventDefault();
 
@@ -309,7 +424,10 @@ document.addEventListener('keydown', (event) => {
   }
 
   root.dispatchEvent(new CustomEvent('site-search:open'));
-});
+}
 
-initSiteSearch();
-document.addEventListener('astro:page-load', initSiteSearch);
+if (typeof document !== 'undefined') {
+  initSiteSearch();
+  document.addEventListener('keydown', handleDocumentKeydown);
+  document.addEventListener('astro:page-load', () => initSiteSearch());
+}

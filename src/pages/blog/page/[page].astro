@@ -72,7 +72,7 @@ const { page, postOffset } = Astro.props;
   </head>
   <body>
     <BlogTopNav />
-    <main data-pagefind-body>
+    <main id="main-content" tabindex="-1" data-pagefind-body>
       <BlogArchive
         page={page}
         postOffset={postOffset}

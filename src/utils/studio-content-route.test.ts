@@ -2,6 +2,7 @@ import { describe, expect, test } from 'bun:test';
 import {
   assertStudioContentSlug,
   resolveStudioCreateSlug,
+  resolveStudioContentStatus,
   studioContentNeedsDeployment,
 } from '../pages/api/studio/content/[collection]/[...slug]';
 
@@ -25,5 +26,14 @@ describe('Studio 内容路径', () => {
     expect(studioContentNeedsDeployment(false, 'draft', 'published')).toBe(true);
     expect(studioContentNeedsDeployment(true, 'draft', 'draft')).toBe(true);
     expect(studioContentNeedsDeployment(false, 'draft', 'ready')).toBe(false);
+  });
+
+  test('普通保存保持当前发布状态，只有明确撤回才变为草稿', () => {
+    expect(resolveStudioContentStatus('save', 'published', 'draft')).toBe('published');
+    expect(resolveStudioContentStatus('save', 'ready', 'draft')).toBe('ready');
+    expect(resolveStudioContentStatus('save', 'draft', 'published')).toBe('draft');
+    expect(resolveStudioContentStatus('save', undefined, 'draft')).toBe('draft');
+    expect(resolveStudioContentStatus('unpublish', 'published', 'published')).toBe('draft');
+    expect(resolveStudioContentStatus('publish', 'draft', 'draft')).toBe('published');
   });
 });

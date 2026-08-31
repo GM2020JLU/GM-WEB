@@ -4,9 +4,11 @@ import { spawn } from 'node:child_process';
 import { existsSync } from 'node:fs';
 import {
   appendFile,
+  chmod,
   cp,
   lstat,
   mkdir,
+  readFile,
   readdir,
   rename,
   rm,
@@ -14,20 +16,30 @@ import {
   writeFile,
 } from 'node:fs/promises';
 import { relative, resolve } from 'node:path';
-
-const [targetSha, reason = '内容发布'] = process.argv.slice(2);
-if (!targetSha || !/^[a-f0-9]{40}$/.test(targetSha)) {
-  throw new Error('缺少合法的本地部署任务标识。');
-}
+import {
+  localDeploymentState,
+  replayStudioLocalDeploymentOutbox,
+  type StudioLocalDeploymentRequest,
+  writeStudioLocalDeploymentState,
+} from '../src/utils/studio-local-deployment';
+import {
+  acquireStudioRuntimeLease,
+  withStudioContentFileLock,
+} from '../src/utils/studio-runtime-lock';
 
 const root = process.cwd();
-const runtime = resolve(root, process.env.STUDIO_RUNTIME_DIR || '.studio/runtime');
+const runtime = localDeploymentState.runtimeRoot();
 const deployments = resolve(runtime, 'deployments');
+const queue = resolve(runtime, 'deployment-queue');
+const pending = resolve(queue, 'pending');
+const processing = resolve(queue, 'processing');
 const releases = resolve(runtime, 'releases');
-const stateFile = resolve(deployments, `${targetSha}.json`);
-const logFile = resolve(deployments, `${targetSha}.log`);
-const lock = resolve(runtime, 'deployment.lock');
+const worktrees = resolve(runtime, 'worktrees');
 const astroBuildCache = resolve(runtime, 'astro-build-cache');
+const once = process.argv.includes('--once');
+const pollIntervalMs = Number(process.env.STUDIO_WORKER_POLL_MS || 2_000);
+const buildTimeoutMs = Number(process.env.STUDIO_BUILD_TIMEOUT_MS || 15 * 60 * 1000);
+const productionTimeoutMs = Number(process.env.STUDIO_PRODUCTION_TIMEOUT_MS || 12 * 60 * 1000);
 const configuredBun = process.env.STUDIO_BUN_PATH?.trim();
 const bunExecutable =
   configuredBun ||
@@ -43,150 +55,338 @@ const studioManagedPaths = [
   'src/content',
 ] as const;
 
+let stopping = false;
+for (const signal of ['SIGINT', 'SIGTERM'] as const) {
+  process.on(signal, () => {
+    stopping = true;
+  });
+}
+
 function ensureInsideRuntime(path: string) {
   const pathFromRuntime = relative(runtime, path);
-  if (pathFromRuntime.startsWith('..') || pathFromRuntime === '') {
+  if (pathFromRuntime.startsWith('..')) {
     throw new Error('本地部署路径超出运行目录。');
   }
 }
 
-async function update(phase: 'queued' | 'building' | 'ready' | 'error') {
-  await mkdir(deployments, { recursive: true });
-  const next = `${stateFile}.${process.pid}.${Date.now()}.tmp`;
-  await writeFile(
-    next,
-    `${JSON.stringify(
-      {
+function isRequest(value: unknown): value is StudioLocalDeploymentRequest {
+  if (!value || typeof value !== 'object') return false;
+  const request = value as Partial<StudioLocalDeploymentRequest>;
+  return (
+    request.version === 1 &&
+    request.kind === 'deployment' &&
+    typeof request.reason === 'string' &&
+    typeof request.createdAt === 'string' &&
+    typeof request.attempts === 'number' &&
+    typeof request.id === 'string' &&
+    /^[a-f0-9]{40}$/u.test(request.id)
+  );
+}
+
+async function prepareDirectories() {
+  for (const directory of [runtime, deployments, queue, pending, processing, releases, worktrees]) {
+    ensureInsideRuntime(directory);
+    await mkdir(directory, { recursive: true, mode: 0o700 });
+    await chmod(directory, 0o700);
+  }
+}
+
+function logFile(request: StudioLocalDeploymentRequest) {
+  return resolve(deployments, `${request.id}.log`);
+}
+
+async function appendLogs(requests: StudioLocalDeploymentRequest[], value: string) {
+  await Promise.all(
+    requests.map((request) => appendFile(logFile(request), value, { mode: 0o600 })),
+  );
+}
+
+async function updateRequests(
+  requests: StudioLocalDeploymentRequest[],
+  phase: 'queued' | 'building' | 'ready' | 'error',
+  extra: Record<string, unknown> = {},
+) {
+  await Promise.all(
+    requests.map((request) =>
+      writeStudioLocalDeploymentState({
         phase,
         provider: 'local',
-        targetSha,
+        targetSha: request.id,
         updatedAt: new Date().toISOString(),
         ...(phase === 'error'
-          ? { logUrl: `/api/studio/deployment/log?sha=${encodeURIComponent(targetSha)}` }
+          ? { logUrl: `/api/studio/deployment/log?sha=${encodeURIComponent(request.id)}` }
           : {}),
-      },
-      null,
-      2,
-    )}\n`,
-    { mode: 0o600 },
+        ...extra,
+      }),
+    ),
   );
-  await rename(next, stateFile);
 }
 
-async function appendLog(value: string) {
-  await appendFile(logFile, value, { mode: 0o600 });
-}
-
-async function run(command: string, args: string[]) {
-  await appendLog(`\n$ ${command} ${args.join(' ')}\n`);
-  return new Promise<void>((accept, reject) => {
+async function run(
+  requests: StudioLocalDeploymentRequest[],
+  command: string,
+  args: string[],
+  options: {
+    cwd?: string;
+    env?: NodeJS.ProcessEnv;
+    timeoutMs?: number;
+    tolerateFailure?: boolean;
+  } = {},
+) {
+  await appendLogs(requests, `\n$ ${command} ${args.join(' ')}\n`);
+  return new Promise<{ code: number; output: string }>((accept, reject) => {
     const child = spawn(command, args, {
-      cwd: root,
-      env: {
-        ...process.env,
-        PATH: `${resolve(root, '.venv/bin')}:${process.env.PATH || ''}`,
-        ASTRO_CACHE_DIR: astroBuildCache,
-        PUBLIC_KEYSTATIC_STORAGE_KIND: 'local',
-        PUBLIC_STUDIO_DEPLOYMENT_MODE: 'local',
-        SITE_URL: 'https://goumin.work',
-      },
+      cwd: options.cwd || root,
+      detached: true,
+      env: options.env || process.env,
       stdio: ['ignore', 'pipe', 'pipe'],
     });
-    child.stdout.on('data', (chunk) => void appendLog(String(chunk)));
-    child.stderr.on('data', (chunk) => void appendLog(String(chunk)));
-    child.on('error', reject);
-    child.on('exit', (code) => {
-      if (code === 0) accept();
-      else reject(new Error(`${command} ${args.join(' ')} 退出码 ${code ?? 'unknown'}`));
+    let output = '';
+    let logTail = Promise.resolve();
+    const capture = (chunk: Buffer | string) => {
+      const text = String(chunk);
+      output += text;
+      if (output.length > 256 * 1024) output = output.slice(-256 * 1024);
+      logTail = logTail.then(() => appendLogs(requests, text));
+    };
+    child.stdout.on('data', capture);
+    child.stderr.on('data', capture);
+    const timeoutMs = options.timeoutMs ?? 2 * 60 * 1000;
+    const timeout = setTimeout(() => {
+      if (!child.pid) return;
+      try {
+        process.kill(-child.pid, 'SIGTERM');
+      } catch {}
+      setTimeout(() => {
+        if (!child.pid) return;
+        try {
+          process.kill(-child.pid, 'SIGKILL');
+        } catch {}
+      }, 5_000).unref();
+    }, timeoutMs);
+    child.on('error', (error) => {
+      clearTimeout(timeout);
+      reject(error);
+    });
+    child.on('exit', (code, signal) => {
+      clearTimeout(timeout);
+      void logTail.then(() => {
+        const exitCode = code ?? 1;
+        if (exitCode === 0 || options.tolerateFailure) {
+          accept({ code: exitCode, output });
+        } else {
+          reject(
+            new Error(
+              `${command} ${args.join(' ')} ${signal ? `被 ${signal} 终止` : `退出码 ${exitCode}`}`,
+            ),
+          );
+        }
+      });
     });
   });
 }
 
-async function runForStatus(command: string, args: string[]) {
-  await appendLog(`\n$ ${command} ${args.join(' ')}\n`);
-  return new Promise<number>((accept, reject) => {
-    const child = spawn(command, args, {
-      cwd: root,
-      env: process.env,
-      stdio: ['ignore', 'pipe', 'pipe'],
-    });
-    child.stdout.on('data', (chunk) => void appendLog(String(chunk)));
-    child.stderr.on('data', (chunk) => void appendLog(String(chunk)));
-    child.on('error', reject);
-    child.on('exit', (code) => accept(code ?? 1));
-  });
+async function gitOutput(
+  requests: StudioLocalDeploymentRequest[],
+  args: string[],
+  options: Parameters<typeof run>[3] = {},
+) {
+  const result = await run(requests, 'git', args, options);
+  return result.output.trim();
 }
 
-async function backupToGitHub() {
-  const existingIndex = await runForStatus('git', ['diff', '--cached', '--quiet']);
-  if (existingIndex !== 0) {
-    throw new Error('Git 暂存区存在非后台操作的更改，为避免误提交已停止发布。');
-  }
-
-  await run('git', ['fetch', 'origin', 'main']);
-  const remoteIsAncestor = await runForStatus('git', [
-    'merge-base',
-    '--is-ancestor',
-    'origin/main',
-    'HEAD',
-  ]);
-  if (remoteIsAncestor !== 0) {
-    throw new Error('GitHub 已有较新更改，请先同步 Mac 再发布，以免覆盖远程内容。');
-  }
-
-  const existingManagedPaths = studioManagedPaths.filter((path) => existsSync(resolve(root, path)));
-  if (existingManagedPaths.length === 0) {
-    await appendLog('\nGitHub 备份：没有可提交的后台内容路径。\n');
-    return;
-  }
-  await run('git', ['add', '--all', '--', ...existingManagedPaths]);
-  const noManagedChanges = await runForStatus('git', ['diff', '--cached', '--quiet']);
-  if (noManagedChanges === 0) {
-    await appendLog('\nGitHub 备份：没有需要提交的后台内容更改。\n');
-    return;
-  }
-
-  // The deployment already completed the full build and artifact verification above.
-  // Avoid running the repository pre-commit build a second time for the same content.
-  await run('git', ['commit', '--no-verify', '-m', `content: ${reason}`]);
-  await run('git', ['push', 'origin', 'HEAD:main']);
-}
-
-async function acquireLock() {
-  for (let attempt = 0; attempt < 180; attempt++) {
+async function recoverInterruptedRequests() {
+  const entries = await readdir(processing, { withFileTypes: true });
+  for (const entry of entries.filter((item) => item.isFile() && item.name.endsWith('.json'))) {
+    const source = resolve(processing, entry.name);
+    const target = resolve(pending, entry.name);
     try {
-      await mkdir(lock);
-      return true;
+      const request = JSON.parse(await readFile(source, 'utf8')) as unknown;
+      if (!isRequest(request)) throw new Error('部署请求已损坏。');
+      if (existsSync(target)) await rm(source, { force: true });
+      else await rename(source, target);
+      await updateRequests([request], 'queued');
+      await appendLogs([request], '\nWorker 重启：已恢复中断的部署请求。\n');
     } catch (error) {
-      if (!(typeof error === 'object' && error && 'code' in error && error.code === 'EEXIST')) {
-        throw error;
+      await rm(source, { force: true });
+      const id = entry.name.replace(/\.json$/u, '');
+      if (/^[a-f0-9]{40}$/u.test(id)) {
+        const damaged: StudioLocalDeploymentRequest = {
+          attempts: 0,
+          createdAt: new Date().toISOString(),
+          id,
+          kind: 'deployment',
+          reason: '损坏的恢复请求',
+          version: 1,
+        };
+        await appendLogs([damaged], `部署请求已损坏：${String(error)}\n`);
+        await updateRequests([damaged], 'error');
       }
-      await new Promise((accept) => setTimeout(accept, 1000));
+      console.error(`无法恢复 ${entry.name}:`, error);
     }
   }
-  throw new Error('等待上一次发布超时。');
 }
 
-async function publishRelease() {
-  const release = resolve(releases, targetSha);
-  const site = resolve(release, 'site');
-  ensureInsideRuntime(release);
-  await mkdir(release, { recursive: true });
-  await cp(resolve(root, 'dist/client'), site, { recursive: true, force: false });
-  await writeFile(
-    resolve(release, 'release.json'),
-    `${JSON.stringify({ targetSha, reason, publishedAt: new Date().toISOString() }, null, 2)}\n`,
-  );
+async function claimPendingBatch() {
+  const entries = (await readdir(pending, { withFileTypes: true }))
+    .filter((entry) => entry.isFile() && /^[a-f0-9]{40}\.json$/u.test(entry.name))
+    .sort((a, b) => a.name.localeCompare(b.name));
+  const requests: StudioLocalDeploymentRequest[] = [];
+  for (const entry of entries) {
+    const source = resolve(pending, entry.name);
+    const target = resolve(processing, entry.name);
+    try {
+      await rename(source, target);
+      const request = JSON.parse(await readFile(target, 'utf8')) as unknown;
+      if (!isRequest(request)) throw new Error('部署请求格式不合法。');
+      requests.push(request);
+    } catch (error) {
+      await rm(target, { force: true });
+      const id = entry.name.replace(/\.json$/u, '');
+      if (/^[a-f0-9]{40}$/u.test(id)) {
+        const damaged: StudioLocalDeploymentRequest = {
+          attempts: 0,
+          createdAt: new Date().toISOString(),
+          id,
+          kind: 'deployment',
+          reason: '损坏的排队请求',
+          version: 1,
+        };
+        await appendLogs([damaged], `部署请求已损坏：${String(error)}\n`);
+        await updateRequests([damaged], 'error');
+      }
+      console.error(`忽略损坏的部署请求 ${entry.name}:`, error);
+    }
+  }
+  return requests;
+}
 
-  const nextLink = resolve(runtime, `current.${targetSha}.next`);
+async function createImmutableSnapshot(requests: StudioLocalDeploymentRequest[]) {
+  await run(requests, 'git', ['fetch', '--quiet', 'origin', 'main']);
+  const ancestry = await run(
+    requests,
+    'git',
+    ['merge-base', '--is-ancestor', 'origin/main', 'HEAD'],
+    { tolerateFailure: true },
+  );
+  if (ancestry.code !== 0) {
+    throw new Error('GitHub main 已领先 Mac，需先安全同步仓库再发布。');
+  }
+
+  return withStudioContentFileLock(async () => {
+    const staged = await run(requests, 'git', ['diff', '--cached', '--quiet'], {
+      tolerateFailure: true,
+    });
+    if (staged.code !== 0) {
+      throw new Error('Git 暂存区存在非后台操作，为避免误提交已停止发布。');
+    }
+    await run(requests, 'git', ['add', '--all', '--', ...studioManagedPaths]);
+    const noChanges = await run(requests, 'git', ['diff', '--cached', '--quiet'], {
+      tolerateFailure: true,
+    });
+    if (noChanges.code !== 0) {
+      const reasons = [...new Set(requests.map((request) => request.reason))].join('；');
+      await run(requests, 'git', [
+        '-c',
+        'user.name=GM Studio',
+        '-c',
+        'user.email=studio@users.noreply.github.com',
+        'commit',
+        '--no-verify',
+        '-m',
+        `content: ${reasons.slice(0, 180)}`,
+      ]);
+    }
+    const snapshotSha = await gitOutput(requests, ['rev-parse', 'HEAD']);
+    if (!/^[a-f0-9]{40}$/u.test(snapshotSha)) throw new Error('无法生成不可变发布快照。');
+    return snapshotSha;
+  });
+}
+
+async function prepareWorktree(requests: StudioLocalDeploymentRequest[], snapshotSha: string) {
+  const worktree = resolve(worktrees, snapshotSha);
+  ensureInsideRuntime(worktree);
+  await run(requests, 'git', ['worktree', 'prune']);
+  await rm(worktree, { recursive: true, force: true });
+  await run(requests, 'git', ['worktree', 'add', '--detach', worktree, snapshotSha]);
+  for (const dependency of ['node_modules', '.venv']) {
+    const source = resolve(root, dependency);
+    const target = resolve(worktree, dependency);
+    if (existsSync(source) && !existsSync(target)) await symlink(source, target, 'dir');
+  }
+  return worktree;
+}
+
+async function publishRelease(
+  requests: StudioLocalDeploymentRequest[],
+  worktree: string,
+  snapshotSha: string,
+) {
+  const release = resolve(releases, snapshotSha);
+  const site = resolve(release, 'site');
+  const staging = resolve(releases, `.${snapshotSha}.staging`);
+  const previous = resolve(releases, `.${snapshotSha}.previous`);
+  ensureInsideRuntime(release);
+  ensureInsideRuntime(staging);
+  ensureInsideRuntime(previous);
+  if (!existsSync(release) && existsSync(previous)) await rename(previous, release);
+  let validExisting = false;
+  try {
+    const marker = JSON.parse(
+      await readFile(resolve(site, '.well-known/navfolio-build.json'), 'utf8'),
+    ) as { sha?: unknown };
+    validExisting = marker.sha === snapshotSha && existsSync(resolve(site, 'index.html'));
+  } catch {}
+  if (!validExisting) {
+    await rm(staging, { recursive: true, force: true });
+    await mkdir(staging, { recursive: true, mode: 0o700 });
+    await cp(resolve(worktree, 'dist/client'), resolve(staging, 'site'), {
+      recursive: true,
+      force: false,
+    });
+    await writeFile(
+      resolve(staging, 'release.json'),
+      `${JSON.stringify(
+        {
+          jobs: requests.map((request) => request.id),
+          publishedAt: new Date().toISOString(),
+          snapshotSha,
+        },
+        null,
+        2,
+      )}\n`,
+      { mode: 0o600 },
+    );
+    await rm(previous, { recursive: true, force: true });
+    if (existsSync(release)) await rename(release, previous);
+    await rename(staging, release);
+    await rm(previous, { recursive: true, force: true });
+  } else {
+    await writeFile(
+      resolve(release, 'release.json'),
+      `${JSON.stringify(
+        {
+          jobs: requests.map((request) => request.id),
+          publishedAt: new Date().toISOString(),
+          snapshotSha,
+        },
+        null,
+        2,
+      )}\n`,
+      { mode: 0o600 },
+    );
+  }
+
+  const nextLink = resolve(runtime, `current.${snapshotSha}.next`);
   ensureInsideRuntime(nextLink);
+  await rm(nextLink, { force: true });
   await symlink(relative(runtime, site), nextLink);
   await rename(nextLink, resolve(runtime, 'current'));
 
   const entries = await readdir(releases, { withFileTypes: true });
   const directories = await Promise.all(
     entries
-      .filter((entry) => entry.isDirectory() && /^[a-f0-9]{40}$/.test(entry.name))
+      .filter((entry) => entry.isDirectory() && /^[a-f0-9]{40}$/u.test(entry.name))
       .map(async (entry) => ({
         name: entry.name,
         modified: (await lstat(resolve(releases, entry.name))).mtimeMs,
@@ -195,33 +395,151 @@ async function publishRelease() {
   for (const stale of directories.sort((a, b) => b.modified - a.modified).slice(5)) {
     const stalePath = resolve(releases, stale.name);
     ensureInsideRuntime(stalePath);
-    await rm(stalePath, { recursive: true });
+    await rm(stalePath, { recursive: true, force: true });
   }
 }
 
-await mkdir(runtime, { recursive: true });
-await update('queued');
-let ownsLock = false;
-try {
-  ownsLock = await acquireLock();
-  await update('building');
-  await appendLog(`本地发布：${reason}\n`);
-  ensureInsideRuntime(astroBuildCache);
-  await rm(resolve(astroBuildCache, 'data-store.json'), { force: true });
-  await run(bunExecutable, ['run', 'build']);
-  await run(bunExecutable, ['run', 'verify:build']);
-  await backupToGitHub();
-  await publishRelease();
-  await update('ready');
-} catch (error) {
-  await appendLog(
-    `\n部署失败：${error instanceof Error ? error.stack || error.message : String(error)}\n`,
-  );
-  await update('error');
-  process.exitCode = 1;
-} finally {
-  if (ownsLock) {
-    ensureInsideRuntime(lock);
-    await rm(lock, { recursive: true, force: true });
+async function readProductionMarker(productionUrl: URL) {
+  const marker = new URL('/.well-known/navfolio-build.json', productionUrl);
+  marker.searchParams.set('_studio_check', Date.now().toString());
+  const response = await fetch(marker, {
+    cache: 'no-store',
+    headers: { Accept: 'application/json', 'Cache-Control': 'no-cache' },
+    redirect: 'error',
+    signal: AbortSignal.timeout(10_000),
+  });
+  if (!response.ok) return undefined;
+  const length = Number(response.headers.get('content-length') || 0);
+  if (length > 8_192) throw new Error('生产构建标记超出大小限制。');
+  const text = await response.text();
+  if (text.length > 8_192) throw new Error('生产构建标记超出大小限制。');
+  const value = JSON.parse(text) as { sha?: unknown };
+  return typeof value.sha === 'string' && /^[a-f0-9]{40}$/u.test(value.sha) ? value.sha : undefined;
+}
+
+async function waitForProduction(requests: StudioLocalDeploymentRequest[], snapshotSha: string) {
+  const productionUrl = new URL(process.env.STUDIO_PRODUCTION_URL || 'https://goumin.work');
+  if (productionUrl.protocol !== 'https:') {
+    throw new Error('生产站点检查必须使用 HTTPS。');
   }
+  const deadline = Date.now() + productionTimeoutMs;
+  let lastObserved: string | undefined;
+  while (Date.now() < deadline && !stopping) {
+    try {
+      lastObserved = await readProductionMarker(productionUrl);
+      if (lastObserved === snapshotSha) {
+        await appendLogs(requests, `\n生产域名已运行提交 ${snapshotSha}。\n`);
+        return productionUrl.origin;
+      }
+    } catch (error) {
+      await appendLogs(
+        requests,
+        `\n等待生产标记：${error instanceof Error ? error.message : String(error)}\n`,
+      );
+    }
+    await new Promise((accept) => setTimeout(accept, 5_000));
+  }
+  throw new Error(
+    `生产域名未在限时内切换到 ${snapshotSha}（当前观察到 ${lastObserved || '无标记'}）。`,
+  );
+}
+
+async function processBatch(requests: StudioLocalDeploymentRequest[]) {
+  await updateRequests(requests, 'building');
+  await appendLogs(requests, `本地发布队列：合并 ${requests.length} 个请求。\n`);
+  let worktree: string | undefined;
+  let snapshotSha: string | undefined;
+  let previewReady = false;
+  try {
+    snapshotSha = await createImmutableSnapshot(requests);
+    await updateRequests(requests, 'building', { snapshotSha });
+    worktree = await prepareWorktree(requests, snapshotSha);
+    const buildEnvironment = {
+      ...process.env,
+      ASTRO_CACHE_DIR: astroBuildCache,
+      NAVFOLIO_BUILD_SHA: snapshotSha,
+      PATH: `${resolve(root, '.venv/bin')}:${process.env.PATH || ''}`,
+      PUBLIC_KEYSTATIC_STORAGE_KIND: 'local',
+      PUBLIC_STUDIO_DEPLOYMENT_MODE: 'local',
+      SITE_URL: 'https://goumin.work',
+    };
+    await rm(resolve(astroBuildCache, 'data-store.json'), { force: true });
+    await run(requests, bunExecutable, ['run', 'build'], {
+      cwd: worktree,
+      env: buildEnvironment,
+      timeoutMs: buildTimeoutMs,
+    });
+    await run(requests, bunExecutable, ['run', 'verify:build'], {
+      cwd: worktree,
+      env: buildEnvironment,
+      timeoutMs: 3 * 60 * 1000,
+    });
+    await run(requests, 'git', ['push', 'origin', `${snapshotSha}:refs/heads/main`], {
+      timeoutMs: 2 * 60 * 1000,
+    });
+    await publishRelease(requests, worktree, snapshotSha);
+    previewReady = true;
+    await updateRequests(requests, 'building', {
+      previewReady: true,
+      snapshotSha,
+    });
+    const productionUrl = await waitForProduction(requests, snapshotSha);
+    await updateRequests(requests, 'ready', {
+      previewReady: true,
+      productionUrl,
+      runtimeSha: snapshotSha,
+      snapshotSha,
+    });
+  } catch (error) {
+    await appendLogs(
+      requests,
+      `\n部署失败：${error instanceof Error ? error.stack || error.message : String(error)}\n`,
+    );
+    await updateRequests(requests, 'error', {
+      ...(snapshotSha ? { snapshotSha } : {}),
+      ...(previewReady ? { previewReady } : {}),
+    });
+  } finally {
+    if (worktree) {
+      await run(requests, 'git', ['worktree', 'remove', '--force', worktree], {
+        tolerateFailure: true,
+      });
+      ensureInsideRuntime(worktree);
+      await rm(worktree, { recursive: true, force: true });
+    }
+    await Promise.all(
+      requests.map((request) => rm(resolve(processing, `${request.id}.json`), { force: true })),
+    );
+  }
+}
+
+await prepareDirectories();
+const workerLease = await acquireStudioRuntimeLease({
+  name: 'deployment-worker',
+  purpose: '单例本地部署 worker',
+  staleMs: 90_000,
+  timeoutMs: 1_000,
+});
+const heartbeat = setInterval(() => {
+  void workerLease.renew().catch((error) => {
+    console.error('Worker 租约续期失败：', error);
+    stopping = true;
+  });
+}, 15_000);
+heartbeat.unref();
+
+try {
+  await recoverInterruptedRequests();
+  do {
+    await replayStudioLocalDeploymentOutbox();
+    const requests = await claimPendingBatch();
+    if (requests.length) await processBatch(requests);
+    if (once) break;
+    if (!stopping && !requests.length) {
+      await new Promise((accept) => setTimeout(accept, pollIntervalMs));
+    }
+  } while (!stopping);
+} finally {
+  clearInterval(heartbeat);
+  await workerLease.release();
 }

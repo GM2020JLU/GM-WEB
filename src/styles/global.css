@@ -1,5 +1,14 @@
 @import './fonts.css';
-@import './studio-theme.css';
+
+:root:not([data-theme='dark']) {
+  /* Small metadata previously used #90998f (2.88:1 on paper). */
+  --paper-ink-faint: #687168;
+}
+
+:root[data-palette='blue-soft']:not([data-theme='dark']) {
+  --accent: #5b759e;
+  --paper-accent: #5b759e;
+}
 
 :root[data-theme-transition-capture='true'] *,
 :root[data-theme-transition-capture='true'] *::before,

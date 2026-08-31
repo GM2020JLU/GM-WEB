@@ -4,6 +4,11 @@ export interface StudioDeploymentState {
   phase: StudioDeploymentPhase;
   provider?: 'local' | 'vercel';
   targetSha: string;
+  /** Exact immutable Git commit used by both the build and production push. */
+  snapshotSha?: string;
+  /** The Mac preview release is available, while production may still be building. */
+  previewReady?: boolean;
+  productionUrl?: string;
   runtimeSha?: string;
   repositorySha?: string;
   deploymentSha?: string;
@@ -20,6 +25,28 @@ export interface PendingStudioDeployment {
 
 export const STUDIO_DEPLOYMENT_STORAGE_KEY = 'gm-studio-pending-deployment';
 export const STUDIO_DEPLOYMENT_MAX_AGE_MS = 3 * 60 * 60 * 1000;
+
+export async function readProductionBuildSha(
+  productionOrigin = process.env.STUDIO_PRODUCTION_URL || 'https://goumin.work',
+) {
+  const origin = new URL(productionOrigin);
+  if (origin.protocol !== 'https:') throw new Error('生产构建标记必须通过 HTTPS 读取。');
+  const marker = new URL('/.well-known/navfolio-build.json', origin);
+  marker.searchParams.set('_studio_check', Date.now().toString());
+  const response = await fetch(marker, {
+    cache: 'no-store',
+    headers: { Accept: 'application/json', 'Cache-Control': 'no-cache' },
+    redirect: 'error',
+    signal: AbortSignal.timeout(8_000),
+  });
+  if (!response.ok) return undefined;
+  const declaredLength = Number(response.headers.get('content-length') || 0);
+  if (declaredLength > 8_192) throw new Error('生产构建标记超出大小限制。');
+  const text = await response.text();
+  if (text.length > 8_192) throw new Error('生产构建标记超出大小限制。');
+  const value = JSON.parse(text) as { sha?: unknown };
+  return typeof value.sha === 'string' && /^[a-f0-9]{40}$/u.test(value.sha) ? value.sha : undefined;
+}
 
 export function resolveStudioDeploymentPhase(input: {
   commitState?: string;

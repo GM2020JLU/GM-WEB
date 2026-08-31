@@ -55,6 +55,8 @@ const brandRouteLabel = activeRoute?.[1];
 const shouldShowTocAction = showTocIcon && tocItems.length > 0;
 ---
 
+<a class="skip-link" href="#main-content">跳到主要内容</a>
+
 <header
   class="blog-top-nav"
   data-pagefind-ignore
@@ -83,19 +85,32 @@ const shouldShowTocAction = showTocIcon && tocItems.length > 0;
   <nav class="nav-links" aria-label="文章导航">
     {
       links.map((link) => (
-        <a class:list={['nav-link', { active: isActive(link.href) }]} href={withBase(link.href)}>
+        <a
+          class:list={['nav-link', { active: isActive(link.href) }]}
+          href={withBase(link.href)}
+          aria-current={isActive(link.href) ? 'page' : undefined}
+        >
           {link.label}
         </a>
       ))
     }
   </nav>
 
-  <nav class="mobile-menu-panel" id="mobile-nav-menu" aria-label="移动端导航" data-mobile-menu>
+  <nav
+    class="mobile-menu-panel"
+    id="mobile-nav-menu"
+    aria-label="移动端导航"
+    aria-hidden="true"
+    data-mobile-menu
+    hidden
+    inert
+  >
     {
       links.map((link) => (
         <a
           class:list={['mobile-menu-link', { active: isActive(link.href) }]}
           href={withBase(link.href)}
+          aria-current={isActive(link.href) ? 'page' : undefined}
           data-mobile-menu-link
         >
           {link.label}
@@ -142,9 +157,12 @@ const shouldShowTocAction = showTocIcon && tocItems.length > 0;
         class="mobile-toc-panel"
         id="mobile-toc-menu"
         aria-label={ui.toc.title}
+        aria-hidden="true"
         data-nav-toc-menu
         data-toc-root
         data-toc-scroll
+        hidden
+        inert
       >
         <p>{ui.toc.title}</p>
         <TocTree items={tocItems} idPrefix="nav-toc" navLink />
@@ -156,6 +174,19 @@ const shouldShowTocAction = showTocIcon && tocItems.length > 0;
 <script>
   let navigationSequence = 0;
   let activeNavigationId = 0;
+  const topNavControllers = new Map<HTMLElement, AbortController>();
+
+  // Public build output is normalized statically. This keeps third-party page
+  // routes usable in the development server before the output pass runs.
+  const ensureMainContentTarget = () => {
+    if (document.getElementById('main-content')) return;
+
+    const main = document.querySelector<HTMLElement>('main:not([id])');
+    if (!main) return;
+
+    main.id = 'main-content';
+    main.tabIndex = -1;
+  };
 
   const clearPendingNavigation = (navigationId?: number) => {
     if (navigationId && navigationId !== activeNavigationId) {
@@ -199,14 +230,18 @@ const shouldShowTocAction = showTocIcon && tocItems.length > 0;
 
   const initMobileTopNav = () => {
     for (const header of document.querySelectorAll<HTMLElement>('.blog-top-nav')) {
+      if (topNavControllers.has(header)) continue;
+
       const toggle = header.querySelector<HTMLButtonElement>('[data-mobile-menu-toggle]');
       const menu = header.querySelector<HTMLElement>('[data-mobile-menu]');
       const tocTrigger = header.querySelector<HTMLButtonElement>('[data-mobile-toc-trigger]');
       const tocMenu = header.querySelector<HTMLElement>('[data-nav-toc-menu]');
 
-      if (!header.dataset.scrollHideReady) {
-        header.dataset.scrollHideReady = 'true';
+      const controller = new AbortController();
+      const { signal } = controller;
+      topNavControllers.set(header, controller);
 
+      {
         const topRevealOffset = 24;
         const hideAfterOffset = 96;
         const scrollIntentDelta = 8;
@@ -223,6 +258,7 @@ const shouldShowTocAction = showTocIcon && tocItems.length > 0;
           window.scrollY <= topRevealOffset ||
           header.dataset.mobileMenuOpen === 'true' ||
           header.dataset.mobileTocOpen === 'true' ||
+          header.querySelector('[data-site-search-root][data-search-open="true"]') !== null ||
           header.matches(':focus-within');
 
         const updateNavVisibility = () => {
@@ -253,86 +289,184 @@ const shouldShowTocAction = showTocIcon && tocItems.length > 0;
 
             scrollFrame = window.requestAnimationFrame(updateNavVisibility);
           },
-          { passive: true },
+          { passive: true, signal },
         );
 
-        window.addEventListener('resize', () => {
-          if (window.scrollY <= topRevealOffset) {
-            setNavHidden(false);
-          }
-        });
+        window.addEventListener(
+          'resize',
+          () => {
+            if (window.scrollY <= topRevealOffset) {
+              setNavHidden(false);
+            }
+          },
+          { signal },
+        );
+
+        signal.addEventListener(
+          'abort',
+          () => {
+            if (scrollFrame) window.cancelAnimationFrame(scrollFrame);
+          },
+          { once: true },
+        );
 
         setNavHidden(false);
       }
 
-      if (toggle && menu && !header.dataset.mobileMenuReady) {
-        header.dataset.mobileMenuReady = 'true';
+      if (toggle && menu) {
+        const reducePanelMotion = window.matchMedia('(prefers-reduced-motion: reduce)');
+        let menuIsOpen = false;
+        let menuTransitionRevision = 0;
+        let tocIsOpen = false;
+        let tocTransitionRevision = 0;
 
-        const setMenuOpen = (open: boolean) => {
-          header.dataset.mobileMenuOpen = open ? 'true' : 'false';
+        const setMenuOpen = (open: boolean, restoreFocus = false) => {
+          menuIsOpen = open;
+          const revision = ++menuTransitionRevision;
           toggle.setAttribute('aria-expanded', String(open));
           toggle.setAttribute('aria-label', open ? '关闭导航菜单' : '打开导航菜单');
+          if (open) {
+            menu.hidden = false;
+            menu.inert = true;
+            menu.setAttribute('aria-hidden', 'true');
+            header.dataset.mobileMenuOpen = 'false';
+            window.requestAnimationFrame(() => {
+              window.requestAnimationFrame(() => {
+                if (signal.aborted || revision !== menuTransitionRevision || !menuIsOpen) return;
+                header.dataset.mobileMenuOpen = 'true';
+                menu.inert = false;
+                menu.setAttribute('aria-hidden', 'false');
+              });
+            });
+            return;
+          }
+
+          header.dataset.mobileMenuOpen = 'false';
+          menu.inert = true;
+          menu.setAttribute('aria-hidden', 'true');
+          if (restoreFocus && menu.contains(document.activeElement)) toggle.focus();
+          const finishClose = () => {
+            if (revision === menuTransitionRevision && !menuIsOpen) menu.hidden = true;
+          };
+          if (menu.hidden || reducePanelMotion.matches) finishClose();
+          else window.setTimeout(finishClose, 180);
         };
-        const setTocOpen = (open: boolean) => {
+        const setTocOpen = (open: boolean, restoreFocus = false) => {
           if (!tocTrigger || !tocMenu) {
             return;
           }
 
+          tocIsOpen = open;
+          const revision = ++tocTransitionRevision;
           const tocOpenLabel = header.dataset.tocOpenLabel ?? '打开目录';
           const tocCloseLabel = header.dataset.tocCloseLabel ?? '关闭目录';
 
-          header.dataset.mobileTocOpen = open ? 'true' : 'false';
           tocTrigger.setAttribute('aria-expanded', String(open));
           tocTrigger.setAttribute('aria-label', open ? tocCloseLabel : tocOpenLabel);
+          if (open) {
+            tocMenu.hidden = false;
+            tocMenu.inert = true;
+            tocMenu.setAttribute('aria-hidden', 'true');
+            header.dataset.mobileTocOpen = 'false';
+            window.requestAnimationFrame(() => {
+              window.requestAnimationFrame(() => {
+                if (signal.aborted || revision !== tocTransitionRevision || !tocIsOpen) return;
+                header.dataset.mobileTocOpen = 'true';
+                tocMenu.inert = false;
+                tocMenu.setAttribute('aria-hidden', 'false');
+              });
+            });
+            return;
+          }
+
+          header.dataset.mobileTocOpen = 'false';
+          tocMenu.inert = true;
+          tocMenu.setAttribute('aria-hidden', 'true');
+          if (restoreFocus && tocMenu.contains(document.activeElement)) {
+            tocTrigger.focus();
+          }
+          const finishClose = () => {
+            if (revision === tocTransitionRevision && !tocIsOpen) tocMenu.hidden = true;
+          };
+          if (tocMenu.hidden || reducePanelMotion.matches) finishClose();
+          else window.setTimeout(finishClose, 180);
         };
 
-        toggle.addEventListener('click', () => {
-          const nextOpen = header.dataset.mobileMenuOpen !== 'true';
-          setMenuOpen(nextOpen);
-          header.dataset.navHidden = 'false';
-          if (nextOpen) {
-            setTocOpen(false);
-          }
-        });
+        setMenuOpen(false);
+        setTocOpen(false);
 
-        menu.addEventListener('click', (event) => {
-          if ((event.target as Element).closest?.('[data-mobile-menu-link]')) {
-            setMenuOpen(false);
-          }
-        });
+        toggle.addEventListener(
+          'click',
+          () => {
+            const nextOpen = !menuIsOpen;
+            setMenuOpen(nextOpen);
+            header.dataset.navHidden = 'false';
+            if (nextOpen) {
+              setTocOpen(false);
+            }
+          },
+          { signal },
+        );
 
-        tocTrigger?.addEventListener('click', () => {
-          const nextOpen = header.dataset.mobileTocOpen !== 'true';
-          setTocOpen(nextOpen);
-          header.dataset.navHidden = 'false';
-          if (nextOpen) {
-            setMenuOpen(false);
-          }
-        });
+        menu.addEventListener(
+          'click',
+          (event) => {
+            if ((event.target as Element).closest?.('[data-mobile-menu-link]')) {
+              setMenuOpen(false, false);
+            }
+          },
+          { signal },
+        );
 
-        tocMenu?.addEventListener('click', (event) => {
-          if ((event.target as Element).closest?.('[data-nav-toc-link]')) {
-            setTocOpen(false);
-          }
-        });
+        tocTrigger?.addEventListener(
+          'click',
+          () => {
+            const nextOpen = !tocIsOpen;
+            setTocOpen(nextOpen);
+            header.dataset.navHidden = 'false';
+            if (nextOpen) {
+              setMenuOpen(false);
+            }
+          },
+          { signal },
+        );
 
-        document.addEventListener('click', (event) => {
-          if (!header.contains(event.target as Node)) {
-            setMenuOpen(false);
-            setTocOpen(false);
-          }
-        });
+        tocMenu?.addEventListener(
+          'click',
+          (event) => {
+            if ((event.target as Element).closest?.('[data-nav-toc-link]')) {
+              setTocOpen(false, false);
+            }
+          },
+          { signal },
+        );
 
-        document.addEventListener('keydown', (event) => {
-          if (event.key === 'Escape') {
-            setMenuOpen(false);
-            setTocOpen(false);
-          }
-        });
+        document.addEventListener(
+          'click',
+          (event) => {
+            if (!header.contains(event.target as Node)) {
+              setMenuOpen(false, false);
+              setTocOpen(false, false);
+            }
+          },
+          { signal },
+        );
+
+        document.addEventListener(
+          'keydown',
+          (event) => {
+            if (event.key === 'Escape') {
+              setMenuOpen(false, true);
+              setTocOpen(false, true);
+            }
+          },
+          { signal },
+        );
       }
     }
   };
 
+  ensureMainContentTarget();
   initMobileTopNav();
   document.addEventListener('astro:before-preparation', (event) => {
     const navigationId = startPendingNavigation(event.sourceElement);
@@ -357,10 +491,40 @@ const shouldShowTocAction = showTocIcon && tocItems.length > 0;
     };
   });
   document.addEventListener('astro:after-swap', () => clearPendingNavigation());
-  document.addEventListener('astro:page-load', initMobileTopNav);
+  document.addEventListener('astro:before-swap', () => {
+    for (const controller of topNavControllers.values()) controller.abort();
+    topNavControllers.clear();
+  });
+  document.addEventListener('astro:page-load', () => {
+    ensureMainContentTarget();
+    initMobileTopNav();
+  });
 </script>
 
 <style>
+  .skip-link {
+    position: fixed;
+    top: 8px;
+    left: 50%;
+    z-index: 120;
+    padding: 10px 14px;
+    border: 2px solid var(--paper-accent);
+    border-radius: 8px;
+    background: var(--paper-surface);
+    color: var(--paper-ink);
+    font-family: var(--font-ui-label);
+    font-size: 0.88rem;
+    font-weight: 700;
+    text-decoration: none;
+    transform: translate(-50%, calc(-100% - 20px));
+  }
+
+  .skip-link:focus {
+    outline: 3px solid color-mix(in srgb, var(--paper-accent) 38%, transparent);
+    outline-offset: 2px;
+    transform: translate(-50%, 0);
+  }
+
   .blog-top-nav {
     position: fixed;
     top: 18px;
@@ -427,6 +591,11 @@ const shouldShowTocAction = showTocIcon && tocItems.length > 0;
   .mobile-menu-toggle,
   .mobile-menu-panel,
   .mobile-toc-panel {
+    display: none;
+  }
+
+  .mobile-menu-panel[hidden],
+  .mobile-toc-panel[hidden] {
     display: none;
   }
 
@@ -718,7 +887,9 @@ const shouldShowTocAction = showTocIcon && tocItems.length > 0;
   }
 
   @media (prefers-reduced-motion: reduce) {
-    .blog-top-nav {
+    .blog-top-nav,
+    .mobile-menu-panel,
+    .mobile-toc-panel {
       transition: none;
     }
 

@@ -1,8 +1,28 @@
 import { Octokit } from '@octokit/core';
 import { createHash } from 'node:crypto';
-import { mkdir, readFile, readdir, rename, stat, unlink, writeFile } from 'node:fs/promises';
+import {
+  chmod,
+  mkdir,
+  readFile,
+  readdir,
+  rename,
+  rm,
+  stat,
+  unlink,
+  writeFile,
+} from 'node:fs/promises';
 import { dirname, resolve } from 'node:path';
+import {
+  createStudioBackupRecord,
+  parseStudioBackupRecord,
+  type StudioBackupRecord,
+} from './studio-backup-record';
+import {
+  commitStudioLocalDeploymentIntent,
+  prepareStudioLocalDeploymentIntent,
+} from './studio-local-deployment';
 import { resolveStudioDeploymentPhase } from './studio-deployment';
+import { withStudioContentFileLock } from './studio-runtime-lock';
 
 const repository = { owner: 'GM2020JLU', repo: 'GM-WEB', branch: 'main' } as const;
 
@@ -52,7 +72,8 @@ function localContentSha(content: string | Buffer) {
 let localWriteTail: Promise<void> = Promise.resolve();
 
 function withLocalWriteLock<T>(operation: () => Promise<T>) {
-  const result = localWriteTail.then(operation, operation);
+  const lockedOperation = () => withStudioContentFileLock(operation);
+  const result = localWriteTail.then(lockedOperation, lockedOperation);
   localWriteTail = result.then(
     () => undefined,
     () => undefined,
@@ -60,17 +81,94 @@ function withLocalWriteLock<T>(operation: () => Promise<T>) {
   return result;
 }
 
-type LocalBackup = {
-  content: string;
-  date: string;
-  encoding: 'base64' | 'utf8';
-  message: string;
-  path: string;
-  sha: string;
-};
+type LocalDeploymentIntentOptions = { deploy: boolean; reason: string };
+
+async function withLocalDeploymentIntent<T extends object>(
+  deployment: LocalDeploymentIntentOptions | undefined,
+  operation: () => Promise<T>,
+) {
+  const intentId = deployment?.deploy
+    ? await prepareStudioLocalDeploymentIntent(deployment.reason)
+    : undefined;
+  try {
+    const result = await operation();
+    if (intentId) await commitStudioLocalDeploymentIntent(intentId);
+    return { ...result, localDeploymentId: intentId };
+  } catch (error) {
+    // Once an intent exists we cannot prove an interrupted multi-step write made
+    // no durable filesystem change. Keep the prepared intent for conservative
+    // replay; an extra no-op deployment is safer than losing a publication.
+    throw error;
+  }
+}
+
+type LocalBackup = StudioBackupRecord;
 
 function localBackupRoot() {
   return resolve(process.cwd(), process.env.STUDIO_RUNTIME_DIR || '.studio/runtime', 'backups');
+}
+
+function localOffsitePendingRoot() {
+  return resolve(
+    process.cwd(),
+    process.env.STUDIO_RUNTIME_DIR || '.studio/runtime',
+    'offsite-pending',
+  );
+}
+
+async function createLocalOffsiteSnapshot(
+  path: string,
+  content: string,
+  message: string,
+  encoding: LocalBackup['encoding'] = 'utf8',
+) {
+  const date = new Date().toISOString();
+  const record = createStudioBackupRecord({
+    content,
+    date,
+    encoding,
+    kind: 'snapshot',
+    message,
+    path,
+  });
+  const { sha } = record;
+  const root = localOffsitePendingRoot();
+  await mkdir(root, { recursive: true, mode: 0o700 });
+  await chmod(root, 0o700);
+  const target = resolve(root, `${sha}.json`);
+  const temporary = `${target}.${process.pid}.${Date.now()}.tmp`;
+  await writeFile(temporary, `${JSON.stringify(record)}\n`, {
+    encoding: 'utf8',
+    mode: 0o600,
+    flag: 'wx',
+  });
+  await rename(temporary, target);
+}
+
+async function createLocalOffsiteTombstone(path: string, message: string, afterDate?: string) {
+  const after = afterDate ? Date.parse(afterDate) : Number.NaN;
+  const date = new Date(Math.max(Date.now(), Number.isFinite(after) ? after + 1 : 0)).toISOString();
+  const record = createStudioBackupRecord({
+    content: '',
+    date,
+    deleted: true,
+    encoding: 'utf8',
+    kind: 'tombstone',
+    message,
+    path,
+  });
+  const { sha } = record;
+  const root = localOffsitePendingRoot();
+  await mkdir(root, { recursive: true, mode: 0o700 });
+  await chmod(root, 0o700);
+  const target = resolve(root, `${sha}.json`);
+  const temporary = `${target}.${process.pid}.${Date.now()}.tmp`;
+  await writeFile(temporary, `${JSON.stringify(record)}\n`, {
+    encoding: 'utf8',
+    mode: 0o600,
+    flag: 'wx',
+  });
+  await rename(temporary, target);
 }
 
 async function createLocalBackup(
@@ -80,15 +178,75 @@ async function createLocalBackup(
   encoding: LocalBackup['encoding'] = 'utf8',
 ) {
   const date = new Date().toISOString();
-  const sha = createHash('sha1').update(`${path}\0${date}\0${encoding}\0${content}`).digest('hex');
+  const record = createStudioBackupRecord({
+    content,
+    date,
+    encoding,
+    kind: 'history',
+    message,
+    path,
+  });
+  const { sha } = record;
   const root = localBackupRoot();
-  await mkdir(root, { recursive: true });
-  await writeFile(
-    resolve(root, `${sha}.json`),
-    `${JSON.stringify({ content, date, encoding, message, path, sha } satisfies LocalBackup)}\n`,
-    { encoding: 'utf8', mode: 0o600, flag: 'wx' },
+  await mkdir(root, { recursive: true, mode: 0o700 });
+  await chmod(root, 0o700);
+  const target = resolve(root, `${sha}.json`);
+  const temporary = `${target}.${process.pid}.${Date.now()}.tmp`;
+  await writeFile(temporary, `${JSON.stringify(record)}\n`, {
+    encoding: 'utf8',
+    mode: 0o600,
+    flag: 'wx',
+  });
+  await rename(temporary, target);
+  await pruneLocalBackups(path);
+  return { date, sha };
+}
+
+async function pruneLocalBackups(path: string, now = Date.now()) {
+  const root = localBackupRoot();
+  let files: string[];
+  try {
+    files = await readdir(root);
+  } catch (error) {
+    if (typeof error === 'object' && error && 'code' in error && error.code === 'ENOENT') return;
+    throw error;
+  }
+  const matching = (
+    await Promise.all(
+      files
+        .filter((file) => file.endsWith('.json'))
+        .map(async (file) => {
+          try {
+            const backup = parseStudioBackupRecord(await readFile(resolve(root, file)), file);
+            return backup.path === path ? { backup, file } : undefined;
+          } catch {
+            return undefined;
+          }
+        }),
+    )
+  )
+    .filter((entry): entry is { backup: LocalBackup; file: string } => Boolean(entry))
+    .sort((a, b) => b.backup.date.localeCompare(a.backup.date));
+  const maximumAge = 120 * 24 * 60 * 60 * 1000;
+  await Promise.all(
+    matching
+      .filter((entry, index) => index >= 30 || now - Date.parse(entry.backup.date) > maximumAge)
+      .map((entry) => rm(resolve(root, entry.file), { force: true })),
   );
-  return sha;
+}
+
+async function atomicWriteLocalFile(target: string, content: string | Buffer) {
+  await mkdir(dirname(target), { recursive: true });
+  const temporary = resolve(
+    dirname(target),
+    `.${target.split('/').at(-1)}.${process.pid}.${Date.now()}.tmp`,
+  );
+  try {
+    await writeFile(temporary, content, { mode: 0o644, flag: 'wx' });
+    await rename(temporary, target);
+  } finally {
+    await rm(temporary, { force: true });
+  }
 }
 
 async function readLocalBackups(path: string) {
@@ -102,11 +260,14 @@ async function readLocalBackups(path: string) {
   const backups: LocalBackup[] = [];
   for (const file of files.filter((name) => name.endsWith('.json'))) {
     try {
-      const backup = JSON.parse(
-        await readFile(resolve(localBackupRoot(), file), 'utf8'),
-      ) as LocalBackup;
+      const backup = parseStudioBackupRecord(
+        await readFile(resolve(localBackupRoot(), file)),
+        file,
+      );
       if (
         backup.path === path &&
+        !backup.deleted &&
+        (backup.kind === undefined || backup.kind === 'history') &&
         backup.content !== undefined &&
         backup.sha &&
         (backup.encoding === undefined || backup.encoding === 'utf8')
@@ -215,62 +376,75 @@ export async function getStudioTaxonomies(token?: string) {
 export async function writeStudioFile(args: {
   beforeWrite?: () => Promise<void>;
   content: string;
+  deployment?: LocalDeploymentIntentOptions;
   expectedSha?: string | null;
   message: string;
   path: string;
   previousPath?: string;
+  repositoryRoot?: string;
   token?: string;
 }) {
   if (!args.token) {
-    return withLocalWriteLock(async () => {
-      const target = resolve(process.cwd(), args.path);
-      const isMove = Boolean(args.previousPath && args.previousPath !== args.path);
-      const versionPath = isMove ? args.previousPath! : args.path;
-      const versionTarget = resolve(process.cwd(), versionPath);
-      let previous: string | undefined;
-      try {
-        previous = await readFile(versionTarget, 'utf8');
-      } catch (error) {
-        if (!(typeof error === 'object' && error && 'code' in error && error.code === 'ENOENT')) {
-          throw error;
-        }
-      }
-
-      if (args.expectedSha === null) {
-        if (previous !== undefined) throw new StudioConflictError('同名内容已经存在。');
-      } else if (args.expectedSha !== undefined) {
-        if (previous === undefined || localContentSha(previous) !== args.expectedSha) {
-          throw new StudioConflictError();
-        }
-      }
-
-      if (isMove) {
+    return withLocalWriteLock(() =>
+      withLocalDeploymentIntent(args.deployment, async () => {
+        const repositoryRoot = args.repositoryRoot || process.cwd();
+        const target = resolve(repositoryRoot, args.path);
+        const isMove = Boolean(args.previousPath && args.previousPath !== args.path);
+        const versionPath = isMove ? args.previousPath! : args.path;
+        const versionTarget = resolve(repositoryRoot, versionPath);
+        let previous: string | undefined;
         try {
-          await readFile(target, 'utf8');
-          throw new StudioConflictError('新的内容标识已经存在。');
+          previous = await readFile(versionTarget, 'utf8');
         } catch (error) {
-          if (
-            error instanceof StudioConflictError ||
-            !(typeof error === 'object' && error && 'code' in error && error.code === 'ENOENT')
-          ) {
+          if (!(typeof error === 'object' && error && 'code' in error && error.code === 'ENOENT')) {
             throw error;
           }
         }
-      }
 
-      await args.beforeWrite?.();
-      await mkdir(dirname(target), { recursive: true });
-      if (previous !== undefined) {
-        await createLocalBackup(versionPath, previous, args.message);
-      }
-      if (isMove) await rename(versionTarget, target);
-      await writeFile(target, args.content, 'utf8');
-      return {
-        path: args.path,
-        commitSha: undefined,
-        contentSha: localContentSha(args.content),
-      };
-    });
+        if (args.expectedSha === null) {
+          if (previous !== undefined) throw new StudioConflictError('同名内容已经存在。');
+        } else if (args.expectedSha !== undefined) {
+          if (previous === undefined || localContentSha(previous) !== args.expectedSha) {
+            throw new StudioConflictError();
+          }
+        }
+
+        if (isMove) {
+          try {
+            await readFile(target, 'utf8');
+            throw new StudioConflictError('新的内容标识已经存在。');
+          } catch (error) {
+            if (
+              error instanceof StudioConflictError ||
+              !(typeof error === 'object' && error && 'code' in error && error.code === 'ENOENT')
+            ) {
+              throw error;
+            }
+          }
+        }
+
+        await args.beforeWrite?.();
+        const backup =
+          previous !== undefined
+            ? await createLocalBackup(versionPath, previous, args.message)
+            : undefined;
+        await atomicWriteLocalFile(target, args.content);
+        if (isMove) {
+          await unlink(versionTarget);
+          await createLocalOffsiteTombstone(
+            versionPath,
+            `Move ${versionPath} to ${args.path}`,
+            backup?.date,
+          );
+        }
+        await createLocalOffsiteSnapshot(args.path, args.content, args.message);
+        return {
+          path: args.path,
+          commitSha: undefined,
+          contentSha: localContentSha(args.content),
+        };
+      }),
+    );
   }
 
   const client = github(args.token);
@@ -301,6 +475,7 @@ export async function writeStudioFile(args: {
       path: args.path,
       commitSha: data.commit?.sha,
       contentSha: data.content?.sha,
+      localDeploymentId: undefined,
     };
   } catch (error) {
     if (
@@ -326,13 +501,19 @@ export async function writeStudioBinaryFile(args: {
       const target = resolve(process.cwd(), args.path);
       await mkdir(dirname(target), { recursive: true });
       try {
-        await writeFile(target, args.content, { flag: 'wx' });
+        await writeFile(target, args.content, { flag: 'wx', mode: 0o644 });
       } catch (error) {
         if (typeof error === 'object' && error && 'code' in error && error.code === 'EEXIST') {
           throw new StudioConflictError('同名素材已经存在。');
         }
         throw error;
       }
+      await createLocalOffsiteSnapshot(
+        args.path,
+        args.content.toString('base64'),
+        args.message,
+        'base64',
+      );
       return { path: args.path, contentSha: localContentSha(args.content) };
     });
   }
@@ -348,6 +529,7 @@ export async function writeStudioBinaryFile(args: {
 
 export interface StudioDeleteFileOptions {
   beforeDelete?: () => Promise<void>;
+  deployment?: LocalDeploymentIntentOptions;
 }
 
 export async function deleteStudioFile(
@@ -357,21 +539,22 @@ export async function deleteStudioFile(
   options: StudioDeleteFileOptions = {},
 ) {
   if (!token) {
-    return withLocalWriteLock(async () => {
-      const target = resolve(process.cwd(), path);
-      const previous = await readFile(target);
-      if (!sha) throw new StudioConflictError('缺少内容版本，请刷新后再删除。');
-      if (localContentSha(previous) !== sha) throw new StudioConflictError();
-      await options.beforeDelete?.();
-      const binaryAsset = path.replaceAll('\\', '/').match(/(?:^|\/)src\/assets\//);
-      if (binaryAsset) {
-        await createLocalBackup(path, previous.toString('base64'), `Delete ${path}`, 'base64');
-      } else {
-        await createLocalBackup(path, previous.toString('utf8'), `Delete ${path}`);
-      }
-      await unlink(target);
-      return { commitSha: undefined };
-    });
+    return withLocalWriteLock(() =>
+      withLocalDeploymentIntent(options.deployment, async () => {
+        const target = resolve(process.cwd(), path);
+        const previous = await readFile(target);
+        if (!sha) throw new StudioConflictError('缺少内容版本，请刷新后再删除。');
+        if (localContentSha(previous) !== sha) throw new StudioConflictError();
+        await options.beforeDelete?.();
+        const binaryAsset = path.replaceAll('\\', '/').match(/(?:^|\/)src\/assets\//);
+        const backup = binaryAsset
+          ? await createLocalBackup(path, previous.toString('base64'), `Delete ${path}`, 'base64')
+          : await createLocalBackup(path, previous.toString('utf8'), `Delete ${path}`);
+        await unlink(target);
+        await createLocalOffsiteTombstone(path, `Delete ${path}`, backup.date);
+        return { commitSha: undefined };
+      }),
+    );
   }
   if (!sha) throw new StudioConflictError('缺少内容版本，请刷新后再删除。');
   await options.beforeDelete?.();
@@ -383,7 +566,10 @@ export async function deleteStudioFile(
     sha,
     headers: { 'X-GitHub-Api-Version': '2022-11-28' },
   });
-  return { commitSha: (response.data as { commit?: { sha?: string } }).commit?.sha };
+  return {
+    commitSha: (response.data as { commit?: { sha?: string } }).commit?.sha,
+    localDeploymentId: undefined,
+  };
 }
 
 export async function listStudioHistory(
@@ -547,3 +733,5 @@ export async function listStudioAssets(
       url: `https://raw.githubusercontent.com/${repository.owner}/${repository.repo}/${repository.branch}/${entry.path}`,
     }));
 }
+
+export const studioStorageInternals = { readLocalBackup, withLocalDeploymentIntent };

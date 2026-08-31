@@ -1,0 +1,45 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>Label</key>
+  <string>com.goumin.goumin-work.studio-worker</string>
+  <key>ProgramArguments</key>
+  <array>
+    <string>/Users/goumin/.bun/bin/bun</string>
+    <string>run</string>
+    <string>studio:worker</string>
+  </array>
+  <key>WorkingDirectory</key>
+  <string>/Users/goumin/Services/goumin-work/repo</string>
+  <key>EnvironmentVariables</key>
+  <dict>
+    <key>PATH</key>
+    <string>/Users/goumin/Services/goumin-work/repo/.venv/bin:/Users/goumin/.bun/bin:/Users/goumin/.local/bin:/usr/bin:/bin:/usr/sbin:/sbin</string>
+    <key>ALL_PROXY</key>
+    <string>http://127.0.0.1:7897</string>
+    <key>HTTP_PROXY</key>
+    <string>http://127.0.0.1:7897</string>
+    <key>HTTPS_PROXY</key>
+    <string>http://127.0.0.1:7897</string>
+    <key>STUDIO_RUNTIME_DIR</key>
+    <string>/Users/goumin/Services/goumin-work/runtime</string>
+    <key>STUDIO_BUN_PATH</key>
+    <string>/Users/goumin/.bun/bin/bun</string>
+    <key>STUDIO_PRODUCTION_URL</key>
+    <string>https://goumin.work</string>
+  </dict>
+  <key>RunAtLoad</key>
+  <true/>
+  <key>KeepAlive</key>
+  <true/>
+  <key>ThrottleInterval</key>
+  <integer>10</integer>
+  <key>ProcessType</key>
+  <string>Background</string>
+  <key>StandardOutPath</key>
+  <string>/Users/goumin/Library/Logs/goumin-work/studio-worker.log</string>
+  <key>StandardErrorPath</key>
+  <string>/Users/goumin/Library/Logs/goumin-work/studio-worker.error.log</string>
+</dict>
+</plist>

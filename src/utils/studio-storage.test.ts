@@ -2,6 +2,8 @@ import { describe, expect, test } from 'bun:test';
 import { mkdir, mkdtemp, readFile, readdir, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { syncStudioOffsiteBackups } from '../../scripts/local-backup';
+import { restoreStudioOffsiteBackup } from '../../scripts/local-backup-restore';
 import {
   deleteStudioFile,
   listStudioAssets,
@@ -158,6 +160,43 @@ describe('Studio 本地备份', () => {
       );
       expect([Buffer.from([1, 2, 3]), Buffer.from([4, 5, 6])]).toContainEqual(await readFile(path));
     } finally {
+      await rm(root, { recursive: true, force: true });
+    }
+  });
+
+  test('重命名后离机恢复不会复活旧 slug', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'goumin-studio-rename-backup-'));
+    const runtime = join(root, 'runtime');
+    const destination = join(root, 'icloud');
+    const output = join(root, 'restored');
+    const previousRuntime = process.env.STUDIO_RUNTIME_DIR;
+    process.env.STUDIO_RUNTIME_DIR = runtime;
+    const oldPath = 'src/content/blog/old-slug.md';
+    const newPath = 'src/content/blog/new-slug.md';
+    try {
+      await mkdir(join(root, 'src/content/blog'), { recursive: true });
+      await writeFile(join(root, oldPath), '旧 slug 内容\n');
+      await writeStudioFile({
+        content: '新 slug 内容\n',
+        message: '重命名内容',
+        path: newPath,
+        previousPath: oldPath,
+        repositoryRoot: root,
+      });
+      await syncStudioOffsiteBackups({
+        destination,
+        repositoryRoot: root,
+        runtimeDirectory: runtime,
+      });
+      expect(await restoreStudioOffsiteBackup(destination, output)).toEqual({
+        restored: 1,
+        tombstones: 1,
+      });
+      expect(await readFile(join(output, newPath), 'utf8')).toBe('新 slug 内容\n');
+      await expect(readFile(join(output, oldPath), 'utf8')).rejects.toThrow();
+    } finally {
+      if (previousRuntime === undefined) delete process.env.STUDIO_RUNTIME_DIR;
+      else process.env.STUDIO_RUNTIME_DIR = previousRuntime;
       await rm(root, { recursive: true, force: true });
     }
   });

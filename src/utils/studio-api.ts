@@ -15,12 +15,13 @@ export const studioUsesLocalDeployment =
 export async function studioDeploymentMetadata(input: {
   commitSha?: string;
   deploy: boolean;
+  localDeploymentId?: string;
   reason: string;
   token?: string;
 }) {
   if (studioUsesLocalDeployment && input.deploy) {
     return {
-      commitSha: await startStudioLocalDeployment(input.reason),
+      commitSha: input.localDeploymentId || (await startStudioLocalDeployment(input.reason)),
       deploymentPending: true,
       deploymentProvider: 'local' as const,
     };

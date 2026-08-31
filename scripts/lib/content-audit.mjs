@@ -41,6 +41,39 @@ function validDate(value) {
     : false;
 }
 
+export function countBodyLevelOneHeadings(body) {
+  const lines = String(body).split(/\r?\n/u);
+  let fence = null;
+  let markdownCount = 0;
+  const visibleLines = [];
+
+  for (const line of lines) {
+    const fenceMarker = line.match(/^ {0,3}(`{3,}|~{3,})/u)?.[1];
+    if (fenceMarker) {
+      if (!fence) fence = fenceMarker;
+      else if (fenceMarker[0] === fence[0] && fenceMarker.length >= fence.length) fence = null;
+      visibleLines.push('');
+      continue;
+    }
+    if (fence) {
+      visibleLines.push('');
+      continue;
+    }
+
+    if (/^ {0,3}#(?:\s+|$)/u.test(line)) markdownCount += 1;
+    visibleLines.push(line);
+  }
+
+  for (let index = 1; index < visibleLines.length; index += 1) {
+    if (/^ {0,3}=+\s*$/u.test(visibleLines[index]) && visibleLines[index - 1].trim()) {
+      markdownCount += 1;
+    }
+  }
+
+  const htmlCount = [...visibleLines.join('\n').matchAll(/<h1(?:\s[^>]*)?>/giu)].length;
+  return markdownCount + htmlCount;
+}
+
 export function auditDocuments(documents, options = {}) {
   const issues = [];
   const taxonomies = options.taxonomies ?? {
@@ -85,6 +118,16 @@ export function auditDocuments(documents, options = {}) {
       issues.push(issue('error', file, '缺少自动更新时间；请在后台重新保存一次'));
     if (blocking && PLACEHOLDER.test(`${data.title ?? ''}\n${data.description ?? ''}\n${body}`))
       issues.push(issue('error', file, '检测到测试或占位内容'));
+    const bodyH1Count = countBodyLevelOneHeadings(body);
+    if (bodyH1Count > 0) {
+      issues.push(
+        issue(
+          level,
+          file,
+          `正文包含 ${bodyH1Count} 个一级标题；页面标题由模板生成，正文请从二级标题开始`,
+        ),
+      );
+    }
 
     if (data.heroImage && !String(data.heroImageAlt ?? '').trim())
       issues.push(issue(level, file, '封面图缺少替代文本'));

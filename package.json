@@ -3,6 +3,7 @@
   "type": "module",
   "version": "1.0.0",
   "private": true,
+  "packageManager": "bun@1.3.10",
   "engines": {
     "node": "22.x"
   },
@@ -10,7 +11,11 @@
     "dev": "astro dev",
     "studio:auth": "bun scripts/studio-auth-service.ts",
     "fonts:ui": "bun scripts/fonts/subset-ui-font.ts",
-    "build": "node scripts/reset-astro-content-cache.mjs && bun run verify:content && bun run verify:keystatic && bun run fonts:ui && astro build && bun run localize:dist && bun run prune:dist && bun scripts/build-search.mjs && bun scripts/sync-vercel-output.mjs",
+    "build": "node scripts/write-build-marker.mjs && node scripts/reset-astro-content-cache.mjs && bun run verify:content && bun run verify:keystatic && bun run fonts:ui && astro build && bun run localize:dist && bun run prune:dist && bun scripts/build-search.mjs && bun scripts/sync-vercel-output.mjs",
+    "studio:worker": "bun scripts/local-deploy.ts",
+    "studio:scheduler": "bun scripts/local-scheduler.ts",
+    "studio:backup": "bun scripts/local-backup.ts",
+    "studio:backup:restore": "bun scripts/local-backup-restore.ts",
     "localize:dist": "node scripts/localize-build.mjs",
     "prune:dist": "node scripts/prune-build-assets.mjs",
     "verify:build": "node scripts/verify-build.mjs",
@@ -68,6 +73,7 @@
     "mdast-util-frontmatter": "^2.0.1",
     "mermaid": "11.16.1",
     "micromark-extension-frontmatter": "^2.0.0",
+    "minimatch": "^10.2.6",
     "pinyin-pro": "3.29.3",
     "react": "19.2.4",
     "react-dom": "19.2.4",
@@ -90,9 +96,10 @@
     "@typescript-eslint/eslint-plugin": "^8.65.0",
     "@typescript-eslint/parser": "^8.65.0",
     "@typescript/native": "npm:typescript@^7.0.2",
+    "eslint": "10.9.1",
     "happy-dom": "^20.11.6",
     "husky": "^9.1.7",
-    "js-yaml": "4.2.0",
+    "js-yaml": "4.3.1",
     "lint-staged": "^17.1.1",
     "mdast-util-from-markdown": "2.0.3",
     "pagefind": "^1.5.2",
@@ -104,6 +111,12 @@
     "*": "bun run format:check"
   },
   "overrides": {
-    "js-yaml": "4.2.0"
+    "dompurify": "3.4.13",
+    "js-yaml": "4.3.1",
+    "minimatch": "10.2.6",
+    "nanoid@3": "3.3.18",
+    "path-to-regexp": "6.3.0",
+    "postcss": "8.5.23",
+    "svgo": "4.0.2"
   }
 }

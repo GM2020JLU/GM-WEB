@@ -22,6 +22,7 @@ import {
   studioApiError,
   studioDeploymentMetadata,
   studioJson,
+  studioUsesLocalDeployment,
   verifyStudioOrigin,
 } from '../../../utils/studio-api';
 import {
@@ -120,6 +121,12 @@ export const POST: APIRoute = async ({ cookies, request, url }) => {
       });
     }
 
+    const shouldDeploy = studioBulkNeedsDeployment(
+      status,
+      planned.map((item) => item.currentStatus),
+    );
+    const deploymentReason = `Bulk ${payload.action}: ${planned.length} entries`;
+    let localDeploymentId: string | undefined;
     let writeFailure: unknown;
     for (const item of planned) {
       try {
@@ -130,8 +137,15 @@ export const POST: APIRoute = async ({ cookies, request, url }) => {
           expectedSha: item.sha,
           content: item.content,
           message: `Bulk ${payload.action} ${item.collection}: ${item.slug}`,
+          // Each local write gets its own durable intent. The worker may acquire
+          // the content lock between entries, so only a final-entry intent can
+          // guarantee eventual convergence after a partial first deployment.
+          deployment: studioUsesLocalDeployment
+            ? { deploy: shouldDeploy, reason: deploymentReason }
+            : undefined,
         });
         commitSha = written.commitSha ?? commitSha;
+        localDeploymentId = written.localDeploymentId ?? localDeploymentId;
         results.push({ collection: item.collection, slug: item.slug });
       } catch (error) {
         writeFailure = error;
@@ -140,11 +154,6 @@ export const POST: APIRoute = async ({ cookies, request, url }) => {
     }
 
     if (writeFailure && results.length === 0) return studioApiError(writeFailure);
-
-    const shouldDeploy = studioBulkNeedsDeployment(
-      status,
-      planned.slice(0, results.length).map((item) => item.currentStatus),
-    );
 
     let deployment: Awaited<ReturnType<typeof studioDeploymentMetadata>> = {
       commitSha,
@@ -158,7 +167,8 @@ export const POST: APIRoute = async ({ cookies, request, url }) => {
           token,
           commitSha,
           deploy: shouldDeploy,
-          reason: `Bulk ${payload.action}: ${results.length} entries`,
+          localDeploymentId,
+          reason: deploymentReason,
         });
       } catch {
         deploymentFailure = true;

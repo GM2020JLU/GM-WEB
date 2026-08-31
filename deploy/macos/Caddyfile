@@ -3,8 +3,32 @@
 	admin off
 }
 
+(security_headers) {
+	header {
+		-Server
+		?Strict-Transport-Security "max-age=63072000; includeSubDomains; preload"
+		?X-Content-Type-Options "nosniff"
+		?X-Frame-Options "SAMEORIGIN"
+		?Referrer-Policy "strict-origin-when-cross-origin"
+		?Permissions-Policy "camera=(), microphone=(), geolocation=()"
+	}
+}
+
+(access_log) {
+	log {
+		output file /Users/goumin/Library/Logs/goumin-work/access.json.log {
+			roll_size 10MiB
+			roll_keep 10
+			roll_keep_for 168h
+		}
+		format json
+	}
+}
+
 http://:8080 {
 	bind 127.0.0.1
+	import security_headers
+	import access_log
 	encode zstd gzip
 	root * /Users/goumin/Services/goumin-work/runtime/current
 
@@ -37,7 +61,15 @@ http://:8080 {
 
 http://:8081 {
 	bind 127.0.0.1
+	import security_headers
+	import access_log
+	# OAuth codes and session actions must never be persisted in access logs.
+	@credentialBearingAuth path /api/studio/auth/github/start /api/studio/auth/github/callback /api/studio/session /api/studio/session/logout
+	log_skip @credentialBearingAuth
 	encode zstd gzip
+	request_body {
+		max_size 6MB
+	}
 
 	# Authentication runs before every Astro/Vite request. Only the self-contained
 	# login surface reaches the auth service without a session; a failed or missing
@@ -63,7 +95,12 @@ http://:8081 {
 		reverse_proxy @localPassword 127.0.0.1:4322
 
 		@authSurface path /studio/login /api/studio/session/logout /api/studio/auth/github/start /api/studio/auth/github/callback /studio/login-assets/* /robots.txt
-		reverse_proxy @authSurface 127.0.0.1:4322
+		reverse_proxy @authSurface 127.0.0.1:4322 {
+			transport http {
+				dial_timeout 3s
+				response_header_timeout 30s
+			}
+		}
 
 		@keystatic path /keystatic /keystatic/* /api/keystatic /api/keystatic/*
 		header @keystatic {
@@ -100,6 +137,10 @@ http://:8081 {
 			# Let this edge define browser caching consistently instead of inheriting
 			# Astro/Vite's development-only no-cache header.
 			header_down -Cache-Control
+			transport http {
+				dial_timeout 3s
+				response_header_timeout 60s
+			}
 		}
 	}
 }

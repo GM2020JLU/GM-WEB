@@ -18,6 +18,17 @@ type BulkResult = {
   updatedItems?: Array<{ collection: string; slug: string }>;
 };
 
+type PlatformHealthStatus = 'error' | 'healthy' | 'unknown' | 'warning';
+type PlatformHealthItem = {
+  checkedAt?: string;
+  detail?: string;
+  status?: PlatformHealthStatus | string;
+  url?: string;
+};
+type PlatformHealth = Partial<
+  Record<'backup' | 'production' | 'scheduler' | 'worker', PlatformHealthItem>
+>;
+
 export interface StudioDashboardOptions {
   confirm?: (message: string) => boolean;
   fetch?: (input: RequestInfo | URL, init?: RequestInit) => Promise<Response>;
@@ -29,6 +40,12 @@ async function json(response: Response) {
   try {
     return (await response.json()) as BulkResult & {
       deployment?: StudioDeploymentState;
+      health?: PlatformHealth;
+      scheduler?: {
+        error?: string;
+        lastFinishedAt?: string;
+        phase?: string;
+      };
     };
   } catch {
     return { error: `服务器响应异常（HTTP ${response.status}）。` };
@@ -218,7 +235,134 @@ export function setupStudioDashboard(document: Document, options: StudioDashboar
   const deploymentTrack = document.querySelector<HTMLElement>('[data-deployment-track]');
   const deploymentProgress = document.querySelector<HTMLElement>('[data-deployment-progress]');
   const deploymentLink = document.querySelector<HTMLAnchorElement>('[data-deployment-link]');
+  const platformHealth = document.querySelector<HTMLElement>('[data-platform-health]');
   let consecutivePollFailures = 0;
+
+  const normalizeHealthStatus = (value: unknown): PlatformHealthStatus =>
+    value === 'healthy' || value === 'warning' || value === 'error' ? value : 'unknown';
+
+  const healthFromResult = (result: Awaited<ReturnType<typeof json>>): PlatformHealth => {
+    const health: PlatformHealth = { ...result.health };
+    if (!health.production && result.deployment) {
+      health.production = {
+        status:
+          result.deployment.phase === 'ready'
+            ? 'healthy'
+            : result.deployment.phase === 'error'
+              ? 'error'
+              : 'warning',
+        checkedAt: result.deployment.updatedAt,
+        detail:
+          result.deployment.phase === 'ready'
+            ? '生产版本标记已确认。'
+            : deploymentCopy(result.deployment).detail,
+        url: result.deployment.logUrl,
+      };
+    }
+    if (!health.scheduler && result.scheduler) {
+      health.scheduler = {
+        status: result.scheduler.error
+          ? 'error'
+          : result.scheduler.phase === 'running'
+            ? 'warning'
+            : 'healthy',
+        checkedAt: result.scheduler.lastFinishedAt,
+        detail: result.scheduler.error || '定时发布轮询正常。',
+      };
+    }
+    return health;
+  };
+
+  const renderPlatformHealth = (
+    result: Awaited<ReturnType<typeof json>>,
+    updateSummary: boolean,
+  ) => {
+    const health = healthFromResult(result);
+    const keys = ['production', 'worker', 'scheduler', 'backup'] as const;
+    const statuses: PlatformHealthStatus[] = [];
+    let latestCheckedAt = 0;
+    for (const key of keys) {
+      const value = health[key] ?? {};
+      const status = normalizeHealthStatus(value.status);
+      statuses.push(status);
+      const item = platformHealth?.querySelector<HTMLElement>(
+        `[data-platform-health-item="${key}"]`,
+      );
+      if (!item) continue;
+      item.dataset.status = status;
+      const detail = item.querySelector<HTMLElement>('[data-health-detail]');
+      const time = item.querySelector<HTMLTimeElement>('[data-health-time]');
+      const link = item.querySelector<HTMLAnchorElement>('[data-health-link]');
+      const defaultDetail =
+        status === 'healthy'
+          ? '运行正常。'
+          : status === 'warning'
+            ? '需要关注。'
+            : status === 'error'
+              ? '检查发现异常。'
+              : '尚未返回健康信息。';
+      if (detail) detail.textContent = value.detail || defaultDetail;
+      const checkedAt = value.checkedAt ? new Date(value.checkedAt) : undefined;
+      if (time) {
+        if (checkedAt && !Number.isNaN(checkedAt.valueOf())) {
+          time.dateTime = checkedAt.toISOString();
+          time.textContent = `最近检查 ${checkedAt.toLocaleString('zh-CN')}`;
+          latestCheckedAt = Math.max(latestCheckedAt, checkedAt.valueOf());
+        } else {
+          time.removeAttribute('datetime');
+          time.textContent = '暂无检查时间';
+        }
+      }
+      if (link) {
+        link.hidden = !value.url;
+        if (value.url) link.href = value.url;
+      }
+    }
+    platformHealth?.setAttribute('aria-busy', 'false');
+    if (!updateSummary) return;
+    const hasError = statuses.includes('error');
+    const hasWarning = statuses.includes('warning');
+    const hasUnknown = statuses.includes('unknown');
+    if (deployment) {
+      deployment.dataset.phase = hasError
+        ? 'error'
+        : hasWarning || hasUnknown
+          ? 'submitted'
+          : 'ready';
+    }
+    if (deploymentTitle) {
+      deploymentTitle.textContent = hasError
+        ? '运行状态需要处理'
+        : hasWarning
+          ? '部分发布服务需要关注'
+          : hasUnknown
+            ? '运行状态尚未完全确认'
+            : '网站与发布服务正常';
+    }
+    if (deploymentDetail) {
+      deploymentDetail.textContent = latestCheckedAt
+        ? `最近检查 ${new Date(latestCheckedAt).toLocaleString('zh-CN')}`
+        : '生产站点、Worker、定时发布与离机备份已请求检查。';
+    }
+    if (deploymentTrack) deploymentTrack.hidden = true;
+  };
+
+  const loadPlatformHealth = async (updateSummary: boolean) => {
+    try {
+      const response = await request('/api/studio/deployment');
+      const result = await json(response);
+      if (!response.ok) throw new Error(result.error || '无法读取运行状态。');
+      renderPlatformHealth(result, updateSummary);
+    } catch (error) {
+      platformHealth?.setAttribute('aria-busy', 'false');
+      if (!updateSummary) return;
+      if (deployment) deployment.dataset.phase = 'error';
+      if (deploymentTitle) deploymentTitle.textContent = '暂时无法读取运行状态';
+      if (deploymentDetail) {
+        deploymentDetail.textContent = error instanceof Error ? error.message : '请稍后刷新重试。';
+      }
+    }
+  };
 
   const pollDeployment = async (pending: PendingStudioDeployment) => {
     if (!deployment) return;
@@ -231,6 +375,9 @@ export function setupStudioDashboard(document: Document, options: StudioDashboar
       const result = await json(response);
       if (!response.ok || !result.deployment) throw new Error(result.error || '无法读取部署状态。');
       consecutivePollFailures = 0;
+      // Task polling intentionally omits the slower full health probe. Preserve
+      // the independently loaded worker/scheduler/backup cards in that case.
+      if (result.health) renderPlatformHealth(result, false);
       const copy = deploymentCopy(result.deployment);
       deployment.dataset.phase = result.deployment.phase;
       if (deploymentTitle) deploymentTitle.textContent = copy.title;
@@ -270,5 +417,6 @@ export function setupStudioDashboard(document: Document, options: StudioDashboar
 
   applyFilters();
   const pending = readPendingDeployment(storage);
+  void loadPlatformHealth(!pending);
   if (pending) void pollDeployment(pending);
 }

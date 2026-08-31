@@ -1,4 +1,4 @@
-<main class="flow-shell" data-pagefind-body>
+<main id="main-content" class="flow-shell" tabindex="-1" data-pagefind-body>
   <section class="flow-grid" aria-label="Gou Min 的个人站">
     <section class="flow-column main-column">
       <slot name="intro" />
@@ -88,42 +88,13 @@
     }
 
     .flow-grid {
-      display: flex;
-      flex-direction: column;
+      grid-template-columns: 1fr;
       gap: 24px;
     }
 
-    .main-column,
-    .side-column {
-      display: contents;
-    }
-
     .flow-grid :global(.intro-card) {
-      order: 5;
       min-height: auto;
       padding: 0;
-    }
-
-    .flow-grid :global(.profile-card) {
-      order: 1;
-    }
-
-    .flow-grid :global(.nav-card) {
-      order: 3;
-    }
-
-    .flow-grid :global(.connect-card) {
-      order: 2;
-      margin-block: -18px -10px;
-    }
-
-    .flow-grid :global(.heatmap-card) {
-      order: 4;
-      margin-top: -8px;
-    }
-
-    .flow-grid :global(.doing-card) {
-      order: 6;
     }
   }
 </style>

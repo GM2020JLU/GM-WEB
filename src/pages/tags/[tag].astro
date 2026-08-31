@@ -63,7 +63,7 @@ const ui = getUiText(siteConfig);
   </head>
   <body>
     <BlogTopNav />
-    <main data-pagefind-body>
+    <main id="main-content" tabindex="-1" data-pagefind-body>
       <BackLink href="/blog/" label={ui.groups.back} />
       <BlogArchive
         page={page}

@@ -1,5 +1,10 @@
 import { describe, expect, test } from 'bun:test';
-import { auditDocuments, parseDocument, publicationStatus } from '../scripts/lib/content-audit.mjs';
+import {
+  auditDocuments,
+  countBodyLevelOneHeadings,
+  parseDocument,
+  publicationStatus,
+} from '../scripts/lib/content-audit.mjs';
 import {
   countWords,
   estimateReadingMinutes,
@@ -49,6 +54,28 @@ describe('内容审计', () => {
     const issues = auditDocuments([document], { taxonomies });
     expect(issues.some((item) => item.level === 'error')).toBe(false);
     expect(issues.some((item) => item.level === 'warning')).toBe(true);
+  });
+
+  test('已发布正文不允许重复一级标题', () => {
+    const source = `---\ntitle: 正文\ndescription: 摘要\ndate: 2026-08-25T12:00:00+08:00\nupdatedDate: 2026-08-25T12:00:00+08:00\npublicationStatus: published\n---\n# 正文\n\n## 章节`;
+    const document = {
+      ...parseDocument(source, '/repo/src/content/blog/published.md'),
+      collection: 'blog',
+    };
+    const issues = auditDocuments([document], { taxonomies });
+
+    expect(issues).toContainEqual(
+      expect.objectContaining({
+        level: 'error',
+        message: expect.stringContaining('正文请从二级标题开始'),
+      }),
+    );
+  });
+
+  test('一级标题检查忽略代码块中的 shell 注释', () => {
+    expect(countBodyLevelOneHeadings('```sh\n# 这是注释\n```\n\n## 章节')).toBe(0);
+    expect(countBodyLevelOneHeadings('标题\n===')).toBe(1);
+    expect(countBodyLevelOneHeadings('<h1>标题</h1>')).toBe(1);
   });
 });
 

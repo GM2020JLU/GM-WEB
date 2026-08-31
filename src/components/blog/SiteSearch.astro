@@ -46,7 +46,14 @@ const vibeRoute = getPageModuleRoute(navfolioConfig, 'vibe');
     <Search size={17} stroke-width={2} />
   </button>
 
-  <div class="site-search-layer" data-site-search-layer data-site-search-backdrop>
+  <div
+    class="site-search-layer"
+    data-site-search-layer
+    data-site-search-backdrop
+    aria-hidden="true"
+    hidden
+    inert
+  >
     <section
       class="site-search-dialog"
       id="site-search-dialog"
@@ -75,6 +82,7 @@ const vibeRoute = getPageModuleRoute(navfolioConfig, 'vibe');
         <Search size={16} stroke-width={2} aria-hidden="true" />
         <input
           type="search"
+          aria-label={ui.search.trigger}
           placeholder={search.placeholder}
           autocomplete="off"
           spellcheck="false"
@@ -82,7 +90,15 @@ const vibeRoute = getPageModuleRoute(navfolioConfig, 'vibe');
         />
       </label>
 
-      <p class="site-search-status" data-site-search-status>{ui.search.idle}</p>
+      <p
+        class="site-search-status"
+        role="status"
+        aria-live="polite"
+        aria-atomic="true"
+        data-site-search-status
+      >
+        {ui.search.idle}
+      </p>
       <ol class="site-search-results" data-site-search-results></ol>
     </section>
   </div>
@@ -133,6 +149,10 @@ const vibeRoute = getPageModuleRoute(navfolioConfig, 'vibe');
     opacity: 0;
     pointer-events: none;
     transition: opacity 160ms ease;
+  }
+
+  .site-search-layer[hidden] {
+    display: none;
   }
 
   :root[data-theme='dark'] .site-search-layer {
@@ -328,6 +348,11 @@ const vibeRoute = getPageModuleRoute(navfolioConfig, 'vibe');
   }
 
   @media (prefers-reduced-motion: reduce) {
+    .site-search-layer,
+    .site-search-dialog {
+      transition: none;
+    }
+
     .site-search-results :global(a) {
       transition: none;
     }

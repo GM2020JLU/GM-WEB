@@ -15,6 +15,7 @@ import {
   studioApiError,
   studioDeploymentMetadata,
   studioJson,
+  studioUsesLocalDeployment,
   verifyStudioOrigin,
 } from '../../../../../utils/studio-api';
 import {
@@ -35,10 +36,19 @@ function pathFromParams(params: Record<string, string | undefined>) {
   return { collection, path: studioContentPath(collection, slug), slug };
 }
 
-export const GET: APIRoute = async ({ params, cookies }) => {
+export const GET: APIRoute = async ({ params, cookies, url }) => {
   try {
     const token = requireStudioToken(cookies);
-    return studioJson({ history: await listStudioHistory(pathFromParams(params).path, token) });
+    const route = pathFromParams(params);
+    const ref = url.searchParams.get('ref');
+    if (ref) {
+      if (!/^[a-f0-9]{7,40}$/i.test(ref)) {
+        return studioJson({ error: '历史版本标识不合法。' }, 400);
+      }
+      const source = await readStudioFileAtRef(route.path, ref, token);
+      return studioJson({ document: parseStudioDocument(route.collection, route.slug, source) });
+    }
+    return studioJson({ history: await listStudioHistory(route.path, token) });
   } catch (error) {
     return studioApiError(error);
   }
@@ -94,6 +104,11 @@ export const POST: APIRoute = async ({ params, cookies, request, url }) => {
       historicalDocument.body,
       restoredStatus,
     );
+    const deploymentRequired =
+      isTaxonomyCollection(collection) ||
+      currentStatus === 'published' ||
+      restoredStatus === 'published';
+    const deploymentReason = `Restore ${collection}: ${slug}`;
     const written = await writeStudioFile({
       beforeWrite: validateReferences,
       token,
@@ -101,15 +116,16 @@ export const POST: APIRoute = async ({ params, cookies, request, url }) => {
       expectedSha: body.expectedSha,
       content: restoredContent,
       message: `Restore ${path} from ${body.ref.slice(0, 7)}`,
+      deployment: studioUsesLocalDeployment
+        ? { deploy: deploymentRequired, reason: deploymentReason }
+        : undefined,
     });
     const deployment = await studioDeploymentMetadata({
       token,
       commitSha: written.commitSha,
-      deploy:
-        isTaxonomyCollection(collection) ||
-        currentStatus === 'published' ||
-        restoredStatus === 'published',
-      reason: `Restore ${collection}: ${slug}`,
+      deploy: deploymentRequired,
+      localDeploymentId: written.localDeploymentId,
+      reason: deploymentReason,
     });
     return studioJson({
       ok: true,

@@ -557,8 +557,11 @@ describe('Studio 平台健康状态', () => {
 describe('Caddy 边缘安全配置', () => {
   test('不覆盖鉴权服务的更严响应头，且跳过 OAuth 凭据日志', async () => {
     const source = await readFile(join(process.cwd(), 'deploy/macos/Caddyfile'), 'utf8');
-    expect(source).toContain('?X-Frame-Options "SAMEORIGIN"');
-    expect(source).toContain('?Referrer-Policy "strict-origin-when-cross-origin"');
+    expect(source).toContain('header ?Strict-Transport-Security');
+    expect(source).toContain('header ?X-Content-Type-Options');
+    expect(source).toContain('header ?X-Frame-Options "SAMEORIGIN"');
+    expect(source).toContain('header ?Referrer-Policy "strict-origin-when-cross-origin"');
+    expect(source).toContain('header ?Permissions-Policy');
     expect(source).toContain('log_skip @credentialBearingAuth');
     expect(source).toContain('/api/studio/auth/github/callback');
   });

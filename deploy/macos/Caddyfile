@@ -4,14 +4,15 @@
 }
 
 (security_headers) {
-	header {
-		-Server
-		?Strict-Transport-Security "max-age=63072000; includeSubDomains; preload"
-		?X-Content-Type-Options "nosniff"
-		?X-Frame-Options "SAMEORIGIN"
-		?Referrer-Policy "strict-origin-when-cross-origin"
-		?Permissions-Policy "camera=(), microphone=(), geolocation=()"
-	}
+	# Keep every default in its own handler. Caddy combines defaults from one
+	# block into a single response matcher, so one upstream-provided header would
+	# otherwise prevent a different missing header (notably HSTS) from being set.
+	header -Server
+	header ?Strict-Transport-Security "max-age=63072000; includeSubDomains; preload"
+	header ?X-Content-Type-Options "nosniff"
+	header ?X-Frame-Options "SAMEORIGIN"
+	header ?Referrer-Policy "strict-origin-when-cross-origin"
+	header ?Permissions-Policy "camera=(), microphone=(), geolocation=()"
 }
 
 (access_log) {

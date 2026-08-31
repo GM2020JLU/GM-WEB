@@ -1,4 +1,5 @@
 import { afterEach, describe, expect, test } from 'bun:test';
+import { createHash } from 'node:crypto';
 import { existsSync } from 'node:fs';
 import { mkdir, mkdtemp, readFile, readdir, rm, stat, writeFile } from 'node:fs/promises';
 import { hostname, tmpdir } from 'node:os';
@@ -225,6 +226,40 @@ describe('Studio 发布队列与生产标记', () => {
 });
 
 describe('Studio 离机备份', () => {
+  test('迁移早期缺少 encoding 的 UTF-8 历史记录且仍校验原始摘要', async () => {
+    const root = await temporaryRoot('studio-offsite-legacy-');
+    const runtime = join(root, 'runtime');
+    const source = join(runtime, 'backups');
+    const destination = join(root, 'icloud-drive');
+    await mkdir(source, { recursive: true });
+    const legacy = {
+      content: '早期草稿',
+      date: '2026-08-27T01:00:00.000Z',
+      message: '旧版保存',
+      path: 'src/content/blog/legacy.md',
+      sha: '',
+    };
+    legacy.sha = createHash('sha1')
+      .update(`${legacy.path}\0${legacy.date}\0${legacy.content}`)
+      .digest('hex');
+    await writeFile(join(source, `${legacy.sha}.json`), JSON.stringify(legacy));
+
+    expect(
+      await syncStudioOffsiteBackups({
+        destination,
+        repositoryRoot: root,
+        runtimeDirectory: runtime,
+      }),
+    ).toMatchObject({ copied: 1, retained: 1 });
+    expect(await restoreStudioOffsiteBackup(destination, join(root, 'restore'))).toEqual({
+      restored: 1,
+      tombstones: 0,
+    });
+    expect(await readFile(join(root, 'restore/src/content/blog/legacy.md'), 'utf8')).toBe(
+      legacy.content,
+    );
+  });
+
   test('首次草稿备份原子复制到独立目录并记录成功时间', async () => {
     const root = await temporaryRoot('studio-offsite-');
     const runtime = join(root, 'runtime');

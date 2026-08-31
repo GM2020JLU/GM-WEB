@@ -38,12 +38,19 @@ export function createStudioBackupRecord(
   return { ...value, sha: digest(canonicalPayload(value)) };
 }
 
-function legacyHashes(record: StudioBackupRecord) {
+function legacyHashes(record: StudioBackupRecord, withoutEncoding = false) {
   if (record.deleted) return [digest(`offsite-delete\0${record.path}\0${record.date}`)];
-  return [
+  const hashes = [
     digest(`${record.path}\0${record.date}\0${record.encoding}\0${record.content}`),
     digest(`offsite\0${record.path}\0${record.date}\0${record.encoding}\0${record.content}`),
   ];
+  // Studio versions before binary asset history existed omitted `encoding`
+  // and hashed the UTF-8 payload without that field. Keep those already-created
+  // records recoverable, while still verifying their original digest exactly.
+  if (withoutEncoding) {
+    hashes.push(digest(`${record.path}\0${record.date}\0${record.content}`));
+  }
+  return hashes;
 }
 
 function validBase64(value: string) {
@@ -55,7 +62,15 @@ function validBase64(value: string) {
 
 export function validateStudioBackupRecord(value: unknown, filename?: string) {
   if (!value || typeof value !== 'object') throw new Error('备份记录不是 JSON 对象。');
-  const record = value as StudioBackupRecord;
+  const rawRecord = value as Partial<StudioBackupRecord>;
+  const legacyWithoutEncoding =
+    rawRecord.encoding === undefined &&
+    rawRecord.version === undefined &&
+    rawRecord.kind === undefined &&
+    rawRecord.deleted === undefined;
+  const record = (
+    legacyWithoutEncoding ? { ...rawRecord, encoding: 'utf8' as const } : rawRecord
+  ) as StudioBackupRecord;
   if (
     typeof record.content !== 'string' ||
     typeof record.date !== 'string' ||
@@ -86,7 +101,7 @@ export function validateStudioBackupRecord(value: unknown, filename?: string) {
     }
     expected = [digest(canonicalPayload(record))];
   } else {
-    expected = legacyHashes(record);
+    expected = legacyHashes(record, legacyWithoutEncoding);
   }
   if (!expected.includes(record.sha)) throw new Error(`备份内容校验失败：${record.sha}`);
   return record;

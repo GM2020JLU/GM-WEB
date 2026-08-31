@@ -306,6 +306,14 @@ describe('Studio 离机备份', () => {
       lastSuccessAt: '2026-08-31T08:01:00.000Z',
       retained: 2,
     });
+    expect(
+      await syncStudioOffsiteBackups({
+        destination,
+        now: new Date('2026-08-31T08:02:00.000Z'),
+        repositoryRoot: root,
+        runtimeDirectory: runtime,
+      }),
+    ).toMatchObject({ copied: 0, retained: 2 });
   });
 
   test('恢复只写入空目录并按最新删除标记跳过旧文件', async () => {

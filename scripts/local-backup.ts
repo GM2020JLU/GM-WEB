@@ -36,6 +36,17 @@ async function writeJsonAtomically(path: string, value: unknown) {
   await rename(temporary, path);
 }
 
+async function ensurePrivateDirectory(directory: string) {
+  await mkdir(directory, { recursive: true, mode: 0o700 });
+  const info = await lstat(directory);
+  if (!info.isDirectory() || info.isSymbolicLink()) {
+    throw new Error(`备份目录不是安全的真实目录：${directory}`);
+  }
+  // macOS File Provider can block indefinitely when chmod is repeated on an
+  // already-correct iCloud directory. Verify first and mutate only when needed.
+  if ((info.mode & 0o777) !== 0o700) await chmod(directory, 0o700);
+}
+
 async function writeBackupFailureState(error: unknown, repositoryRoot = process.cwd()) {
   const runtime = resolve(repositoryRoot, process.env.STUDIO_RUNTIME_DIR || '.studio/runtime');
   await mkdir(runtime, { recursive: true, mode: 0o700 });
@@ -83,10 +94,8 @@ export async function syncStudioOffsiteBackups(
     timeoutMs: 5_000,
   });
   try {
-    await mkdir(runtime, { recursive: true, mode: 0o700 });
-    await chmod(runtime, 0o700);
-    await mkdir(destination, { recursive: true, mode: 0o700 });
-    await chmod(destination, 0o700);
+    await ensurePrivateDirectory(runtime);
+    await ensurePrivateDirectory(destination);
     let copied = 0;
     for (const source of sources.filter((directory) => existsSync(directory))) {
       const entries = (await readdir(source, { withFileTypes: true })).filter(
@@ -218,4 +227,8 @@ if (import.meta.main) {
   }
 }
 
-export const localBackupInternals = { assertSeparateDestination, writeBackupFailureState };
+export const localBackupInternals = {
+  assertSeparateDestination,
+  ensurePrivateDirectory,
+  writeBackupFailureState,
+};
